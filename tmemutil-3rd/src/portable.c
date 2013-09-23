@@ -18,6 +18,8 @@
 #  pragma comment(lib, "gdi32.lib")
 #endif
 
+void * A_memset (void * dest, int c, size_t count);            // Set count bytes in dest to (char)c
+
 HMODULE	dll_module				= NULL;             /* dll module entry point */
 List    ttf_list 				= NULL;             /* fonts list */
 static  WCHAR  appdata_path[VALUE_LEN+1];			/* 自定义的appdata变量路径  */
@@ -84,7 +86,7 @@ uint32_t GetNonTemporalDataSizeMin_tt( void )
 TETE_EXT_CLASS 
 void * __cdecl memset_nontemporal_tt ( void *dest, int c, size_t count )
 {
-	return memset(dest, c, count);
+	return A_memset(dest, c, count);
 }
 
 TETE_EXT_CLASS
