@@ -21,7 +21,6 @@
 void * A_memset (void * dest, int c, size_t count);            // Set count bytes in dest to (char)c
 
 HMODULE	dll_module				= NULL;             /* dll module entry point */
-List    ttf_list 				= NULL;             /* fonts list */
 static  WCHAR  appdata_path[VALUE_LEN+1];			/* 自定义的appdata变量路径  */
 static  WCHAR  localdata_path[VALUE_LEN+1];
 
@@ -93,103 +92,6 @@ TETE_EXT_CLASS
 intptr_t GetAppDirHash_tt( void )
 {
 	return 0;
-}
-
-void find_fonts_tolist(LPCWSTR parent)
-{
-    HANDLE h_file = NULL;
-    WIN32_FIND_DATAW fd;
-    WCHAR filepathname[VALUE_LEN+1] = {0};
-    WCHAR sub[VALUE_LEN+1] = {0};
-    if( parent[wcslen(parent) -1] != L'\\' )
-        _snwprintf(filepathname,VALUE_LEN, L"%ls\\*.*", parent);
-    else
-        _snwprintf(filepathname,VALUE_LEN, L"%ls*.*", parent);
-    h_file = FindFirstFileW(filepathname, &fd);
-    if(h_file != INVALID_HANDLE_VALUE)
-    {
-        do
-        {
-			if(	wcscmp(fd.cFileName, L".") == 0 ||
-				wcscmp(fd.cFileName, L"..")== 0 )
-				continue;
-            if(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-            {
-                int m = _snwprintf(sub,VALUE_LEN, L"%ls\\%ls",parent, fd.cFileName);
-				sub[m] = L'\0';
-                find_fonts_tolist(sub);
-            }
-            else if( PathMatchSpecW(fd.cFileName, L"*.ttf") ||
-				     PathMatchSpecW(fd.cFileName, L"*.ttc") ||
-				     PathMatchSpecW(fd.cFileName, L"*.otf") )
-            {
-                WCHAR font_path[VALUE_LEN+1] = {0};
-                _snwprintf(font_path, VALUE_LEN, L"%s\\%s", parent, fd.cFileName);
-				if (ttf_list)
-				{
-					add_node(font_path, ttf_list);
-				}
-            }
-        } while(FindNextFileW(h_file, &fd) != 0 || GetLastError() != ERROR_NO_MORE_FILES);
-        FindClose(h_file); h_file = NULL;
-    }
-	return;
-}
-
-void add_fonts_toapp(List *Li_header)
-{
-	PtrToNode *curr;
-	for (curr = Li_header; *curr; )
-	{
-		Position ttf_element = *curr;
-		DWORD	 numFonts = 0;
-		if ( AddFontResourceExW(ttf_element->Element,FR_PRIVATE,&numFonts) )
-		{
-		#ifdef _DEBUG
-			logmsg("AddFontResourceW ok\n");
-		#endif
-		}
-		*curr = ttf_element->Next; 
-	}
-}
-
-unsigned WINAPI install_fonts(void * pParam)
-{
-	WCHAR fonts_path[VALUE_LEN+1];
-	if ( read_appkey(L"Env",L"DiyFontPath",fonts_path,sizeof(fonts_path)) )
-	{
-		PathToCombineW(fonts_path,VALUE_LEN);
-		if ( PathFileExistsW(fonts_path) )
-		{
-			/* 初始化字体存储链表 */
-			struct	Node fonts_header;
-			ttf_list = init_listing( &fonts_header );
-			if (ttf_list)
-			{
-				find_fonts_tolist(fonts_path);
-				add_fonts_toapp(&ttf_list);
-			}
-		}
-	}
-	return (1);
-}
-
-void WINAPI uninstall_fonts(List *PtrLi)
-{
-	PtrToNode *curr;
-	for (curr = PtrLi; *curr; )
-	{
-		Position pfonts = *curr; 
-		if ( wcslen(pfonts->Element)>0 )
-		{
-			RemoveFontResourceExW(pfonts->Element,FR_PRIVATE,NULL);
-		}
-        *curr = pfonts->Next; 
-        if (pfonts)
-        {
-			SYS_FREE(pfonts);
-        }
-	}
 }
 
 BOOL WINAPI WaitWriteFile(LPCWSTR ap_path)
@@ -422,8 +324,7 @@ unsigned WINAPI SetPluginPath(void * pParam)
 							}
 						}
 					}
-					else if	(stristrW(strKey, L"TmpDataPath") ||
-							 stristrW(strKey, L"DiyFontPath") )
+					else if	(stristrW(strKey, L"TmpDataPath"))
 					{
 						;
 					}
@@ -485,10 +386,6 @@ void WINAPI hook_end(void)
 	}
 	jmp_end();
 	safe_end();
-	if (ttf_list)
-	{
-		uninstall_fonts(&ttf_list);
-	}
 	return;
 }
 
@@ -543,7 +440,6 @@ BOOL WINAPI DllMain(HINSTANCE hModule, DWORD dwReason, LPVOID lpvReserved)
 					CloseHandle((HANDLE)_beginthreadex(NULL,0,&GdiSetLimit_tt,hc,0,NULL));
 				}
 			}
-			CloseHandle((HANDLE)_beginthreadex(NULL,0,&install_fonts,NULL,0,NULL));
 			if ( read_appint(L"General",L"ProcessAffinityMask") > 0 )
 			{
 				hc = OpenThread(THREAD_ALL_ACCESS, 0, GetCurrentThreadId());

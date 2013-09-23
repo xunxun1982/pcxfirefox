@@ -68,7 +68,7 @@ $(OUT1)		      : $(SUB_DIR)/Makefile
 	$(call SUBMK)
 $(OUT2)		      : $(OBJECTS)
 	$(LD) $@ $(OBJECTS) $(DLLFLAGS) $(OUT1) $(LDFLAGS) $(LDLIBS)
-$(DEP)/portable.o     : $(SRC)/portable.c $(SRC)/portable.h $(SRC)/ttf_list.h
+$(DEP)/portable.o     : $(SRC)/portable.c $(SRC)/portable.h 
 	$(call EXEC)
 	$(CC) $< $(CFLAGS) -o $@
 $(DEP)/inipara.o      : $(SRC)/inipara.c $(SRC)/inipara.h

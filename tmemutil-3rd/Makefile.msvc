@@ -53,7 +53,7 @@ $(OUT1)			: $(SUB_DIR)/Makefile.msvc
 	$(SUBMK)
 $(OUT2)			: $(OBJDLL)
 	$(LD) /OUT:"$@" $(OBJDLL) $(LDFLAGS) $(OUT1) 
-$(DEP)\portable.obj     : $(SRC)\portable.c $(SRC)\portable.h $(SRC)\ttf_list.h
+$(DEP)\portable.obj     : $(SRC)\portable.c $(SRC)\portable.h 
 	$(EXEC)
 	$(CC) $(CFLAGS) /c $(SRC)\portable.c /Fo$@
 $(DEP)\inipara.obj      : $(SRC)\inipara.c $(SRC)\inipara.h
