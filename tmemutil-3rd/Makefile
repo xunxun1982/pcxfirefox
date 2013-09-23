@@ -41,10 +41,10 @@ OBJECTS  = $(DEP)/portable.o $(DEP)/inipara.o $(DEP)/ice_error.o \
 	   $(DEP)/safe_ex.o $(DEP)/bosskey.o $(DEP)/resource.o
 DISTDIR  = Release
 OUT1     = $(DISTDIR)/libmhook$(BITS).a
-OUT2     = $(DISTDIR)/portable$(BITS).dll
+OUT2     = $(DISTDIR)/tmemutil$(BITS).dll
 RC       = windres
 RCFLAGS  = -l "LANGUAGE 4,2" -J rc -O coff
-DLLFLAGS += -shared -Wl,--out-implib,$(DISTDIR)/portable$(BITS).lib --entry=$(DLL_MAIN_STDCALL_NAME)
+DLLFLAGS += -shared -Wl,--out-implib,$(DISTDIR)/tmemutil$(BITS).lib --entry=$(DLL_MAIN_STDCALL_NAME)
 MKDLL	 += $(LD) $(DLLFLAGS) -shared -L$(DISTDIR) -lmhook
 
 EXEC     = \

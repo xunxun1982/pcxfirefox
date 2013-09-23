@@ -44,7 +44,7 @@ LONG WINAPI ProcessException_ice(PEXCEPTION_POINTERS pExceptionInfo)
 	{
 		return EXCEPTION_CONTINUE_SEARCH;
 	}
-    PathAppendW(appdir,L"Iceweasel.dmp");
+    PathAppendW(appdir,L"pcxfirefox.dmp");
     //创建文件句柄
     hFile = CreateFileW(appdir,
         GENERIC_WRITE,
@@ -65,6 +65,7 @@ LONG WINAPI ProcessException_ice(PEXCEPTION_POINTERS pExceptionInfo)
 	}
 	if (INVALID_HANDLE_VALUE == hFile)
 		return EXCEPTION_CONTINUE_SEARCH;
+    MINIDUMP_EXCEPTION_INFORMATION  ExInfo;
     ExInfo.ThreadId = GetCurrentThreadId();
     ExInfo.ExceptionPointers = pExceptionInfo;
     ExInfo.ClientPointers = TRUE;

@@ -2,7 +2,7 @@
 
 CC       = cl.exe
 CPP	 = cl.exe
-CFLAGS   = /EHs-c- /nologo /W3 /WX- /wd4819 /O2 /GR- /Gd /GL /MD /fp:precise /D "NDEBUG" /D "_UNICODE" /D "UNICODE" \
+CFLAGS   = /EHs-c- /nologo /W3 /WX- /wd4819 /O2 /Ot /Oi /Ob2 /Oy /GT /Gy /GF /GS- /GR- /Gd /GL /MD /D "NDEBUG" /D "_UNICODE" /D "UNICODE" \
                   /D "_CRT_SECURE_NO_WARNINGS" /D "_USRDLL" /D "LIBPORTABLE_EXPORTS"
 LD       = link.exe /DLL
 MAKE	 = nmake
@@ -10,14 +10,14 @@ MAKE	 = nmake
 !if "$(PLATFORM)"=="X64"
 PLATFORM = X64
 BITS	 = 64
-CFLAGS = $(CFLAGS) /D "WIN64" /D "_WIN64"
+CFLAGS = $(CFLAGS) /D "WIN64" /D "_WIN64" /favor:blend /fp:fast
 !else
 PLATFORM = X86
 BITS	 = 32
-CFLAGS = $(CFLAGS) /D "WIN32" /D "_WIN32" /arch:SSE2
+CFLAGS = $(CFLAGS) /D "WIN32" /D "_WIN32" /arch:SSE2 /fp:fast
 !endif
 
-LDFLAGS   =  /NOLOGO /LTCG /opt:ref /opt:icf /MACHINE:$(PLATFORM)
+LDFLAGS   =  /NOLOGO /LTCG /opt:ref /opt:icf /MACHINE:$(PLATFORM) /LARGEADDRESSAWARE
 LIBFLAGS   =  /LTCG /NOLOGO /OUT:"$(DISTDIR)\$(OUT)" 
 
 CPPFLAGS = $(CFLAGS) /TP
@@ -40,7 +40,7 @@ OBJDLL  = $(DEP)\portable.obj $(DEP)\inipara.obj $(DEP)\ice_error.obj  $(DEP)\sa
 
 DISTDIR	= Release
 OUT1	= $(DISTDIR)\mhook$(BITS).lib
-OUT2	= $(DISTDIR)\portable$(BITS).dll
+OUT2	= $(DISTDIR)\tmemutil$(BITS).dll
 EXEC		= \
 	@echo coming to src subdir...  && \
 	@if not exist $(DISTDIR) $(MD) $(DISTDIR) 2>NUL 1>NUL && \
@@ -59,7 +59,7 @@ $(DEP)\inipara.obj      : $(SRC)\inipara.c $(SRC)\inipara.h
 $(DEP)\safe_ex.obj      : $(SRC)\safe_ex.c $(SRC)\safe_ex.h $(SRC)\header.h
 	$(CC) $(CFLAGS) /c $(SRC)\safe_ex.c /Fo$@
 $(DEP)\ice_error.obj    : $(SRC)\ice_error.c $(SRC)\ice_error.h
-	$(CC) $(CFLAGS) /c $(SRC)\ice_error.c /Fo$@
+	$(CC) $(CFLAGS) /TP /c $(SRC)\ice_error.c /Fo$@
 $(DEP)\bosskey.obj    : $(SRC)\bosskey.c $(SRC)\bosskey.h
 	$(CC) $(CFLAGS) /c $(SRC)\bosskey.c /Fo$@
 $(DEP)\resource.res     : $(SRC)\resource.rc

@@ -6,21 +6,21 @@
 // Version
 
 1 VERSIONINFO
-FILEVERSION     1,0,3,240
-PRODUCTVERSION  1,0,3,240
+FILEVERSION     0,0,1,0
+PRODUCTVERSION  0,0,1,0
 BEGIN
   BLOCK "StringFileInfo"
   BEGIN
     BLOCK "080904E4"
     BEGIN
       VALUE "CompanyName", "ZH_CN NetWork\0"
-      VALUE "FileDescription", "Portable dll for Mozilla by adonais\0"
-      VALUE "FileVersion", "1.0.3"
-      VALUE "InternalName", "Portable\0"
-      VALUE "LegalCopyright", " (C) 华のblog , 保留所有权利。\0"
-      VALUE "OriginalFilename", "Portable.dll\0"
-      VALUE "ProductName", "Portable.dll"
-      VALUE "ProductVersion", "1.0.3"
+      VALUE "FileDescription", "Memory utility and Portable dll for Mozilla pcxfirefox and tete009 builds\0"
+      VALUE "FileVersion", "0.0.1"
+      VALUE "InternalName", "tmemutil\0"
+      VALUE "LegalCopyright", " Copyright (C) 2013 pcxfirefox & adonais\0"
+      VALUE "OriginalFilename", "tmemutil.dll\0"
+      VALUE "ProductName", "tmemutil.dll"
+      VALUE "ProductVersion", "0.0.1"
     END
   END
 

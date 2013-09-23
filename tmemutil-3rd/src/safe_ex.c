@@ -133,7 +133,7 @@ BOOL WINAPI in_whitelist(LPCWSTR lpfile)
 	ret = stristrW(white_list[1],L"plugin-container.exe") != NULL;
 	if ( !ret )
 	{
-		/* iceweasel,plugin-container,plugin-hang-ui进程的路径 */
+		/* firefox,plugin-container,plugin-hang-ui进程的路径 */
 		GetModuleFileNameW(NULL,white_list[0],VALUE_LEN);
 		GetModuleFileNameW(dll_module,white_list[1],VALUE_LEN);
 		PathRemoveFileSpecW(white_list[1]);

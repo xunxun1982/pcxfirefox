@@ -9,9 +9,7 @@ BOOL is_browser(void)
 {
 	WCHAR	process_name[VALUE_LEN+1];
 	GetModuleFileNameW(NULL,process_name,VALUE_LEN);
-	return ( stristrW(process_name, L"Iceweasel.exe")||
-		     stristrW(process_name, L"firefox.exe")	||
-		     stristrW(process_name, L"lawlietfox.exe") ||
+	return ( stristrW(process_name, L"firefox.exe")	||
 			 stristrW(process_name, L"thunderbird.exe") );
 }
 
