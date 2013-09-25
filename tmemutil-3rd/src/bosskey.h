@@ -24,7 +24,6 @@ typedef WNDINFO *LPWNDINFO;
 #ifdef __cplusplus
 extern "C" {
 #endif
-BOSS_EXTERN BOOL is_browser(void);
 BOSS_EXTERN unsigned WINAPI bosskey_thread(void * lparam);
 #ifdef __cplusplus
 }
