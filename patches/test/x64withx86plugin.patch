@@ -1,0 +1,359 @@
+# pcxfirefox patch
+# User xunxun
+# Date 2013022302:00
+# Make x64 Firefox support x86 plugins
+
+diff -ruNa 20/dom/plugins/base/nsPluginDirServiceProvider.cpp mozilla-release/dom/plugins/base/nsPluginDirServiceProvider.cpp
+--- 20/dom/plugins/base/nsPluginDirServiceProvider.cpp	Wed Mar 27 06:17:42 2013
++++ mozilla-release/dom/plugins/base/nsPluginDirServiceProvider.cpp	Sat Apr  6 23:59:55 2013
+@@ -3,6 +3,9 @@
+  * License, v. 2.0. If a copy of the MPL was not distributed with this
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
++#include "GeckoChildProcessHost.h"
++#include "base/process_util.h"
++
+ #include "nsPluginDirServiceProvider.h"
+ 
+ #include "nsCRT.h"
+@@ -452,21 +455,41 @@
+ 
+   nsCOMArray<nsIFile> dirs;
+ 
+-  GetPLIDDirectoriesWithRootKey(nsIWindowsRegKey::ROOT_KEY_CURRENT_USER, dirs);
+-  GetPLIDDirectoriesWithRootKey(nsIWindowsRegKey::ROOT_KEY_LOCAL_MACHINE, dirs);
++  GetPLIDDirectoriesWithRootKey(nsIWindowsRegKey::ROOT_KEY_CURRENT_USER,
++                                PR_FALSE, dirs);
++  GetPLIDDirectoriesWithRootKey(nsIWindowsRegKey::ROOT_KEY_LOCAL_MACHINE,
++                                PR_FALSE, dirs);
++
++#if defined(_M_X64)
++  // enumerate 32-bit registry to support x86 image on x64 via IPC
++
++  nsCOMPtr<nsIPrefBranch> prefs(do_GetService(NS_PREFSERVICE_CONTRACTID));
++  if (prefs) {
++    bool b32Bit = PR_FALSE;
++    prefs->GetBoolPref("dom.ipc.plugins.i386", &b32Bit);
++    if (b32Bit) {
++      if (mozilla::ipc::GeckoChildProcessHost::GetSupportedArchitecturesForProcessType(GeckoProcessType_Plugin) & base::PROCESS_ARCH_I386) {
++        GetPLIDDirectoriesWithRootKey(nsIWindowsRegKey::ROOT_KEY_LOCAL_MACHINE,
++                                      PR_TRUE, dirs);
++      }
++    }
++  }
++#endif
+ 
+   return NS_NewArrayEnumerator(aEnumerator, dirs);
+ }
+ 
+ nsresult
+-nsPluginDirServiceProvider::GetPLIDDirectoriesWithRootKey(uint32_t aKey, nsCOMArray<nsIFile> &aDirs)
++nsPluginDirServiceProvider::GetPLIDDirectoriesWithRootKey(uint32_t aKey, const PRBool aWow6432, nsCOMArray<nsIFile> &aDirs)
+ {
+   nsCOMPtr<nsIWindowsRegKey> regKey =
+     do_CreateInstance("@mozilla.org/windows-registry-key;1");
+   NS_ENSURE_TRUE(regKey, NS_ERROR_FAILURE);
+ 
+   nsresult rv = regKey->Open(aKey,
+-                             NS_LITERAL_STRING("Software\\MozillaPlugins"),
++                             aWow6432 ?
++                               NS_LITERAL_STRING("Software\\Wow6432Node\\MozillaPlugins") :
++                               NS_LITERAL_STRING("Software\\MozillaPlugins"),
+                              nsIWindowsRegKey::ACCESS_READ);
+   NS_ENSURE_SUCCESS(rv, rv);
+ 
+diff -ruNa 20/dom/plugins/base/nsPluginDirServiceProvider.h mozilla-release/dom/plugins/base/nsPluginDirServiceProvider.h
+--- 20/dom/plugins/base/nsPluginDirServiceProvider.h	Wed Mar 27 06:17:42 2013
++++ mozilla-release/dom/plugins/base/nsPluginDirServiceProvider.h	Sat Apr  6 23:49:42 2013
+@@ -37,6 +37,7 @@
+    static nsresult GetPLIDDirectories(nsISimpleEnumerator **aEnumerator);
+ private:
+    static nsresult GetPLIDDirectoriesWithRootKey(uint32_t aKey,
++     const PRBool aWow6432,
+      nsCOMArray<nsIFile> &aDirs);
+ #endif
+ 
+diff -ruNa 20/dom/plugins/base/nsPluginsDirWin.cpp mozilla-release/dom/plugins/base/nsPluginsDirWin.cpp
+--- 20/dom/plugins/base/nsPluginsDirWin.cpp	Wed Mar 27 06:17:42 2013
++++ mozilla-release/dom/plugins/base/nsPluginsDirWin.cpp	Sat Apr  6 23:51:39 2013
+@@ -11,6 +11,9 @@
+   by Alex Musil
+  */
+ 
++#include "GeckoChildProcessHost.h"
++#include "base/process_util.h"
++
+ #include "mozilla/DebugOnly.h"
+ 
+ #include "nsPluginsDir.h"
+@@ -25,6 +28,8 @@
+ #include "nsString.h"
+ #include "nsIFile.h"
+ #include "nsUnicharUtils.h"
++#include "nsIPrefBranch.h"
++#include "nsIPrefService.h"
+ 
+ using namespace mozilla;
+ 
+@@ -163,7 +168,30 @@
+ #ifdef _M_IX86
+             canLoad = (arch == IMAGE_FILE_MACHINE_I386);
+ #elif defined(_M_X64)
+-            canLoad = (arch == IMAGE_FILE_MACHINE_AMD64);
++            // x64 supports both x86 and x64
++            switch (arch) {
++            case IMAGE_FILE_MACHINE_AMD64:
++              canLoad = PR_TRUE;
++              break;
++
++            case IMAGE_FILE_MACHINE_I386:
++              nsCOMPtr<nsIPrefBranch> prefs(do_GetService(NS_PREFSERVICE_CONTRACTID));
++              if (prefs) {
++                bool enabled = PR_FALSE;
++                if (NS_SUCCEEDED(prefs->GetBoolPref("dom.ipc.plugins.enabled",
++                                                    &enabled)) &&
++                    enabled) {
++                  if (NS_SUCCEEDED(prefs->GetBoolPref("dom.ipc.plugins.i386",
++                                                      &enabled)) &&
++                      enabled) {
++                    if (mozilla::ipc::GeckoChildProcessHost::GetSupportedArchitecturesForProcessType(GeckoProcessType_Plugin) & base::PROCESS_ARCH_I386) {
++                      canLoad = PR_TRUE;
++                    }
++                  }
++                }
++              }
++              break;
++            }
+ #elif defined(_M_IA64)
+             canLoad = (arch == IMAGE_FILE_MACHINE_IA64);
+ #endif
+diff -ruNa 20/dom/plugins/ipc/PluginProcessParent.cpp mozilla-release/dom/plugins/ipc/PluginProcessParent.cpp
+--- 20/dom/plugins/ipc/PluginProcessParent.cpp	Wed Mar 27 06:17:42 2013
++++ mozilla-release/dom/plugins/ipc/PluginProcessParent.cpp	Sat Apr  6 23:52:55 2013
+@@ -50,6 +50,16 @@
+         // If the call failed just assume that we want the current architecture.
+         pluginLibArchitectures = currentArchitecture;
+     }
++#elif defined(XP_WIN) && defined(_M_X64)
++    // check binary format.  x64 supports both x86 and x64.
++    int len = MultiByteToWideChar(CP_UTF8, 0, mPluginFilePath.c_str(),
++                                  -1, NULL, 0);
++    LPWSTR unicodePath = new WCHAR[len];
++    MultiByteToWideChar(CP_UTF8, 0, mPluginFilePath.c_str(), -1,
++                        unicodePath, len);
++    nsresult rv = GetArchitecturesForBinary(unicodePath,
++                                            &pluginLibArchitectures);
++    delete [] unicodePath;
+ #endif
+ 
+     ProcessArchitecture selectedArchitecture = currentArchitecture;
+diff -ruNa 20/ipc/glue/GeckoChildProcessHost.cpp mozilla-release/ipc/glue/GeckoChildProcessHost.cpp
+--- 20/ipc/glue/GeckoChildProcessHost.cpp	Wed Mar 27 06:17:46 2013
++++ mozilla-release/ipc/glue/GeckoChildProcessHost.cpp	Sun Apr  7 11:30:43 2013
+@@ -27,6 +27,8 @@
+ 
+ #include "nsDirectoryServiceDefs.h"
+ #include "nsIFile.h"
++#include "nsIPrefBranch.h"
++#include "nsIPrefService.h"
+ 
+ #include "mozilla/ipc/BrowserProcessSubThread.h"
+ #include "mozilla/Omnijar.h"
+@@ -115,8 +117,18 @@
+ #endif
+ }
+ 
+-void GetPathToBinary(FilePath& exePath)
++bool GetPathToBinary(FilePath& exePath, base::ProcessArchitecture arch)
+ {
++#if defined(OS_WIN)
++  exePath = FilePath::FromWStringHack(CommandLine::ForCurrentProcess()->program());
++  exePath = exePath.DirName();
++#if defined(_M_X64)
++  if (arch == base::PROCESS_ARCH_I386) {
++        exePath = exePath.AppendASCII("x86");
++  }
++#endif
++  exePath = exePath.AppendASCII(MOZ_CHILD_PROCESS_NAME);
++#elif defined(OS_POSIX)
+   if (ShouldHaveDirectoryService()) {
+     nsCOMPtr<nsIProperties> directoryService(do_GetService(NS_DIRECTORY_SERVICE_CONTRACTID));
+     NS_ASSERTION(directoryService, "Expected XPCOM to be available");
+@@ -124,13 +136,8 @@
+       nsCOMPtr<nsIFile> greDir;
+       nsresult rv = directoryService->Get(NS_GRE_DIR, NS_GET_IID(nsIFile), getter_AddRefs(greDir));
+       if (NS_SUCCEEDED(rv)) {
+-#ifdef OS_WIN
+-        nsString path;
+-        greDir->GetPath(path);
+-#else
+         nsCString path;
+         greDir->GetNativePath(path);
+-#endif
+         exePath = FilePath(path.get());
+ #ifdef MOZ_WIDGET_COCOA
+         // We need to use an App Bundle on OS X so that we can hide
+@@ -142,15 +149,13 @@
+   }
+ 
+   if (exePath.empty()) {
+-#ifdef OS_WIN
+-    exePath = FilePath::FromWStringHack(CommandLine::ForCurrentProcess()->program());
+-#else
+     exePath = FilePath(CommandLine::ForCurrentProcess()->argv()[0]);
+-#endif
+     exePath = exePath.DirName();
+   }
+ 
+   exePath = exePath.AppendASCII(MOZ_CHILD_PROCESS_NAME);
++#endif
++  return true;
+ }
+ 
+ #ifdef MOZ_WIDGET_COCOA
+@@ -169,7 +174,11 @@
+ };
+ #endif
+ 
++#ifdef XP_WIN
++nsresult GeckoChildProcessHost::GetArchitecturesForBinary(const wchar_t *path, uint32_t *result)
++#else
+ nsresult GeckoChildProcessHost::GetArchitecturesForBinary(const char *path, uint32_t *result)
++#endif
+ {
+   *result = 0;
+ 
+@@ -212,6 +221,40 @@
+   }
+ 
+   return (*result ? NS_OK : NS_ERROR_FAILURE);
++#elif defined(XP_WIN) && defined(_M_X64)
++  HANDLE file = CreateFileW(path, GENERIC_READ,
++                            FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
++                            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
++  if (file != INVALID_HANDLE_VALUE) {
++    HANDLE map = CreateFileMappingW(file, NULL, PAGE_READONLY, 0,
++                                    GetFileSize(file, NULL), NULL);
++    if (map != NULL) {
++      LPVOID mapView = MapViewOfFile(map, FILE_MAP_READ, 0, 0, 0);
++      if (mapView != NULL) {
++        if (((IMAGE_DOS_HEADER*)mapView)->e_magic == IMAGE_DOS_SIGNATURE) {
++          long peImageHeaderStart = (((IMAGE_DOS_HEADER*)mapView)->e_lfanew);
++          if (peImageHeaderStart != 0L) {
++            DWORD arch = (((IMAGE_NT_HEADERS*)((LPBYTE)mapView + peImageHeaderStart))->FileHeader.Machine);
++            switch (arch) {
++            case IMAGE_FILE_MACHINE_I386:
++              *result = base::PROCESS_ARCH_I386;
++              break;
++            case IMAGE_FILE_MACHINE_AMD64:
++              *result = base::PROCESS_ARCH_X86_64;
++              break;
++            default:
++              break;
++            }
++          }
++        }
++        UnmapViewOfFile(mapView);
++      }
++      CloseHandle(map);
++    }
++    CloseHandle(file);
++  }
++
++  return (*result ? NS_OK : NS_ERROR_FAILURE);
+ #else
+   return NS_ERROR_NOT_IMPLEMENTED;
+ #endif
+@@ -225,7 +268,7 @@
+     static uint32_t pluginContainerArchs = 0;
+     if (pluginContainerArchs == 0) {
+       FilePath exePath;
+-      GetPathToBinary(exePath);
++      GetPathToBinary(exePath, base::GetCurrentProcessArchitecture());
+       nsresult rv = GetArchitecturesForBinary(exePath.value().c_str(), &pluginContainerArchs);
+       NS_ASSERTION(NS_SUCCEEDED(rv) && pluginContainerArchs != 0, "Getting architecture of plugin container failed!");
+       if (NS_FAILED(rv) || pluginContainerArchs == 0) {
+@@ -234,6 +277,19 @@
+     }
+     return pluginContainerArchs;
+   }
++#elif defined(XP_WIN) && defined(_M_X64)
++  if (type == GeckoProcessType_Plugin) {
++    static uint32_t pluginContainerArchs = 0;
++    if (pluginContainerArchs == 0) {
++      pluginContainerArchs = base::PROCESS_ARCH_X86_64;
++
++      // Check 32-bit firefox installation
++      FilePath exePath;
++      if (GetPathToBinary(exePath, base::PROCESS_ARCH_I386))
++        pluginContainerArchs |= base::PROCESS_ARCH_I386;
++    }
++    return pluginContainerArchs;
++  }
+ #endif
+ 
+   return base::GetCurrentProcessArchitecture();
+@@ -548,7 +604,7 @@
+ #endif  // OS_LINUX || OS_MACOSX
+ 
+   FilePath exePath;
+-  GetPathToBinary(exePath);
++  GetPathToBinary(exePath, arch);
+ 
+ #ifdef MOZ_WIDGET_ANDROID
+   // The java wrapper unpacks this for us but can't make it executable
+@@ -714,7 +770,8 @@
+ #elif defined(OS_WIN)
+ 
+   FilePath exePath;
+-  GetPathToBinary(exePath);
++  if (!GetPathToBinary(exePath, arch))
++    return false;
+ 
+   CommandLine cmdLine(exePath.ToWStringHack());
+   cmdLine.AppendSwitchWithValue(switches::kProcessChannelID, channel_id());
+diff -ruNa 20/ipc/glue/GeckoChildProcessHost.h mozilla-release/ipc/glue/GeckoChildProcessHost.h
+--- 20/ipc/glue/GeckoChildProcessHost.h	Wed Mar 27 06:17:46 2013
++++ mozilla-release/ipc/glue/GeckoChildProcessHost.h	Sat Apr  6 23:42:55 2013
+@@ -34,7 +34,11 @@
+ 
+   ~GeckoChildProcessHost();
+ 
++#if defined(XP_WIN)
++  static nsresult GetArchitecturesForBinary(const wchar_t *path, uint32_t *result);
++#else
+   static nsresult GetArchitecturesForBinary(const char *path, uint32_t *result);
++#endif
+ 
+   static uint32_t GetSupportedArchitecturesForProcessType(GeckoProcessType type);
+ 
+diff -ruNa 20/ipc/glue/Makefile.in mozilla-release/ipc/glue/Makefile.in
+--- 20/ipc/glue/Makefile.in	Wed Mar 27 06:17:46 2013
++++ mozilla-release/ipc/glue/Makefile.in	Sat Apr  6 23:43:50 2013
+@@ -114,6 +114,9 @@
+ include $(topsrcdir)/ipc/app/defs.mk
+ DEFINES += -DMOZ_CHILD_PROCESS_NAME=\"$(MOZ_CHILD_PROCESS_NAME)\"
+ DEFINES += -DMOZ_CHILD_PROCESS_BUNDLE=\"$(MOZ_CHILD_PROCESS_BUNDLE)\"
++ifeq ($(OS_ARCH),WINNT)
++DEFINES += -DMOZ_APP_DISPLAYNAME=\"$(MOZ_APP_DISPLAYNAME)\"
++endif
+ 
+ include $(topsrcdir)/config/config.mk
+ include $(topsrcdir)/ipc/chromium/chromium-config.mk
+diff -ruNa 20/modules/libpref/src/init/all.js mozilla-release/modules/libpref/src/init/all.js
+--- 20/modules/libpref/src/init/all.js	Wed Mar 27 06:18:00 2013
++++ mozilla-release/modules/libpref/src/init/all.js	Sat Apr  6 23:44:58 2013
+@@ -1785,6 +1785,13 @@
+ 
+ pref("dom.ipc.processCount", 1);
+ 
++#ifdef XP_WIN
++#ifdef HAVE_64BIT_OS
++// Win64 supports 32bit plugins via IPC
++pref("dom.ipc.plugins.i386", true);
++#endif
++#endif
++
+ pref("svg.smil.enabled", true);
+ 
+ // Enable the use of display-lists for SVG hit-testing and painting.
