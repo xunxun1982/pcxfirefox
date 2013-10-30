@@ -1,0 +1,11 @@
+diff -ruNa old/media/webrtc/trunk/webrtc/build/common.gypi new/media/webrtc/trunk/webrtc/build/common.gypi
+--- old/media/webrtc/trunk/webrtc/build/common.gypi	Fri Sep  6 09:18:24 2013
++++ new/media/webrtc/trunk/webrtc/build/common.gypi	Sun Sep  8 20:02:59 2013
+@@ -276,7 +276,6 @@
+       ['OS=="win"', {
+         'defines': [
+           'WEBRTC_WIN',
+-	  'WEBRTC_EXPORT',
+         ],
+         # TODO(andrew): enable all warnings when possible.
+         # 4389: Signed/unsigned mismatch.

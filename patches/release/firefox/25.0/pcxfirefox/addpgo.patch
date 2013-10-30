@@ -1,0 +1,732 @@
+diff -ruNa mozilla-beta/browser/app/Makefile.in mozilla-beta-fix/browser/app/Makefile.in
+--- mozilla-beta/browser/app/Makefile.in	Tue Oct  1 17:51:52 2013
++++ mozilla-beta-fix/browser/app/Makefile.in	Sun Oct  6 18:02:06 2013
+@@ -11,6 +11,8 @@
+ 
+ dist_dest   = $(DIST)/$(MOZ_MACBUNDLE_NAME)
+ 
++MSVC_ENABLE_PGO := 1
++
+ ifdef ENABLE_MARIONETTE
+ DEFINES += -DENABLE_MARIONETTE=1
+ endif
+diff -ruNa mozilla-beta/browser/components/about/Makefile.in mozilla-beta-fix/browser/components/about/Makefile.in
+--- mozilla-beta/browser/components/about/Makefile.in	Tue Oct  1 17:51:54 2013
++++ mozilla-beta-fix/browser/components/about/Makefile.in	Sun Oct  6 18:02:06 2013
+@@ -9,6 +9,7 @@
+ 
+ include $(DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
+ FORCE_STATIC_LIB = 1
+ USE_STATIC_LIBS = 1
+ 
+diff -ruNa mozilla-beta/browser/components/build/Makefile.in mozilla-beta-fix/browser/components/build/Makefile.in
+--- mozilla-beta/browser/components/build/Makefile.in	Tue Oct  1 17:51:54 2013
++++ mozilla-beta-fix/browser/components/build/Makefile.in	Sun Oct  6 18:02:06 2013
+@@ -14,6 +14,7 @@
+ MODULE_NAME = nsBrowserCompsModule
+ FORCE_SHARED_LIB = 1
+ 
++MSVC_ENABLE_PGO := 1
+ USE_STATIC_LIBS = 1
+ 
+ ifeq ($(OS_ARCH),WINNT)
+diff -ruNa mozilla-beta/browser/components/dirprovider/Makefile.in mozilla-beta-fix/browser/components/dirprovider/Makefile.in
+--- mozilla-beta/browser/components/dirprovider/Makefile.in	Tue Oct  1 17:51:54 2013
++++ mozilla-beta-fix/browser/components/dirprovider/Makefile.in	Sun Oct  6 18:02:06 2013
+@@ -9,6 +9,7 @@
+ 
+ include $(DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
+ FORCE_STATIC_LIB = 1
+ USE_STATIC_LIBS = 1
+ 
+diff -ruNa mozilla-beta/browser/components/feeds/src/Makefile.in mozilla-beta-fix/browser/components/feeds/src/Makefile.in
+--- mozilla-beta/browser/components/feeds/src/Makefile.in	Tue Oct  1 17:51:54 2013
++++ mozilla-beta-fix/browser/components/feeds/src/Makefile.in	Sun Oct  6 18:02:06 2013
+@@ -9,6 +9,7 @@
+ 
+ include $(DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
+ FORCE_STATIC_LIB = 1
+ USE_STATIC_LIBS = 1
+ 
+diff -ruNa mozilla-beta/browser/components/migration/src/Makefile.in mozilla-beta-fix/browser/components/migration/src/Makefile.in
+--- mozilla-beta/browser/components/migration/src/Makefile.in	Tue Oct  1 17:51:54 2013
++++ mozilla-beta-fix/browser/components/migration/src/Makefile.in	Sun Oct  6 18:02:06 2013
+@@ -9,6 +9,7 @@
+ 
+ include $(DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
+ FORCE_STATIC_LIB = 1
+ USE_STATIC_LIBS = 1
+ 
+diff -ruNa mozilla-beta/browser/components/shell/src/Makefile.in mozilla-beta-fix/browser/components/shell/src/Makefile.in
+--- mozilla-beta/browser/components/shell/src/Makefile.in	Tue Oct  1 17:51:54 2013
++++ mozilla-beta-fix/browser/components/shell/src/Makefile.in	Sun Oct  6 18:02:06 2013
+@@ -10,6 +10,7 @@
+ 
+ include $(DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
+ FORCE_STATIC_LIB = 1
+ USE_STATIC_LIBS = 1
+ 
+diff -ruNa mozilla-beta/db/sqlite3/src/Makefile.in mozilla-beta-fix/db/sqlite3/src/Makefile.in
+--- mozilla-beta/db/sqlite3/src/Makefile.in	Tue Oct  1 17:52:04 2013
++++ mozilla-beta-fix/db/sqlite3/src/Makefile.in	Sun Oct  6 18:02:06 2013
+@@ -18,6 +18,7 @@
+ endif
+ VISIBILITY_FLAGS =
+ LIB_IS_C_ONLY    = 1
++MSVC_ENABLE_PGO := 1
+ 
+ ifeq ($(OS_ARCH),WINNT)
+ DEFFILE = $(CURDIR)/sqlite-processed.def
+diff -ruNa mozilla-beta/gfx/angle/src/libEGL/Makefile.in mozilla-beta-fix/gfx/angle/src/libEGL/Makefile.in
+--- mozilla-beta/gfx/angle/src/libEGL/Makefile.in	Tue Oct  1 17:52:16 2013
++++ mozilla-beta-fix/gfx/angle/src/libEGL/Makefile.in	Sun Oct  6 18:02:06 2013
+@@ -10,6 +10,7 @@
+ include $(DEPTH)/config/autoconf.mk
+ 
+ # On Windows, we don't automatically get "lib" prepended, but we need it.
++MSVC_ENABLE_PGO := 1
+ FORCE_SHARED_LIB = 1
+ 
+ # ANGLE uses the STL, so we can't use our derpy STL wrappers.
+diff -ruNa mozilla-beta/gfx/angle/src/libGLESv2/Makefile.in mozilla-beta-fix/gfx/angle/src/libGLESv2/Makefile.in
+--- mozilla-beta/gfx/angle/src/libGLESv2/Makefile.in	Tue Oct  1 17:52:16 2013
++++ mozilla-beta-fix/gfx/angle/src/libGLESv2/Makefile.in	Sun Oct  6 18:02:06 2013
+@@ -11,6 +11,7 @@
+ include $(DEPTH)/config/autoconf.mk
+ 
+ # On Windows, we don't automatically get "lib" prepended, but we need it.
++MSVC_ENABLE_PGO := 1
+ FORCE_SHARED_LIB = 1
+ 
+ # ANGLE uses the STL, so we can't use our derpy STL wrappers.
+diff -ruNa mozilla-beta/gfx/ipc/Makefile.in mozilla-beta-fix/gfx/ipc/Makefile.in
+--- mozilla-beta/gfx/ipc/Makefile.in	Tue Oct  1 17:52:16 2013
++++ mozilla-beta-fix/gfx/ipc/Makefile.in	Sun Oct  6 18:02:06 2013
+@@ -13,6 +13,7 @@
+ LIBRARY_NAME       = gfxipc_s
+ LIBXUL_LIBRARY     = 1
+ EXPORT_LIBRARY     = 1
++MSVC_ENABLE_PGO := 1
+ 
+ include $(topsrcdir)/config/config.mk
+ include $(topsrcdir)/config/rules.mk
+diff -ruNa mozilla-beta/gfx/ipc/Makefile.in.orig mozilla-beta-fix/gfx/ipc/Makefile.in.orig
+--- mozilla-beta/gfx/ipc/Makefile.in.orig	Thu Jan  1 08:00:00 1970
++++ mozilla-beta-fix/gfx/ipc/Makefile.in.orig	Tue Oct  1 17:52:16 2013
+@@ -0,0 +1,21 @@
++#
++# This Source Code Form is subject to the terms of the Mozilla Public
++# License, v. 2.0. If a copy of the MPL was not distributed with this
++# file, You can obtain one at http://mozilla.org/MPL/2.0/.
++
++DEPTH       = @DEPTH@
++topsrcdir   = @top_srcdir@
++srcdir      = @srcdir@
++VPATH       = @srcdir@
++
++include $(DEPTH)/config/autoconf.mk
++
++LIBRARY_NAME       = gfxipc_s
++LIBXUL_LIBRARY     = 1
++EXPORT_LIBRARY     = 1
++
++include $(topsrcdir)/config/config.mk
++include $(topsrcdir)/config/rules.mk
++include $(topsrcdir)/ipc/chromium/chromium-config.mk
++
++CXXFLAGS += $(MOZ_CAIRO_CFLAGS) $(MOZ_PIXMAN_CFLAGS) $(TK_CFLAGS)
+diff -ruNa mozilla-beta/gfx/ycbcr/Makefile.in mozilla-beta-fix/gfx/ycbcr/Makefile.in
+--- mozilla-beta/gfx/ycbcr/Makefile.in	Tue Oct  1 17:52:18 2013
++++ mozilla-beta-fix/gfx/ycbcr/Makefile.in	Sun Oct  6 18:03:35 2013
+@@ -7,6 +7,7 @@
+ 
+ LIBXUL_LIBRARY = 1
+ EXPORT_LIBRARY = 1
++MSVC_ENABLE_PGO := 1
+ 
+ include $(topsrcdir)/config/rules.mk
+ 
+diff -ruNa mozilla-beta/hal/Makefile.in mozilla-beta-fix/hal/Makefile.in
+--- mozilla-beta/hal/Makefile.in	Tue Oct  1 17:52:18 2013
++++ mozilla-beta-fix/hal/Makefile.in	Sun Oct  6 18:04:32 2013
+@@ -25,6 +25,7 @@
+ LIBXUL_LIBRARY = 1
+ EXPORT_LIBRARY = 1
+ FAIL_ON_WARNINGS = 1
++MSVC_ENABLE_PGO := 1
+ 
+ MOCHITEST_BROWSER_FILES += \
+ 	tests/browser_alarms.js \
+diff -ruNa mozilla-beta/image/build/Makefile.in mozilla-beta-fix/image/build/Makefile.in
+--- mozilla-beta/image/build/Makefile.in	Tue Oct  1 17:52:18 2013
++++ mozilla-beta-fix/image/build/Makefile.in	Sun Oct  6 18:02:06 2013
+@@ -15,6 +15,7 @@
+ MODULE_NAME	= nsImageLib2Module
+ LIBXUL_LIBRARY = 1
+ FAIL_ON_WARNINGS = 1
++MSVC_ENABLE_PGO := 1
+ 
+ LOCAL_INCLUDES	= \
+ 		-I. \
+diff -ruNa mozilla-beta/image/decoders/Makefile.in mozilla-beta-fix/image/decoders/Makefile.in
+--- mozilla-beta/image/decoders/Makefile.in	Tue Oct  1 17:52:18 2013
++++ mozilla-beta-fix/image/decoders/Makefile.in	Sun Oct  6 18:05:10 2013
+@@ -13,6 +13,7 @@
+ MODULE_NAME = nsDecodersModule
+ LIBXUL_LIBRARY  = 1
+ FAIL_ON_WARNINGS = 1
++MSVC_ENABLE_PGO := 1
+ 
+ CSRCS   = iccjpeg.c \
+           $(NULL)
+diff -ruNa mozilla-beta/image/decoders/icon/Makefile.in mozilla-beta-fix/image/decoders/icon/Makefile.in
+--- mozilla-beta/image/decoders/icon/Makefile.in	Tue Oct  1 17:52:18 2013
++++ mozilla-beta-fix/image/decoders/icon/Makefile.in	Sun Oct  6 18:02:06 2013
+@@ -16,6 +16,8 @@
+ EXPORT_LIBRARY = 1
+ FAIL_ON_WARNINGS = 1
+ 
++MSVC_ENABLE_PGO := 1
++
+ ifdef MOZ_WIDGET_GTK
+ PLATFORM = gtk
+ endif
+diff -ruNa mozilla-beta/image/decoders/icon/win/Makefile.in mozilla-beta-fix/image/decoders/icon/win/Makefile.in
+--- mozilla-beta/image/decoders/icon/win/Makefile.in	Tue Oct  1 17:52:18 2013
++++ mozilla-beta-fix/image/decoders/icon/win/Makefile.in	Sun Oct  6 18:05:52 2013
+@@ -12,6 +12,7 @@
+ 
+ LIBXUL_LIBRARY = 1
+ FAIL_ON_WARNINGS = 1
++MSVC_ENABLE_PGO := 1
+ 
+ include $(topsrcdir)/config/rules.mk
+ 
+diff -ruNa mozilla-beta/image/encoders/bmp/Makefile.in mozilla-beta-fix/image/encoders/bmp/Makefile.in
+--- mozilla-beta/image/encoders/bmp/Makefile.in	Tue Oct  1 17:52:18 2013
++++ mozilla-beta-fix/image/encoders/bmp/Makefile.in	Sun Oct  6 18:06:17 2013
+@@ -12,6 +12,7 @@
+ MODULE_NAME	= imgEncoderBMPModule
+ LIBXUL_LIBRARY = 1
+ FAIL_ON_WARNINGS = 1
++MSVC_ENABLE_PGO := 1
+ 
+ LOCAL_INCLUDES += -I$(topsrcdir)/image/src/
+ 
+diff -ruNa mozilla-beta/image/encoders/ico/Makefile.in mozilla-beta-fix/image/encoders/ico/Makefile.in
+--- mozilla-beta/image/encoders/ico/Makefile.in	Tue Oct  1 17:52:18 2013
++++ mozilla-beta-fix/image/encoders/ico/Makefile.in	Sun Oct  6 18:06:36 2013
+@@ -12,6 +12,7 @@
+ MODULE_NAME	= imgEncoderICOModule
+ LIBXUL_LIBRARY = 1
+ FAIL_ON_WARNINGS = 1
++MSVC_ENABLE_PGO := 1
+ 
+ # Decoders need RasterImage.h
+ LOCAL_INCLUDES += -I$(topsrcdir)/image/src/
+diff -ruNa mozilla-beta/image/encoders/jpeg/Makefile.in mozilla-beta-fix/image/encoders/jpeg/Makefile.in
+--- mozilla-beta/image/encoders/jpeg/Makefile.in	Tue Oct  1 17:52:18 2013
++++ mozilla-beta-fix/image/encoders/jpeg/Makefile.in	Sun Oct  6 18:06:58 2013
+@@ -12,6 +12,7 @@
+ MODULE_NAME	= imgEncoderJPEGModule
+ LIBXUL_LIBRARY = 1
+ FAIL_ON_WARNINGS = 1
++MSVC_ENABLE_PGO := 1
+ 
+ include $(topsrcdir)/config/rules.mk
+ 
+diff -ruNa mozilla-beta/image/encoders/png/Makefile.in mozilla-beta-fix/image/encoders/png/Makefile.in
+--- mozilla-beta/image/encoders/png/Makefile.in	Tue Oct  1 17:52:18 2013
++++ mozilla-beta-fix/image/encoders/png/Makefile.in	Sun Oct  6 18:07:15 2013
+@@ -12,6 +12,7 @@
+ MODULE_NAME	= imgEncoderPNGModule
+ LIBXUL_LIBRARY = 1
+ FAIL_ON_WARNINGS = 1
++MSVC_ENABLE_PGO := 1
+ 
+ DEFINES		+= -DMOZ_PNG_WRITE \
+ 	-DMOZ_PNG_READ \
+diff -ruNa mozilla-beta/image/src/Makefile.in mozilla-beta-fix/image/src/Makefile.in
+--- mozilla-beta/image/src/Makefile.in	Tue Oct  1 17:52:18 2013
++++ mozilla-beta-fix/image/src/Makefile.in	Sun Oct  6 18:07:39 2013
+@@ -14,6 +14,7 @@
+ MODULE_NAME	= nsImageLib2Module
+ LIBXUL_LIBRARY  = 1
+ FAIL_ON_WARNINGS = 1
++MSVC_ENABLE_PGO := 1
+ 
+ # We need to instantiate the decoders
+ LOCAL_INCLUDES += -I$(topsrcdir)/image/decoders
+diff -ruNa mozilla-beta/ipc/app/Makefile.in mozilla-beta-fix/ipc/app/Makefile.in
+--- mozilla-beta/ipc/app/Makefile.in	Tue Oct  1 17:52:26 2013
++++ mozilla-beta-fix/ipc/app/Makefile.in	Sun Oct  6 18:02:06 2013
+@@ -9,6 +9,8 @@
+ 
+ include $(DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ ifneq ($(dir $(PROGRAM)),./)
+   GENERATED_DIRS = $(dir $(PROGRAM))
+ endif
+diff -ruNa mozilla-beta/layout/media/Makefile.in mozilla-beta-fix/layout/media/Makefile.in
+--- mozilla-beta/layout/media/Makefile.in	Tue Oct  1 17:52:58 2013
++++ mozilla-beta-fix/layout/media/Makefile.in	Sun Oct  6 18:02:06 2013
+@@ -15,6 +15,8 @@
+ FORCE_SHARED_LIB = 1
+ endif
+ 
++MSVC_ENABLE_PGO := 1
++
+ SHARED_LIBRARY_LIBS = \
+     $(MOZ_OTS_LIBS) \
+     $(QCMS_LIBS) \
+diff -ruNa mozilla-beta/media/kiss_fft/Makefile.in mozilla-beta-fix/media/kiss_fft/Makefile.in
+--- mozilla-beta/media/kiss_fft/Makefile.in	Tue Oct  1 17:53:16 2013
++++ mozilla-beta-fix/media/kiss_fft/Makefile.in	Sun Oct  6 18:09:00 2013
+@@ -9,6 +9,8 @@
+ 
+ include $(DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ ifeq (WINNT,$(OS_TARGET))
+ VISIBILITY_FLAGS =
+ endif
+diff -ruNa mozilla-beta/memory/build/Makefile.in mozilla-beta-fix/memory/build/Makefile.in
+--- mozilla-beta/memory/build/Makefile.in	Tue Oct  1 17:53:24 2013
++++ mozilla-beta-fix/memory/build/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -9,6 +9,7 @@
+ 
+ include $(DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
+ FORCE_STATIC_LIB = 1
+ STLFLAGS =
+ ifdef MOZ_GLUE_PROGRAM_LDFLAGS
+diff -ruNa mozilla-beta/memory/jemalloc/Makefile.in mozilla-beta-fix/memory/jemalloc/Makefile.in
+--- mozilla-beta/memory/jemalloc/Makefile.in	Tue Oct  1 17:53:24 2013
++++ mozilla-beta-fix/memory/jemalloc/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -10,6 +10,7 @@
+ 
+ include $(DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
+ FORCE_STATIC_LIB = 1
+ 
+ ifdef MOZ_GLUE_PROGRAM_LDFLAGS
+diff -ruNa mozilla-beta/memory/mozalloc/Makefile.in mozilla-beta-fix/memory/mozalloc/Makefile.in
+--- mozilla-beta/memory/mozalloc/Makefile.in	Tue Oct  1 17:53:24 2013
++++ mozilla-beta-fix/memory/mozalloc/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -18,6 +18,7 @@
+ 
+ DIST_INSTALL 	= 1
+ 
++MSVC_ENABLE_PGO := 1
+ ifeq (gonk,$(MOZ_WIDGET_TOOLKIT))
+ FORCE_STATIC_LIB= 1
+ else
+diff -ruNa mozilla-beta/memory/mozjemalloc/Makefile.in mozilla-beta-fix/memory/mozjemalloc/Makefile.in
+--- mozilla-beta/memory/mozjemalloc/Makefile.in	Tue Oct  1 17:53:24 2013
++++ mozilla-beta-fix/memory/mozjemalloc/Makefile.in	Sun Oct  6 18:09:46 2013
+@@ -10,6 +10,8 @@
+ 
+ include $(DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ ifndef MOZ_JEMALLOC3
+ FORCE_STATIC_LIB= 1
+ 
+diff -ruNa mozilla-beta/memory/replace/dmd/Makefile.in mozilla-beta-fix/memory/replace/dmd/Makefile.in
+--- mozilla-beta/memory/replace/dmd/Makefile.in	Tue Oct  1 17:53:24 2013
++++ mozilla-beta-fix/memory/replace/dmd/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -11,6 +11,7 @@
+ include $(DEPTH)/config/autoconf.mk
+ 
+ LIBRARY_NAME	= dmd
++MSVC_ENABLE_PGO := 1
+ FORCE_SHARED_LIB= 1
+ 
+ DEFINES 	+= -DMOZ_NO_MOZALLOC
+diff -ruNa mozilla-beta/memory/replace/dummy/Makefile.in mozilla-beta-fix/memory/replace/dummy/Makefile.in
+--- mozilla-beta/memory/replace/dummy/Makefile.in	Tue Oct  1 17:53:24 2013
++++ mozilla-beta-fix/memory/replace/dummy/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -9,6 +9,7 @@
+ 
+ include $(DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
+ FORCE_SHARED_LIB = 1
+ 
+ include $(topsrcdir)/config/rules.mk
+diff -ruNa mozilla-beta/memory/replace/jemalloc/Makefile.in mozilla-beta-fix/memory/replace/jemalloc/Makefile.in
+--- mozilla-beta/memory/replace/jemalloc/Makefile.in	Tue Oct  1 17:53:24 2013
++++ mozilla-beta-fix/memory/replace/jemalloc/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -9,6 +9,7 @@
+ 
+ include $(DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
+ FORCE_SHARED_LIB = 1
+ 
+ SHARED_LIBRARY_LIBS = $(call EXPAND_LIBNAME_PATH,jemalloc,$(DEPTH)/memory/jemalloc)
+diff -ruNa mozilla-beta/mfbt/Makefile.in mozilla-beta-fix/mfbt/Makefile.in
+--- mozilla-beta/mfbt/Makefile.in	Tue Oct  1 17:53:24 2013
++++ mozilla-beta-fix/mfbt/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -9,6 +9,7 @@
+ 
+ include $(DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
+ FORCE_STATIC_LIB = 1
+ STL_FLAGS =
+ 
+diff -ruNa mozilla-beta/modules/zlib/src/Makefile.in mozilla-beta-fix/modules/zlib/src/Makefile.in
+--- mozilla-beta/modules/zlib/src/Makefile.in	Tue Oct  1 17:53:30 2013
++++ mozilla-beta-fix/modules/zlib/src/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -11,6 +11,8 @@
+ include $(DEPTH)/config/autoconf.mk
+ include $(srcdir)/objs.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ CSRCS		= $(MODULES_ZLIB_SRC_LCSRCS)
+ 
+ include $(topsrcdir)/config/rules.mk
+diff -ruNa mozilla-beta/mozglue/build/Makefile.in mozilla-beta-fix/mozglue/build/Makefile.in
+--- mozilla-beta/mozglue/build/Makefile.in	Tue Oct  1 17:53:30 2013
++++ mozilla-beta-fix/mozglue/build/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -12,6 +12,8 @@
+ 
+ DIST_INSTALL = 1
+ 
++MSVC_ENABLE_PGO := 1
++
+ # Build mozglue as a shared lib on Windows, OSX and Android.
+ # If this is ever changed, update MOZ_SHARED_MOZGLUE in browser/installer/Makefile.in
+ ifneq (,$(filter WINNT Darwin Android,$(OS_TARGET)))
+diff -ruNa mozilla-beta/netwerk/protocol/about/Makefile.in mozilla-beta-fix/netwerk/protocol/about/Makefile.in
+--- mozilla-beta/netwerk/protocol/about/Makefile.in	Tue Oct  1 17:53:30 2013
++++ mozilla-beta-fix/netwerk/protocol/about/Makefile.in	Sun Oct  6 18:10:35 2013
+@@ -13,6 +13,7 @@
+ 
+ LIBRARY_NAME   = nkabout_s
+ LIBXUL_LIBRARY = 1
++MSVC_ENABLE_PGO := 1
+ 
+ LOCAL_INCLUDES = \
+   -I$(srcdir)/../../base/src \
+diff -ruNa mozilla-beta/netwerk/protocol/data/Makefile.in mozilla-beta-fix/netwerk/protocol/data/Makefile.in
+--- mozilla-beta/netwerk/protocol/data/Makefile.in	Tue Oct  1 17:53:30 2013
++++ mozilla-beta-fix/netwerk/protocol/data/Makefile.in	Sun Oct  6 18:10:55 2013
+@@ -12,6 +12,7 @@
+ include $(DEPTH)/config/autoconf.mk
+ 
+ LIBXUL_LIBRARY = 1
++MSVC_ENABLE_PGO := 1
+ 
+ LOCAL_INCLUDES = \
+   -I$(srcdir)/../../base/src \
+diff -ruNa mozilla-beta/netwerk/protocol/viewsource/Makefile.in mozilla-beta-fix/netwerk/protocol/viewsource/Makefile.in
+--- mozilla-beta/netwerk/protocol/viewsource/Makefile.in	Tue Oct  1 17:53:30 2013
++++ mozilla-beta-fix/netwerk/protocol/viewsource/Makefile.in	Sun Oct  6 18:12:27 2013
+@@ -12,6 +12,7 @@
+ include $(DEPTH)/config/autoconf.mk
+ 
+ LIBXUL_LIBRARY = 1
++MSVC_ENABLE_PGO := 1
+ 
+ LOCAL_INCLUDES = \
+   -I$(srcdir)/../../base/src \
+diff -ruNa mozilla-beta/netwerk/protocol/wyciwyg/Makefile.in mozilla-beta-fix/netwerk/protocol/wyciwyg/Makefile.in
+--- mozilla-beta/netwerk/protocol/wyciwyg/Makefile.in	Tue Oct  1 17:53:32 2013
++++ mozilla-beta-fix/netwerk/protocol/wyciwyg/Makefile.in	Sun Oct  6 18:11:14 2013
+@@ -12,6 +12,7 @@
+ LIBRARY_NAME	= nkwyciwyg_s
+ LIBXUL_LIBRARY	= 1
+ FAIL_ON_WARNINGS = 1
++MSVC_ENABLE_PGO := 1
+ 
+ LOCAL_INCLUDES = \
+   -I$(srcdir)/../../base/src \
+diff -ruNa mozilla-beta/netwerk/socket/Makefile.in mozilla-beta-fix/netwerk/socket/Makefile.in
+--- mozilla-beta/netwerk/socket/Makefile.in	Tue Oct  1 17:53:32 2013
++++ mozilla-beta-fix/netwerk/socket/Makefile.in	Sun Oct  6 18:13:32 2013
+@@ -12,7 +12,7 @@
+ include $(DEPTH)/config/autoconf.mk
+ 
+ LIBXUL_LIBRARY = 1
+-
++MSVC_ENABLE_PGO := 1
+ 
+ include $(topsrcdir)/config/rules.mk
+ 
+diff -ruNa mozilla-beta/netwerk/system/win32/Makefile.in mozilla-beta-fix/netwerk/system/win32/Makefile.in
+--- mozilla-beta/netwerk/system/win32/Makefile.in	Tue Oct  1 17:53:32 2013
++++ mozilla-beta-fix/netwerk/system/win32/Makefile.in	Sun Oct  6 18:13:59 2013
+@@ -12,6 +12,7 @@
+ include $(DEPTH)/config/autoconf.mk
+ 
+ LIBXUL_LIBRARY = 1
++MSVC_ENABLE_PGO := 1
+ 
+ include $(topsrcdir)/config/rules.mk
+ 
+diff -ruNa mozilla-beta/nsprpub/lib/ds/Makefile.in mozilla-beta-fix/nsprpub/lib/ds/Makefile.in
+--- mozilla-beta/nsprpub/lib/ds/Makefile.in	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-fix/nsprpub/lib/ds/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ INCLUDES = -I$(dist_includedir) -I$(topsrcdir)/pr/include
+diff -ruNa mozilla-beta/nsprpub/lib/libc/src/Makefile.in mozilla-beta-fix/nsprpub/lib/libc/src/Makefile.in
+--- mozilla-beta/nsprpub/lib/libc/src/Makefile.in	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-fix/nsprpub/lib/libc/src/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -13,6 +13,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ INCLUDES = -I$(dist_includedir)
+diff -ruNa mozilla-beta/nsprpub/lib/prstreams/Makefile.in mozilla-beta-fix/nsprpub/lib/prstreams/Makefile.in
+--- mozilla-beta/nsprpub/lib/prstreams/Makefile.in	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-fix/nsprpub/lib/prstreams/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ ifeq ($(OS_ARCH), IRIX)
+diff -ruNa mozilla-beta/nsprpub/pr/src/Makefile.in mozilla-beta-fix/nsprpub/pr/src/Makefile.in
+--- mozilla-beta/nsprpub/pr/src/Makefile.in	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-fix/nsprpub/pr/src/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ DIRS = io linking malloc md memory misc threads
+diff -ruNa mozilla-beta/nsprpub/pr/src/bthreads/Makefile.in mozilla-beta-fix/nsprpub/pr/src/bthreads/Makefile.in
+--- mozilla-beta/nsprpub/pr/src/bthreads/Makefile.in	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-fix/nsprpub/pr/src/bthreads/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -13,6 +13,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ include $(srcdir)/bsrcs.mk
+diff -ruNa mozilla-beta/nsprpub/pr/src/cplus/Makefile.in mozilla-beta-fix/nsprpub/pr/src/cplus/Makefile.in
+--- mozilla-beta/nsprpub/pr/src/cplus/Makefile.in	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-fix/nsprpub/pr/src/cplus/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ CXXSRCS =           \
+diff -ruNa mozilla-beta/nsprpub/pr/src/io/Makefile.in mozilla-beta-fix/nsprpub/pr/src/io/Makefile.in
+--- mozilla-beta/nsprpub/pr/src/io/Makefile.in	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-fix/nsprpub/pr/src/io/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ CSRCS = \
+diff -ruNa mozilla-beta/nsprpub/pr/src/linking/Makefile.in mozilla-beta-fix/nsprpub/pr/src/linking/Makefile.in
+--- mozilla-beta/nsprpub/pr/src/linking/Makefile.in	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-fix/nsprpub/pr/src/linking/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -13,6 +13,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ CSRCS =           \
+diff -ruNa mozilla-beta/nsprpub/pr/src/malloc/Makefile.in mozilla-beta-fix/nsprpub/pr/src/malloc/Makefile.in
+--- mozilla-beta/nsprpub/pr/src/malloc/Makefile.in	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-fix/nsprpub/pr/src/malloc/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ TARGETS	= $(OBJS)
+diff -ruNa mozilla-beta/nsprpub/pr/src/md/Makefile.in mozilla-beta-fix/nsprpub/pr/src/md/Makefile.in
+--- mozilla-beta/nsprpub/pr/src/md/Makefile.in	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-fix/nsprpub/pr/src/md/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ DIRS = $(PR_MD_ARCH_DIR)
+diff -ruNa mozilla-beta/nsprpub/pr/src/md/windows/Makefile.in mozilla-beta-fix/nsprpub/pr/src/md/windows/Makefile.in
+--- mozilla-beta/nsprpub/pr/src/md/windows/Makefile.in	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-fix/nsprpub/pr/src/md/windows/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ ifeq (,$(filter-out WIN95 WINCE WINMO, $(OS_TARGET)))
+diff -ruNa mozilla-beta/nsprpub/pr/src/memory/Makefile.in mozilla-beta-fix/nsprpub/pr/src/memory/Makefile.in
+--- mozilla-beta/nsprpub/pr/src/memory/Makefile.in	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-fix/nsprpub/pr/src/memory/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ CSRCS = prseg.c prshm.c prshma.c
+diff -ruNa mozilla-beta/nsprpub/pr/src/misc/Makefile.in mozilla-beta-fix/nsprpub/pr/src/misc/Makefile.in
+--- mozilla-beta/nsprpub/pr/src/misc/Makefile.in	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-fix/nsprpub/pr/src/misc/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ CSRCS = \
+diff -ruNa mozilla-beta/nsprpub/pr/src/pthreads/Makefile.in mozilla-beta-fix/nsprpub/pr/src/pthreads/Makefile.in
+--- mozilla-beta/nsprpub/pr/src/pthreads/Makefile.in	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-fix/nsprpub/pr/src/pthreads/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -13,6 +13,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ CSRCS = \
+diff -ruNa mozilla-beta/nsprpub/pr/src/threads/Makefile.in mozilla-beta-fix/nsprpub/pr/src/threads/Makefile.in
+--- mozilla-beta/nsprpub/pr/src/threads/Makefile.in	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-fix/nsprpub/pr/src/threads/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ ifdef USE_PTHREADS
+diff -ruNa mozilla-beta/nsprpub/pr/src/threads/combined/Makefile.in mozilla-beta-fix/nsprpub/pr/src/threads/combined/Makefile.in
+--- mozilla-beta/nsprpub/pr/src/threads/combined/Makefile.in	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-fix/nsprpub/pr/src/threads/combined/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -13,6 +13,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ ifdef USE_PTHREADS
+diff -ruNa mozilla-beta/parser/htmlparser/src/Makefile.in mozilla-beta-fix/parser/htmlparser/src/Makefile.in
+--- mozilla-beta/parser/htmlparser/src/Makefile.in	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-fix/parser/htmlparser/src/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -14,6 +14,7 @@
+ MODULE_NAME	   = nsParserModule
+ LIBXUL_LIBRARY = 1
+ 
++MSVC_ENABLE_PGO := 1
+ 
+ SHARED_LIBRARY_LIBS = \
+ 		$(DEPTH)/parser/xml/src/$(LIB_PREFIX)saxp.$(LIB_SUFFIX) \
+diff -ruNa mozilla-beta/security/manager/ssl/src/Makefile.in mozilla-beta-fix/security/manager/ssl/src/Makefile.in
+--- mozilla-beta/security/manager/ssl/src/Makefile.in	Tue Oct  1 17:53:36 2013
++++ mozilla-beta-fix/security/manager/ssl/src/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -17,6 +17,8 @@
+ LIBXUL_LIBRARY	= 1
+ CSRCS += md4.c
+ 
++MSVC_ENABLE_PGO := 1
++
+ DEFINES += \
+   -DNSS_ENABLE_ECC \
+   -DDLL_PREFIX=\"$(DLL_PREFIX)\" \
+diff -ruNa mozilla-beta/startupcache/Makefile.in mozilla-beta-fix/startupcache/Makefile.in
+--- mozilla-beta/startupcache/Makefile.in	Tue Oct  1 17:53:42 2013
++++ mozilla-beta-fix/startupcache/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -15,4 +15,6 @@
+ LIBXUL_LIBRARY = 1
+ IS_COMPONENT = 1
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/rules.mk
+diff -ruNa mozilla-beta/storage/src/Makefile.in mozilla-beta-fix/storage/src/Makefile.in
+--- mozilla-beta/storage/src/Makefile.in	Tue Oct  1 17:53:42 2013
++++ mozilla-beta-fix/storage/src/Makefile.in	Sun Oct  6 18:14:46 2013
+@@ -12,6 +12,7 @@
+ 
+ MODULE_NAME      = mozStorageModule
+ LIBXUL_LIBRARY = 1
++MSVC_ENABLE_PGO := 1
+ 
+ # Don't use the jemalloc allocator on Android, because we can't guarantee
+ # that Gecko will configure sqlite before it is first used (bug 730495).
+diff -ruNa mozilla-beta/xpcom/glue/staticruntime/Makefile.in mozilla-beta-fix/xpcom/glue/staticruntime/Makefile.in
+--- mozilla-beta/xpcom/glue/staticruntime/Makefile.in	Tue Oct  1 17:53:54 2013
++++ mozilla-beta-fix/xpcom/glue/staticruntime/Makefile.in	Sun Oct  6 18:02:08 2013
+@@ -13,6 +13,7 @@
+ 
+ EXTRA_DEPS += $(srcdir)/../objs.mk
+ 
++MSVC_ENABLE_PGO := 1
+ DIST_INSTALL	= 1
+ 
+ LOCAL_INCLUDES	= \

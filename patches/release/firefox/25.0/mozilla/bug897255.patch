@@ -1,0 +1,15 @@
+diff -ruNa old/extensions/spellcheck/hunspell/src/csutil.cpp new/extensions/spellcheck/hunspell/src/csutil.cpp
+--- old/extensions/spellcheck/hunspell/src/csutil.cpp	Fri Sep  6 09:18:04 2013
++++ new/extensions/spellcheck/hunspell/src/csutil.cpp	Sun Sep  8 19:39:21 2013
+@@ -397,7 +397,10 @@
+     for ( i = 1; i < linenum; i++ ) {
+         int dup = 0;
+         for (int j = 0; j < i; j++) {
+-            if (strcmp(lines[i], lines[j]) == 0) dup = 1;
++            if (strcmp(lines[i], lines[j]) == 0) {
++              dup = 1;
++              break;
++            }
+         }
+         if (!dup) {
+             if ((i > 1) || (*(lines[0]) != '\0')) {

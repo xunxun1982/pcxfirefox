@@ -1,0 +1,11 @@
+diff -ruNa old/netwerk/sctp/src/netinet/sctp_usrreq.c new/netwerk/sctp/src/netinet/sctp_usrreq.c
+--- old/netwerk/sctp/src/netinet/sctp_usrreq.c	Fri Sep  6 09:18:28 2013
++++ new/netwerk/sctp/src/netinet/sctp_usrreq.c	Sun Sep  8 19:34:14 2013
+@@ -4756,6 +4756,7 @@
+ 			if (hmaclist->hmac[i] == SCTP_AUTH_HMAC_ID_SHA1) {
+ 				/* already in list */
+ 				found = 1;
++                break;
+ 			}
+ 		}
+ 		if (!found) {

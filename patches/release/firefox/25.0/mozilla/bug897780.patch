@@ -1,0 +1,84 @@
+diff -ruNa old/extensions/spellcheck/hunspell/src/suggestmgr.cpp new/extensions/spellcheck/hunspell/src/suggestmgr.cpp
+--- old/extensions/spellcheck/hunspell/src/suggestmgr.cpp	Fri Sep  6 09:18:04 2013
++++ new/extensions/spellcheck/hunspell/src/suggestmgr.cpp	Sun Sep  8 19:46:47 2013
+@@ -161,7 +161,10 @@
+       int cwrd = 1;
+       if (ns == maxSug) return maxSug;
+       for (int k=0; k < ns; k++) {
+-        if (strcmp(candidate,wlst[k]) == 0) cwrd = 0;
++        if (strcmp(candidate,wlst[k]) == 0) {
++            cwrd = 0;
++            break;
++        }
+       }
+       if ((cwrd) && checkword(candidate, wl, cpdsuggest, timer, timelimit)) {
+         wlst[ns] = mystrdup(candidate);
+@@ -418,8 +421,12 @@
+       int cwrd = 1;
+       *(candidate + cn) = '\0';
+       int wl = strlen(candidate);
+-      for (int m=0; m < ns; m++)
+-          if (strcmp(candidate, wlst[m]) == 0) cwrd = 0;
++      for (int m=0; m < ns; m++) {
++          if (strcmp(candidate, wlst[m]) == 0) {
++              cwrd = 0;
++              break;
++          }
++      }
+       if ((cwrd) && checkword(candidate, wl, cpdsuggest, timer, timelimit)) {
+           if (ns < maxSug) {
+               wlst[ns] = mystrdup(candidate);
+@@ -815,8 +822,12 @@
+                 ((c1 == 3) && (c2 >= 2)))) *p = '-';
+ 
+             cwrd = 1;
+-            for (int k=0; k < ns; k++)
+-                if (strcmp(candidate,wlst[k]) == 0) cwrd = 0;
++            for (int k=0; k < ns; k++) {
++                if (strcmp(candidate,wlst[k]) == 0) {
++                    cwrd = 0;
++                    break;
++                }
++            }
+             if (ns < maxSug) {
+                 if (cwrd) {
+                     wlst[ns] = mystrdup(candidate);
+@@ -831,8 +842,12 @@
+                 mystrlen(p + 1) > 1 &&
+                 mystrlen(candidate) - mystrlen(p) > 1) {
+                 *p = '-'; 
+-                for (int k=0; k < ns; k++)
+-                    if (strcmp(candidate,wlst[k]) == 0) cwrd = 0;
++                 for (int k=0; k < ns; k++) {
++                     if (strcmp(candidate,wlst[k]) == 0) {
++                         cwrd = 0;
++                         break;
++                     }
++                 }
+                 if (ns < maxSug) {
+                     if (cwrd) {
+                         wlst[ns] = mystrdup(candidate);
+@@ -1387,7 +1402,10 @@
+           if ((!guessorig[i] && strstr(guess[i], wlst[j])) ||
+ 	     (guessorig[i] && strstr(guessorig[i], wlst[j])) ||
+             // check forbidden words
+-            !checkword(guess[i], strlen(guess[i]), 0, NULL, NULL)) unique = 0;
++            !checkword(guess[i], strlen(guess[i]), 0, NULL, NULL)) {
++            unique = 0;
++            break;
++          }
+         }
+         if (unique) {
+     	    wlst[ns++] = guess[i];
+@@ -1415,7 +1433,10 @@
+           // don't suggest previous suggestions or a previous suggestion with prefixes or affixes
+           if (strstr(rootsphon[i], wlst[j]) || 
+             // check forbidden words
+-            !checkword(rootsphon[i], strlen(rootsphon[i]), 0, NULL, NULL)) unique = 0;
++            !checkword(rootsphon[i], strlen(rootsphon[i]), 0, NULL, NULL)) {
++            unique = 0;
++            break;
++          }
+         }
+         if (unique) {
+             wlst[ns++] = mystrdup(rootsphon[i]);

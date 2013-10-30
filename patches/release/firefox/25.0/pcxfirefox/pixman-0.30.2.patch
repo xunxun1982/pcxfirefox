@@ -1,0 +1,2303 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1380341210 -28800
+#      Sat Sep 28 12:06:50 2013 +0800
+# Node ID 31ab78ee4ac9f72ceb9bcc2df62f9758be98f00a
+# Parent  b3bb2171ff2b872427acc189bd8a2cf557cd0bfd
+Update libpixman to 0.30.2
+
+diff -r b3bb2171ff2b -r 31ab78ee4ac9 gfx/cairo/libpixman/src/pixman-arm-neon-asm.h
+--- a/gfx/cairo/libpixman/src/pixman-arm-neon-asm.h	Fri Sep 27 19:35:44 2013 -0700
++++ b/gfx/cairo/libpixman/src/pixman-arm-neon-asm.h	Sat Sep 28 12:06:50 2013 +0800
+@@ -385,7 +385,7 @@
+  * execute simultaneously with NEON and be completely shadowed by it. Thus
+  * we get no performance overhead at all (*). This looks like a very nice
+  * feature of Cortex-A8, if used wisely. We don't have a hardware prefetcher,
+- * but still can implement some rather advanced prefetch logic in sofware
++ * but still can implement some rather advanced prefetch logic in software
+  * for almost zero cost!
+  *
+  * (*) The overhead of the prefetcher is visible when running some trivial
+diff -r b3bb2171ff2b -r 31ab78ee4ac9 gfx/cairo/libpixman/src/pixman-combine-float.c
+--- a/gfx/cairo/libpixman/src/pixman-combine-float.c	Fri Sep 27 19:35:44 2013 -0700
++++ b/gfx/cairo/libpixman/src/pixman-combine-float.c	Sat Sep 28 12:06:50 2013 +0800
+@@ -42,8 +42,6 @@
+ #define force_inline __inline__
+ #endif
+ 
+-#define IS_ZERO(f)     (-FLT_MIN < (f) && (f) < FLT_MIN)
+-
+ typedef float (* combine_channel_t) (float sa, float s, float da, float d);
+ 
+ static force_inline void
+@@ -203,56 +201,56 @@
+ 	break;
+ 
+     case SA_OVER_DA:
+-	if (IS_ZERO (da))
++	if (FLOAT_IS_ZERO (da))
+ 	    f = 1.0f;
+ 	else
+ 	    f = CLAMP (sa / da);
+ 	break;
+ 
+     case DA_OVER_SA:
+-	if (IS_ZERO (sa))
++	if (FLOAT_IS_ZERO (sa))
+ 	    f = 1.0f;
+ 	else
+ 	    f = CLAMP (da / sa);
+ 	break;
+ 
+     case INV_SA_OVER_DA:
+-	if (IS_ZERO (da))
++	if (FLOAT_IS_ZERO (da))
+ 	    f = 1.0f;
+ 	else
+ 	    f = CLAMP ((1.0f - sa) / da);
+ 	break;
+ 
+     case INV_DA_OVER_SA:
+-	if (IS_ZERO (sa))
++	if (FLOAT_IS_ZERO (sa))
+ 	    f = 1.0f;
+ 	else
+ 	    f = CLAMP ((1.0f - da) / sa);
+ 	break;
+ 
+     case ONE_MINUS_SA_OVER_DA:
+-	if (IS_ZERO (da))
++	if (FLOAT_IS_ZERO (da))
+ 	    f = 0.0f;
+ 	else
+ 	    f = CLAMP (1.0f - sa / da);
+ 	break;
+ 
+     case ONE_MINUS_DA_OVER_SA:
+-	if (IS_ZERO (sa))
++	if (FLOAT_IS_ZERO (sa))
+ 	    f = 0.0f;
+ 	else
+ 	    f = CLAMP (1.0f - da / sa);
+ 	break;
+ 
+     case ONE_MINUS_INV_DA_OVER_SA:
+-	if (IS_ZERO (sa))
++	if (FLOAT_IS_ZERO (sa))
+ 	    f = 0.0f;
+ 	else
+ 	    f = CLAMP (1.0f - (1.0f - da) / sa);
+ 	break;
+ 
+     case ONE_MINUS_INV_SA_OVER_DA:
+-	if (IS_ZERO (da))
++	if (FLOAT_IS_ZERO (da))
+ 	    f = 0.0f;
+ 	else
+ 	    f = CLAMP (1.0f - (1.0f - sa) / da);
+@@ -405,11 +403,11 @@
+ static force_inline float
+ blend_color_dodge (float sa, float s, float da, float d)
+ {
+-    if (IS_ZERO (d))
++    if (FLOAT_IS_ZERO (d))
+ 	return 0.0f;
+     else if (d * sa >= sa * da - s * da)
+ 	return sa * da;
+-    else if (IS_ZERO (sa - s))
++    else if (FLOAT_IS_ZERO (sa - s))
+ 	return sa * da;
+     else
+ 	return sa * sa * d / (sa - s);
+@@ -422,7 +420,7 @@
+ 	return sa * da;
+     else if (sa * (da - d) >= s * da)
+ 	return 0.0f;
+-    else if (IS_ZERO (s))
++    else if (FLOAT_IS_ZERO (s))
+ 	return 0.0f;
+     else
+ 	return sa * (da - sa * (da - d) / s);
+@@ -442,14 +440,14 @@
+ {
+     if (2 * s < sa)
+     {
+-	if (IS_ZERO (da))
++	if (FLOAT_IS_ZERO (da))
+ 	    return d * sa;
+ 	else
+ 	    return d * sa - d * (da - d) * (sa - 2 * s) / da;
+     }
+     else
+     {
+-	if (IS_ZERO (da))
++	if (FLOAT_IS_ZERO (da))
+ 	{
+ 	    return 0.0f;
+ 	}
+@@ -658,7 +656,7 @@
+     if (n < 0.0f)
+     {
+ 	t = l - n;
+-	if (IS_ZERO (t))
++	if (FLOAT_IS_ZERO (t))
+ 	{
+ 	    color->r = 0.0f;
+ 	    color->g = 0.0f;
+@@ -674,7 +672,7 @@
+     if (x > a)
+     {
+ 	t = x - l;
+-	if (IS_ZERO (t))
++	if (FLOAT_IS_ZERO (t))
+ 	{
+ 	    color->r = a;
+ 	    color->g = a;
+@@ -758,7 +756,7 @@
+ 
+     t = *max - *min;
+ 
+-    if (IS_ZERO (t))
++    if (FLOAT_IS_ZERO (t))
+     {
+ 	*mid = *max = 0.0f;
+     }
+diff -r b3bb2171ff2b -r 31ab78ee4ac9 gfx/cairo/libpixman/src/pixman-compiler.h
+--- a/gfx/cairo/libpixman/src/pixman-compiler.h	Fri Sep 27 19:35:44 2013 -0700
++++ b/gfx/cairo/libpixman/src/pixman-compiler.h	Sat Sep 28 12:06:50 2013 +0800
+@@ -19,6 +19,12 @@
+ #endif
+ 
+ #if defined (__GNUC__)
++#  define unlikely(expr) __builtin_expect ((expr), 0)
++#else
++#  define unlikely(expr)  (expr)
++#endif
++
++#if defined (__GNUC__)
+ #  define MAYBE_UNUSED  __attribute__((unused))
+ #else
+ #  define MAYBE_UNUSED
+diff -r b3bb2171ff2b -r 31ab78ee4ac9 gfx/cairo/libpixman/src/pixman-gradient-walker.c
+--- a/gfx/cairo/libpixman/src/pixman-gradient-walker.c	Fri Sep 27 19:35:44 2013 -0700
++++ b/gfx/cairo/libpixman/src/pixman-gradient-walker.c	Sat Sep 28 12:06:50 2013 +0800
+@@ -37,11 +37,14 @@
+     walker->stops     = gradient->stops;
+     walker->left_x    = 0;
+     walker->right_x   = 0x10000;
+-    walker->stepper   = 0;
+-    walker->left_ag   = 0;
+-    walker->left_rb   = 0;
+-    walker->right_ag  = 0;
+-    walker->right_rb  = 0;
++    walker->a_s       = 0.0f;
++    walker->a_b       = 0.0f;
++    walker->r_s       = 0.0f;
++    walker->r_b       = 0.0f;
++    walker->g_s       = 0.0f;
++    walker->g_b       = 0.0f;
++    walker->b_s       = 0.0f;
++    walker->b_b       = 0.0f;
+     walker->repeat    = repeat;
+ 
+     walker->need_reset = TRUE;
+@@ -55,6 +58,9 @@
+     pixman_color_t *left_c, *right_c;
+     int n, count = walker->num_stops;
+     pixman_gradient_stop_t *stops = walker->stops;
++    float la, lr, lg, lb;
++    float ra, rr, rg, rb;
++    float lx, rx;
+ 
+     if (walker->repeat == PIXMAN_REPEAT_NORMAL)
+     {
+@@ -116,24 +122,49 @@
+ 	    left_c = right_c;
+     }
+ 
+-    walker->left_x   = left_x;
+-    walker->right_x  = right_x;
+-    walker->left_ag  = ((left_c->alpha >> 8) << 16)   | (left_c->green >> 8);
+-    walker->left_rb  = ((left_c->red & 0xff00) << 8)  | (left_c->blue >> 8);
+-    walker->right_ag = ((right_c->alpha >> 8) << 16)  | (right_c->green >> 8);
+-    walker->right_rb = ((right_c->red & 0xff00) << 8) | (right_c->blue >> 8);
++    /* The alpha channel is scaled to be in the [0, 255] interval,
++     * and the red/green/blue channels are scaled to be in [0, 1].
++     * This ensures that after premultiplication all channels will
++     * be in the [0, 255] interval.
++     */
++    la = (left_c->alpha * (1.0f/257.0f));
++    lr = (left_c->red * (1.0f/257.0f));
++    lg = (left_c->green * (1.0f/257.0f));
++    lb = (left_c->blue * (1.0f/257.0f));
+ 
+-    if (walker->left_x == walker->right_x                ||
+-        (walker->left_ag == walker->right_ag &&
+-	 walker->left_rb == walker->right_rb))
++    ra = (right_c->alpha * (1.0f/257.0f));
++    rr = (right_c->red * (1.0f/257.0f));
++    rg = (right_c->green * (1.0f/257.0f));
++    rb = (right_c->blue * (1.0f/257.0f));
++    
++    lx = left_x * (1.0f/65536.0f);
++    rx = right_x * (1.0f/65536.0f);
++    
++    if (FLOAT_IS_ZERO (rx - lx) || left_x == INT32_MIN || right_x == INT32_MAX)
+     {
+-	walker->stepper = 0;
++	walker->a_s = walker->r_s = walker->g_s = walker->b_s = 0.0f;
++	walker->a_b = (la + ra) / 2.0f;
++	walker->r_b = (lr + rr) / 510.0f;
++	walker->g_b = (lg + rg) / 510.0f;
++	walker->b_b = (lb + rb) / 510.0f;
+     }
+     else
+     {
+-	int32_t width = right_x - left_x;
+-	walker->stepper = ((1 << 24) + width / 2) / width;
++	float w_rec = 1.0f / (rx - lx);
++
++	walker->a_b = (la * rx - ra * lx) * w_rec;
++	walker->r_b = (lr * rx - rr * lx) * w_rec * (1.0f/255.0f);
++	walker->g_b = (lg * rx - rg * lx) * w_rec * (1.0f/255.0f);
++	walker->b_b = (lb * rx - rb * lx) * w_rec * (1.0f/255.0f);
++
++	walker->a_s = (ra - la) * w_rec;
++	walker->r_s = (rr - lr) * w_rec * (1.0f/255.0f);
++	walker->g_s = (rg - lg) * w_rec * (1.0f/255.0f);
++	walker->b_s = (rb - lb) * w_rec * (1.0f/255.0f);
+     }
++   
++    walker->left_x = left_x;
++    walker->right_x = right_x;
+ 
+     walker->need_reset = FALSE;
+ }
+@@ -142,31 +173,30 @@
+ _pixman_gradient_walker_pixel (pixman_gradient_walker_t *walker,
+                                pixman_fixed_48_16_t      x)
+ {
+-    int dist, idist;
+-    uint32_t t1, t2, a, color;
++    float a, r, g, b;
++    uint8_t a8, r8, g8, b8;
++    uint32_t v;
++    float y;
+ 
+     if (walker->need_reset || x < walker->left_x || x >= walker->right_x)
+-	gradient_walker_reset (walker, x);
++        gradient_walker_reset (walker, x);
+ 
+-    dist  = ((int)(x - walker->left_x) * walker->stepper) >> 16;
+-    idist = 256 - dist;
++    y = x * (1.0f / 65536.0f);
+ 
+-    /* combined INTERPOLATE and premultiply */
+-    t1 = walker->left_rb * idist + walker->right_rb * dist;
+-    t1 = (t1 >> 8) & 0xff00ff;
++    a = walker->a_s * y + walker->a_b;
++    r = a * (walker->r_s * y + walker->r_b);
++    g = a * (walker->g_s * y + walker->g_b);
++    b = a * (walker->b_s * y + walker->b_b);
+ 
+-    t2  = walker->left_ag * idist + walker->right_ag * dist;
+-    t2 &= 0xff00ff00;
++    a8 = a + 0.5f;
++    r8 = r + 0.5f;
++    g8 = g + 0.5f;
++    b8 = b + 0.5f;
+ 
+-    color = t2 & 0xff000000;
+-    a     = t2 >> 24;
++    v = ((a8 << 24) & 0xff000000) |
++        ((r8 << 16) & 0x00ff0000) |
++        ((g8 <<  8) & 0x0000ff00) |
++        ((b8 >>  0) & 0x000000ff);
+ 
+-    t1  = t1 * a + 0x800080;
+-    t1  = (t1 + ((t1 >> 8) & 0xff00ff)) >> 8;
+-
+-    t2  = (t2 >> 8) * a + 0x800080;
+-    t2  = (t2 + ((t2 >> 8) & 0xff00ff));
+-
+-    return (color | (t1 & 0xff00ff) | (t2 & 0xff00));
++    return v;
+ }
+-
+diff -r b3bb2171ff2b -r 31ab78ee4ac9 gfx/cairo/libpixman/src/pixman-implementation.c
+--- a/gfx/cairo/libpixman/src/pixman-implementation.c	Fri Sep 27 19:35:44 2013 -0700
++++ b/gfx/cairo/libpixman/src/pixman-implementation.c	Sat Sep 28 12:06:50 2013 +0800
+@@ -150,9 +150,16 @@
+     }
+ 
+     /* We should never reach this point */
+-    _pixman_log_error (FUNC, "No known composite function\n");
++    _pixman_log_error (
++        FUNC,
++        "No composite function found\n"
++        "\n"
++        "The most likely cause of this is that this system has issues with\n"
++        "thread local storage\n");
++
+     *out_imp = NULL;
+     *out_func = dummy_composite_rect;
++    return;
+ 
+ update_cache:
+     if (i)
+diff -r b3bb2171ff2b -r 31ab78ee4ac9 gfx/cairo/libpixman/src/pixman-mips-dspr2-asm.S
+--- a/gfx/cairo/libpixman/src/pixman-mips-dspr2-asm.S	Fri Sep 27 19:35:44 2013 -0700
++++ b/gfx/cairo/libpixman/src/pixman-mips-dspr2-asm.S	Sat Sep 28 12:06:50 2013 +0800
+@@ -310,6 +310,516 @@
+ 
+ END(pixman_composite_src_x888_8888_asm_mips)
+ 
++#if defined(__MIPSEL__) || defined(__MIPSEL) || defined(_MIPSEL) || defined(MIPSEL)
++LEAF_MIPS_DSPR2(pixman_composite_src_0888_8888_rev_asm_mips)
++/*
++ * a0 - dst (a8r8g8b8)
++ * a1 - src (b8g8r8)
++ * a2 - w
++ */
++
++    beqz              a2, 6f
++     nop
++
++    lui               t8, 0xff00;
++    srl               t9, a2, 2   /* t9 = how many multiples of 4 src pixels */
++    beqz              t9, 4f      /* branch if less than 4 src pixels */
++     nop
++
++    li                t0, 0x1
++    li                t1, 0x2
++    li                t2, 0x3
++    andi              t3, a1, 0x3
++    beq               t3, t0, 1f
++     nop
++    beq               t3, t1, 2f
++     nop
++    beq               t3, t2, 3f
++     nop
++
++0:
++    beqz              t9, 4f
++     addiu            t9, t9, -1
++    lw                t0, 0(a1)            /* t0 = R2 | B1 | G1 | R1 */
++    lw                t1, 4(a1)            /* t1 = G3 | R3 | B2 | G2 */
++    lw                t2, 8(a1)            /* t2 = B4 | G4 | R4 | B3 */
++
++    addiu             a1, a1, 12
++    addiu             a2, a2, -4
++
++    wsbh              t0, t0               /* t0 = B1 | R2 | R1 | G1 */
++    wsbh              t1, t1               /* t1 = R3 | G3 | G2 | B2 */
++    wsbh              t2, t2               /* t2 = G4 | B4 | B3 | R4 */
++
++    packrl.ph         t3, t1, t0           /* t3 = G2 | B2 | B1 | R2 */
++    packrl.ph         t4, t0, t0           /* t4 = R1 | G1 | B1 | R2 */
++    rotr              t3, t3, 16           /* t3 = B1 | R2 | G2 | B2 */
++    or                t3, t3, t8           /* t3 = FF | R2 | G2 | B2 */
++    srl               t4, t4, 8            /* t4 =  0 | R1 | G1 | B1 */
++    or                t4, t4, t8           /* t4 = FF | R1 | G1 | B1 */
++    packrl.ph         t5, t2, t1           /* t5 = B3 | R4 | R3 | G3 */
++    rotr              t5, t5, 24           /* t5 = R4 | R3 | G3 | B3 */
++    or                t5, t5, t8           /* t5 = FF | R3 | G3 | B3 */
++    rotr              t2, t2, 16           /* t2 = B3 | R4 | G4 | B4 */
++    or                t2, t2, t8           /* t5 = FF | R3 | G3 | B3 */
++
++    sw                t4, 0(a0)
++    sw                t3, 4(a0)
++    sw                t5, 8(a0)
++    sw                t2, 12(a0)
++    b                 0b
++     addiu            a0, a0, 16
++
++1:
++    lbu               t6, 0(a1)            /* t6 =  0 |  0 |  0 | R1 */
++    lhu               t7, 1(a1)            /* t7 =  0 |  0 | B1 | G1 */
++    sll               t6, t6, 16           /* t6 =  0 | R1 |  0 | 0  */
++    wsbh              t7, t7               /* t7 =  0 |  0 | G1 | B1 */
++    or                t7, t6, t7           /* t7 =  0 | R1 | G1 | B1 */
++11:
++    beqz              t9, 4f
++     addiu            t9, t9, -1
++    lw                t0, 3(a1)            /* t0 = R3 | B2 | G2 | R2 */
++    lw                t1, 7(a1)            /* t1 = G4 | R4 | B3 | G3 */
++    lw                t2, 11(a1)           /* t2 = B5 | G5 | R5 | B4 */
++
++    addiu             a1, a1, 12
++    addiu             a2, a2, -4
++
++    wsbh              t0, t0               /* t0 = B2 | R3 | R2 | G2 */
++    wsbh              t1, t1               /* t1 = R4 | G4 | G3 | B3 */
++    wsbh              t2, t2               /* t2 = G5 | B5 | B4 | R5 */
++
++    packrl.ph         t3, t1, t0           /* t3 = G3 | B3 | B2 | R3 */
++    packrl.ph         t4, t2, t1           /* t4 = B4 | R5 | R4 | G4 */
++    rotr              t0, t0, 24           /* t0 = R3 | R2 | G2 | B2 */
++    rotr              t3, t3, 16           /* t3 = B2 | R3 | G3 | B3 */
++    rotr              t4, t4, 24           /* t4 = R5 | R4 | G4 | B4 */
++    or                t7, t7, t8           /* t7 = FF | R1 | G1 | B1 */
++    or                t0, t0, t8           /* t0 = FF | R2 | G2 | B2 */
++    or                t3, t3, t8           /* t1 = FF | R3 | G3 | B3 */
++    or                t4, t4, t8           /* t3 = FF | R4 | G4 | B4 */
++
++    sw                t7, 0(a0)
++    sw                t0, 4(a0)
++    sw                t3, 8(a0)
++    sw                t4, 12(a0)
++    rotr              t7, t2, 16           /* t7 = xx | R5 | G5 | B5 */
++    b                 11b
++     addiu            a0, a0, 16
++
++2:
++    lhu               t7, 0(a1)            /* t7 =  0 |  0 | G1 | R1 */
++    wsbh              t7, t7               /* t7 =  0 |  0 | R1 | G1 */
++21:
++    beqz              t9, 4f
++     addiu            t9, t9, -1
++    lw                t0, 2(a1)            /* t0 = B2 | G2 | R2 | B1 */
++    lw                t1, 6(a1)            /* t1 = R4 | B3 | G3 | R3 */
++    lw                t2, 10(a1)           /* t2 = G5 | R5 | B4 | G4 */
++
++    addiu             a1, a1, 12
++    addiu             a2, a2, -4
++
++    wsbh              t0, t0               /* t0 = G2 | B2 | B1 | R2 */
++    wsbh              t1, t1               /* t1 = B3 | R4 | R3 | G3 */
++    wsbh              t2, t2               /* t2 = R5 | G5 | G4 | B4 */
++
++    precr_sra.ph.w    t7, t0, 0            /* t7 = R1 | G1 | B1 | R2 */
++    rotr              t0, t0, 16           /* t0 = B1 | R2 | G2 | B2 */
++    packrl.ph         t3, t2, t1           /* t3 = G4 | B4 | B3 | R4 */
++    rotr              t1, t1, 24           /* t1 = R4 | R3 | G3 | B3 */
++    srl               t7, t7, 8            /* t7 =  0 | R1 | G1 | B1 */
++    rotr              t3, t3, 16           /* t3 = B3 | R4 | G4 | B4 */
++    or                t7, t7, t8           /* t7 = FF | R1 | G1 | B1 */
++    or                t0, t0, t8           /* t0 = FF | R2 | G2 | B2 */
++    or                t1, t1, t8           /* t1 = FF | R3 | G3 | B3 */
++    or                t3, t3, t8           /* t3 = FF | R4 | G4 | B4 */
++
++    sw                t7, 0(a0)
++    sw                t0, 4(a0)
++    sw                t1, 8(a0)
++    sw                t3, 12(a0)
++    srl               t7, t2, 16           /* t7 =  0 |  0 | R5 | G5 */
++    b                 21b
++     addiu            a0, a0, 16
++
++3:
++    lbu               t7, 0(a1)            /* t7 =  0 |  0 |  0 | R1 */
++31:
++    beqz              t9, 4f
++     addiu            t9, t9, -1
++    lw                t0, 1(a1)            /* t0 = G2 | R2 | B1 | G1 */
++    lw                t1, 5(a1)            /* t1 = B3 | G3 | R3 | B2 */
++    lw                t2, 9(a1)            /* t2 = R5 | B4 | G4 | R4 */
++
++    addiu             a1, a1, 12
++    addiu             a2, a2, -4
++
++    wsbh              t0, t0               /* t0 = R2 | G2 | G1 | B1 */
++    wsbh              t1, t1               /* t1 = G3 | B3 | B2 | R3 */
++    wsbh              t2, t2               /* t2 = B4 | R5 | R4 | G4 */
++
++    precr_sra.ph.w    t7, t0, 0            /* t7 = xx | R1 | G1 | B1 */
++    packrl.ph         t3, t1, t0           /* t3 = B2 | R3 | R2 | G2 */
++    rotr              t1, t1, 16           /* t1 = B2 | R3 | G3 | B3 */
++    rotr              t4, t2, 24           /* t4 = R5 | R4 | G4 | B4 */
++    rotr              t3, t3, 24           /* t3 = R3 | R2 | G2 | B2 */
++    or                t7, t7, t8           /* t7 = FF | R1 | G1 | B1 */
++    or                t3, t3, t8           /* t3 = FF | R2 | G2 | B2 */
++    or                t1, t1, t8           /* t1 = FF | R3 | G3 | B3 */
++    or                t4, t4, t8           /* t4 = FF | R4 | G4 | B4 */
++
++    sw                t7, 0(a0)
++    sw                t3, 4(a0)
++    sw                t1, 8(a0)
++    sw                t4, 12(a0)
++    srl               t7, t2, 16           /* t7 =  0 |  0 | xx | R5 */
++    b                 31b
++     addiu            a0, a0, 16
++
++4:
++    beqz              a2, 6f
++     nop
++5:
++    lbu               t0, 0(a1)            /* t0 =  0 | 0 | 0 | R */
++    lbu               t1, 1(a1)            /* t1 =  0 | 0 | 0 | G */
++    lbu               t2, 2(a1)            /* t2 =  0 | 0 | 0 | B */
++    addiu             a1, a1, 3
++
++    sll               t0, t0, 16           /* t2 =  0 | R | 0 | 0 */
++    sll               t1, t1, 8            /* t1 =  0 | 0 | G | 0 */
++
++    or                t2, t2, t1           /* t2 =  0 | 0 | G | B */
++    or                t2, t2, t0           /* t2 =  0 | R | G | B */
++    or                t2, t2, t8           /* t2 = FF | R | G | B */
++
++    sw                t2, 0(a0)
++    addiu             a2, a2, -1
++    bnez              a2, 5b
++     addiu            a0, a0, 4
++6:
++    j                 ra
++     nop
++
++END(pixman_composite_src_0888_8888_rev_asm_mips)
++
++LEAF_MIPS_DSPR2(pixman_composite_src_0888_0565_rev_asm_mips)
++/*
++ * a0 - dst (r5g6b5)
++ * a1 - src (b8g8r8)
++ * a2 - w
++ */
++
++    SAVE_REGS_ON_STACK 0, v0, v1
++    beqz              a2, 6f
++     nop
++
++    li                t6, 0xf800f800
++    li                t7, 0x07e007e0
++    li                t8, 0x001F001F
++    srl               t9, a2, 2   /* t9 = how many multiples of 4 src pixels */
++    beqz              t9, 4f      /* branch if less than 4 src pixels */
++     nop
++
++    li                t0, 0x1
++    li                t1, 0x2
++    li                t2, 0x3
++    andi              t3, a1, 0x3
++    beq               t3, t0, 1f
++     nop
++    beq               t3, t1, 2f
++     nop
++    beq               t3, t2, 3f
++     nop
++
++0:
++    beqz              t9, 4f
++     addiu            t9, t9, -1
++    lw                t0, 0(a1)            /* t0 = R2 | B1 | G1 | R1 */
++    lw                t1, 4(a1)            /* t1 = G3 | R3 | B2 | G2 */
++    lw                t2, 8(a1)            /* t2 = B4 | G4 | R4 | B3 */
++
++    addiu             a1, a1, 12
++    addiu             a2, a2, -4
++
++    wsbh              t0, t0               /* t0 = B1 | R2 | R1 | G1 */
++    wsbh              t1, t1               /* t1 = R3 | G3 | G2 | B2 */
++    wsbh              t2, t2               /* t2 = G4 | B4 | B3 | R4 */
++
++    packrl.ph         t3, t1, t0           /* t3 = G2 | B2 | B1 | R2 */
++    packrl.ph         t4, t0, t0           /* t4 = R1 | G1 | B1 | R2 */
++    rotr              t3, t3, 16           /* t3 = B1 | R2 | G2 | B2 */
++    srl               t4, t4, 8            /* t4 =  0 | R1 | G1 | B1 */
++    packrl.ph         t5, t2, t1           /* t5 = B3 | R4 | R3 | G3 */
++    rotr              t5, t5, 24           /* t5 = R4 | R3 | G3 | B3 */
++    rotr              t2, t2, 16           /* t2 = B3 | R4 | G4 | B4 */
++
++    CONVERT_2x8888_TO_2x0565 t4, t3, t4, t3, t6, t7, t8, v0, v1
++    CONVERT_2x8888_TO_2x0565 t5, t2, t5, t2, t6, t7, t8, v0, v1
++
++    sh                t4, 0(a0)
++    sh                t3, 2(a0)
++    sh                t5, 4(a0)
++    sh                t2, 6(a0)
++    b                 0b
++     addiu            a0, a0, 8
++
++1:
++    lbu               t4, 0(a1)            /* t4 =  0 |  0 |  0 | R1 */
++    lhu               t5, 1(a1)            /* t5 =  0 |  0 | B1 | G1 */
++    sll               t4, t4, 16           /* t4 =  0 | R1 |  0 | 0  */
++    wsbh              t5, t5               /* t5 =  0 |  0 | G1 | B1 */
++    or                t5, t4, t5           /* t5 =  0 | R1 | G1 | B1 */
++11:
++    beqz              t9, 4f
++     addiu            t9, t9, -1
++    lw                t0, 3(a1)            /* t0 = R3 | B2 | G2 | R2 */
++    lw                t1, 7(a1)            /* t1 = G4 | R4 | B3 | G3 */
++    lw                t2, 11(a1)           /* t2 = B5 | G5 | R5 | B4 */
++
++    addiu             a1, a1, 12
++    addiu             a2, a2, -4
++
++    wsbh              t0, t0               /* t0 = B2 | R3 | R2 | G2 */
++    wsbh              t1, t1               /* t1 = R4 | G4 | G3 | B3 */
++    wsbh              t2, t2               /* t2 = G5 | B5 | B4 | R5 */
++
++    packrl.ph         t3, t1, t0           /* t3 = G3 | B3 | B2 | R3 */
++    packrl.ph         t4, t2, t1           /* t4 = B4 | R5 | R4 | G4 */
++    rotr              t0, t0, 24           /* t0 = R3 | R2 | G2 | B2 */
++    rotr              t3, t3, 16           /* t3 = B2 | R3 | G3 | B3 */
++    rotr              t4, t4, 24           /* t4 = R5 | R4 | G4 | B4 */
++
++    CONVERT_2x8888_TO_2x0565 t5, t0, t5, t0, t6, t7, t8, v0, v1
++    CONVERT_2x8888_TO_2x0565 t3, t4, t3, t4, t6, t7, t8, v0, v1
++
++    sh                t5, 0(a0)
++    sh                t0, 2(a0)
++    sh                t3, 4(a0)
++    sh                t4, 6(a0)
++    rotr              t5, t2, 16           /* t5 = xx | R5 | G5 | B5 */
++    b                 11b
++     addiu            a0, a0, 8
++
++2:
++    lhu               t5, 0(a1)            /* t5 =  0 |  0 | G1 | R1 */
++    wsbh              t5, t5               /* t5 =  0 |  0 | R1 | G1 */
++21:
++    beqz              t9, 4f
++     addiu            t9, t9, -1
++    lw                t0, 2(a1)            /* t0 = B2 | G2 | R2 | B1 */
++    lw                t1, 6(a1)            /* t1 = R4 | B3 | G3 | R3 */
++    lw                t2, 10(a1)           /* t2 = G5 | R5 | B4 | G4 */
++
++    addiu             a1, a1, 12
++    addiu             a2, a2, -4
++
++    wsbh              t0, t0               /* t0 = G2 | B2 | B1 | R2 */
++    wsbh              t1, t1               /* t1 = B3 | R4 | R3 | G3 */
++    wsbh              t2, t2               /* t2 = R5 | G5 | G4 | B4 */
++
++    precr_sra.ph.w    t5, t0, 0            /* t5 = R1 | G1 | B1 | R2 */
++    rotr              t0, t0, 16           /* t0 = B1 | R2 | G2 | B2 */
++    packrl.ph         t3, t2, t1           /* t3 = G4 | B4 | B3 | R4 */
++    rotr              t1, t1, 24           /* t1 = R4 | R3 | G3 | B3 */
++    srl               t5, t5, 8            /* t5 =  0 | R1 | G1 | B1 */
++    rotr              t3, t3, 16           /* t3 = B3 | R4 | G4 | B4 */
++
++    CONVERT_2x8888_TO_2x0565 t5, t0, t5, t0, t6, t7, t8, v0, v1
++    CONVERT_2x8888_TO_2x0565 t1, t3, t1, t3, t6, t7, t8, v0, v1
++
++    sh                t5, 0(a0)
++    sh                t0, 2(a0)
++    sh                t1, 4(a0)
++    sh                t3, 6(a0)
++    srl               t5, t2, 16           /* t5 =  0 |  0 | R5 | G5 */
++    b                 21b
++     addiu            a0, a0, 8
++
++3:
++    lbu               t5, 0(a1)            /* t5 =  0 |  0 |  0 | R1 */
++31:
++    beqz              t9, 4f
++     addiu            t9, t9, -1
++    lw                t0, 1(a1)            /* t0 = G2 | R2 | B1 | G1 */
++    lw                t1, 5(a1)            /* t1 = B3 | G3 | R3 | B2 */
++    lw                t2, 9(a1)            /* t2 = R5 | B4 | G4 | R4 */
++
++    addiu             a1, a1, 12
++    addiu             a2, a2, -4
++
++    wsbh              t0, t0               /* t0 = R2 | G2 | G1 | B1 */
++    wsbh              t1, t1               /* t1 = G3 | B3 | B2 | R3 */
++    wsbh              t2, t2               /* t2 = B4 | R5 | R4 | G4 */
++
++    precr_sra.ph.w    t5, t0, 0            /* t5 = xx | R1 | G1 | B1 */
++    packrl.ph         t3, t1, t0           /* t3 = B2 | R3 | R2 | G2 */
++    rotr              t1, t1, 16           /* t1 = B2 | R3 | G3 | B3 */
++    rotr              t4, t2, 24           /* t4 = R5 | R4 | G4 | B4 */
++    rotr              t3, t3, 24           /* t3 = R3 | R2 | G2 | B2 */
++
++    CONVERT_2x8888_TO_2x0565 t5, t3, t5, t3, t6, t7, t8, v0, v1
++    CONVERT_2x8888_TO_2x0565 t1, t4, t1, t4, t6, t7, t8, v0, v1
++
++    sh                t5, 0(a0)
++    sh                t3, 2(a0)
++    sh                t1, 4(a0)
++    sh                t4, 6(a0)
++    srl               t5, t2, 16           /* t5 =  0 |  0 | xx | R5 */
++    b                 31b
++     addiu            a0, a0, 8
++
++4:
++    beqz              a2, 6f
++     nop
++5:
++    lbu               t0, 0(a1)            /* t0 =  0 | 0 | 0 | R */
++    lbu               t1, 1(a1)            /* t1 =  0 | 0 | 0 | G */
++    lbu               t2, 2(a1)            /* t2 =  0 | 0 | 0 | B */
++    addiu             a1, a1, 3
++
++    sll               t0, t0, 16           /* t2 =  0 | R | 0 | 0 */
++    sll               t1, t1, 8            /* t1 =  0 | 0 | G | 0 */
++
++    or                t2, t2, t1           /* t2 =  0 | 0 | G | B */
++    or                t2, t2, t0           /* t2 =  0 | R | G | B */
++
++    CONVERT_1x8888_TO_1x0565 t2, t3, t4, t5
++
++    sh                t3, 0(a0)
++    addiu             a2, a2, -1
++    bnez              a2, 5b
++     addiu            a0, a0, 2
++6:
++    RESTORE_REGS_FROM_STACK 0, v0, v1
++    j                 ra
++     nop
++
++END(pixman_composite_src_0888_0565_rev_asm_mips)
++#endif
++
++LEAF_MIPS_DSPR2(pixman_composite_src_pixbuf_8888_asm_mips)
++/*
++ * a0 - dst  (a8b8g8r8)
++ * a1 - src  (a8r8g8b8)
++ * a2 - w
++ */
++
++    SAVE_REGS_ON_STACK 0, v0
++    li       v0, 0x00ff00ff
++
++    beqz     a2, 3f
++     nop
++    addiu    t1, a2, -1
++    beqz     t1, 2f
++     nop
++1:
++    lw       t0, 0(a1)
++    lw       t1, 4(a1)
++    addiu    a1, a1, 8
++    addiu    a2, a2, -2
++    srl      t2, t0, 24
++    srl      t3, t1, 24
++
++    MIPS_2xUN8x4_MUL_2xUN8 t0, t1, t2, t3, t0, t1, v0, t4, t5, t6, t7, t8, t9
++
++    sll      t0, t0, 8
++    sll      t1, t1, 8
++    andi     t2, t2, 0xff
++    andi     t3, t3, 0xff
++    or       t0, t0, t2
++    or       t1, t1, t3
++    wsbh     t0, t0
++    wsbh     t1, t1
++    rotr     t0, t0, 16
++    rotr     t1, t1, 16
++    sw       t0, 0(a0)
++    sw       t1, 4(a0)
++
++    addiu    t2, a2, -1
++    bgtz     t2, 1b
++     addiu   a0, a0, 8
++2:
++    beqz     a2, 3f
++     nop
++    lw       t0, 0(a1)
++    srl      t1, t0, 24
++
++    MIPS_UN8x4_MUL_UN8 t0, t1, t0, v0, t3, t4, t5
++
++    sll      t0, t0, 8
++    andi     t1, t1, 0xff
++    or       t0, t0, t1
++    wsbh     t0, t0
++    rotr     t0, t0, 16
++    sw       t0, 0(a0)
++3:
++    RESTORE_REGS_FROM_STACK 0, v0
++    j        ra
++     nop
++
++END(pixman_composite_src_pixbuf_8888_asm_mips)
++
++LEAF_MIPS_DSPR2(pixman_composite_src_rpixbuf_8888_asm_mips)
++/*
++ * a0 - dst  (a8r8g8b8)
++ * a1 - src  (a8r8g8b8)
++ * a2 - w
++ */
++
++    SAVE_REGS_ON_STACK 0, v0
++    li       v0, 0x00ff00ff
++
++    beqz     a2, 3f
++     nop
++    addiu    t1, a2, -1
++    beqz     t1, 2f
++     nop
++1:
++    lw       t0, 0(a1)
++    lw       t1, 4(a1)
++    addiu    a1, a1, 8
++    addiu    a2, a2, -2
++    srl      t2, t0, 24
++    srl      t3, t1, 24
++
++    MIPS_2xUN8x4_MUL_2xUN8 t0, t1, t2, t3, t0, t1, v0, t4, t5, t6, t7, t8, t9
++
++    sll      t0, t0, 8
++    sll      t1, t1, 8
++    andi     t2, t2, 0xff
++    andi     t3, t3, 0xff
++    or       t0, t0, t2
++    or       t1, t1, t3
++    rotr     t0, t0, 8
++    rotr     t1, t1, 8
++    sw       t0, 0(a0)
++    sw       t1, 4(a0)
++
++    addiu    t2, a2, -1
++    bgtz     t2, 1b
++     addiu   a0, a0, 8
++2:
++    beqz     a2, 3f
++     nop
++    lw       t0, 0(a1)
++    srl      t1, t0, 24
++
++    MIPS_UN8x4_MUL_UN8 t0, t1, t0, v0, t3, t4, t5
++
++    sll      t0, t0, 8
++    andi     t1, t1, 0xff
++    or       t0, t0, t1
++    rotr     t0, t0, 8
++    sw       t0, 0(a0)
++3:
++    RESTORE_REGS_FROM_STACK 0, v0
++    j        ra
++     nop
++
++END(pixman_composite_src_rpixbuf_8888_asm_mips)
++
+ LEAF_MIPS_DSPR2(pixman_composite_src_n_8_8888_asm_mips)
+ /*
+  * a0 - dst  (a8r8g8b8)
+@@ -451,34 +961,35 @@
+  * a3 - w
+  */
+ 
++    beqz         a3, 8f
++     nop
+     SAVE_REGS_ON_STACK 8, s0, s1, s2, s3, s4, s5
+-    beqz         a3, 4f
+-     nop
++
+     li           t6, 0xff
+     addiu        t7, zero, -1 /* t7 = 0xffffffff */
+     srl          t8, a1, 24   /* t8 = srca */
+     li           t9, 0x00ff00ff
++
+     addiu        t1, a3, -1
+-    beqz         t1, 3f       /* last pixel */
++    beqz         t1, 4f       /* last pixel */
+      nop
+-    beq          t8, t6, 2f   /* if (srca == 0xff) */
+-     nop
+-1:
+-                              /* a1 = src */
++
++0:
+     lw           t0, 0(a2)    /* t0 = mask */
+     lw           t1, 4(a2)    /* t1 = mask */
++    addiu        a3, a3, -2   /* w = w - 2 */
+     or           t2, t0, t1
+-    beqz         t2, 12f      /* if (t0 == 0) && (t1 == 0) */
++    beqz         t2, 3f      /* if (t0 == 0) && (t1 == 0) */
+      addiu       a2, a2, 8
+-    and          t3, t0, t1
+-    move         t4, a1       /* t4 = src */
+-    move         t5, a1       /* t5 = src */
++    and          t2, t0, t1
++    beq          t2, t7, 1f  /* if (t0 == 0xffffffff) && (t1 == 0xffffffff) */
++     nop
++
++//if(ma)
+     lw           t2, 0(a0)    /* t2 = dst */
+-    beq          t3, t7, 11f  /* if (t0 == 0xffffffff) && (t1 == 0xffffffff) */
+-     lw          t3, 4(a0)    /* t3 = dst */
++    lw           t3, 4(a0)    /* t3 = dst */
+     MIPS_2xUN8x4_MUL_2xUN8x4 a1, a1, t0, t1, t4, t5, t9, s0, s1, s2, s3, s4, s5
+     MIPS_2xUN8x4_MUL_2xUN8   t0, t1, t8, t8, t0, t1, t9, s0, s1, s2, s3, s4, s5
+-11:
+     not          t0, t0
+     not          t1, t1
+     MIPS_2xUN8x4_MUL_2xUN8x4 t2, t3, t0, t1, t2, t3, t9, s0, s1, s2, s3, s4, s5
+@@ -486,62 +997,79 @@
+     addu_s.qb    t3, t5, t3
+     sw           t2, 0(a0)
+     sw           t3, 4(a0)
+-12:
+-    addiu        a3, a3, -2
+     addiu        t1, a3, -1
+-    bgtz         t1, 1b
++    bgtz         t1, 0b
+      addiu       a0, a0, 8
+-    b            3f
++    b            4f
++     nop
++1:
++//if (t0 == 0xffffffff) && (t1 == 0xffffffff):
++    beq          t8, t6, 2f   /* if (srca == 0xff) */
++     nop
++    lw           t2, 0(a0)    /* t2 = dst */
++    lw           t3, 4(a0)    /* t3 = dst */
++    not          t0, a1
++    not          t1, a1
++    srl          t0, t0, 24
++    srl          t1, t1, 24
++    MIPS_2xUN8x4_MUL_2xUN8 t2, t3, t0, t1, t2, t3, t9, s0, s1, s2, s3, s4, s5
++    addu_s.qb    t2, a1, t2
++    addu_s.qb    t3, a1, t3
++    sw           t2, 0(a0)
++    sw           t3, 4(a0)
++    addiu        t1, a3, -1
++    bgtz         t1, 0b
++     addiu       a0, a0, 8
++    b            4f
+      nop
+ 2:
++    sw           a1, 0(a0)
++    sw           a1, 4(a0)
++3:
++    addiu        t1, a3, -1
++    bgtz         t1, 0b
++     addiu       a0, a0, 8
++
++4:
++    beqz         a3, 7f
++     nop
+                               /* a1 = src */
+     lw           t0, 0(a2)    /* t0 = mask */
+-    lw           t1, 4(a2)    /* t1 = mask */
+-    or           t2, t0, t1
+-    beqz         t2, 22f      /* if (t0 == 0) & (t1 == 0) */
+-     addiu       a2, a2, 8
+-    and          t2, t0, t1
+-    move         t4, a1
+-    beq          t2, t7, 21f  /* if (t0 == 0xffffffff) && (t1 == 0xffffffff) */
+-     move        t5, a1
+-    lw           t2, 0(a0)    /* t2 = dst */
+-    lw           t3, 4(a0)    /* t3 = dst */
+-    MIPS_2xUN8x4_MUL_2xUN8x4 a1, a1, t0, t1, t4, t5, t9, s0, s1, s2, s3, s4, s5
++    beqz         t0, 7f       /* if (t0 == 0) */
++     nop
++    beq          t0, t7, 5f  /* if (t0 == 0xffffffff) */
++     nop
++//if(ma)
++    lw           t1, 0(a0)    /* t1 = dst */
++    MIPS_UN8x4_MUL_UN8x4  a1, t0, t2, t9, t3, t4, t5, s0
++    MIPS_UN8x4_MUL_UN8    t0, t8, t0, t9, t3, t4, t5
+     not          t0, t0
+-    not          t1, t1
+-    MIPS_2xUN8x4_MUL_2xUN8x4 t2, t3, t0, t1, t2, t3, t9, s0, s1, s2, s3, s4, s5
+-    addu_s.qb    t4, t4, t2
+-    addu_s.qb    t5, t5, t3
+-21:
+-    sw           t4, 0(a0)
+-    sw           t5, 4(a0)
+-22:
+-    addiu        a3, a3, -2
+-    addiu        t1, a3, -1
+-    bgtz         t1, 2b
+-     addiu       a0, a0, 8
+-3:
+-    blez         a3, 4f
++    MIPS_UN8x4_MUL_UN8x4  t1, t0, t1, t9, t3, t4, t5, s0
++    addu_s.qb    t1, t2, t1
++    sw           t1, 0(a0)
++    RESTORE_REGS_FROM_STACK 8, s0, s1, s2, s3, s4, s5
++    j            ra
+      nop
+-                              /* a1 = src */
+-    lw           t1, 0(a2)    /* t1 = mask */
+-    beqz         t1, 4f
++5:
++//if (t0 == 0xffffffff)
++    beq          t8, t6, 6f   /* if (srca == 0xff) */
+      nop
+-    move         t2, a1       /* t2 = src */
+-    beq          t1, t7, 31f
+-     lw          t0, 0(a0)    /* t0 = dst */
+-
+-    MIPS_UN8x4_MUL_UN8x4  a1, t1, t2, t9, t3, t4, t5, t6
+-    MIPS_UN8x4_MUL_UN8    t1, t8, t1, t9, t3, t4, t5
+-31:
+-    not          t1, t1
+-    MIPS_UN8x4_MUL_UN8x4  t0, t1, t0, t9, t3, t4, t5, t6
+-    addu_s.qb    t0, t2, t0
+-    sw           t0, 0(a0)
+-4:
++    lw           t1, 0(a0)    /* t1 = dst */
++    not          t0, a1
++    srl          t0, t0, 24
++    MIPS_UN8x4_MUL_UN8 t1, t0, t1, t9, t2, t3, t4
++    addu_s.qb    t1, a1, t1
++    sw           t1, 0(a0)
+     RESTORE_REGS_FROM_STACK 8, s0, s1, s2, s3, s4, s5
+     j            ra
+      nop
++6:
++    sw           a1, 0(a0)
++7:
++    RESTORE_REGS_FROM_STACK 8, s0, s1, s2, s3, s4, s5
++8:
++    j            ra
++     nop
+ 
+ END(pixman_composite_over_n_8888_8888_ca_asm_mips)
+ 
+@@ -553,111 +1081,251 @@
+  * a3 - w
+  */
+ 
++    beqz         a3, 8f
++     nop
+     SAVE_REGS_ON_STACK 20, s0, s1, s2, s3, s4, s5, s6, s7, s8
+-    beqz         a3, 4f
++
++    li           t6, 0xff
++    addiu        t7, zero, -1 /* t7 = 0xffffffff */
++    srl          t8, a1, 24   /* t8 = srca */
++    li           t9, 0x00ff00ff
++    li           s6, 0xf800f800
++    li           s7, 0x07e007e0
++    li           s8, 0x001F001F
++
++    addiu        t1, a3, -1
++    beqz         t1, 4f       /* last pixel */
+      nop
+-    li           t5, 0xf800f800
+-    li           t6, 0x07e007e0
+-    li           t7, 0x001F001F
+-    li           t9, 0x00ff00ff
+-
+-    srl          t8, a1, 24   /* t8 = srca */
++
++0:
++    lw           t0, 0(a2)    /* t0 = mask */
++    lw           t1, 4(a2)    /* t1 = mask */
++    addiu        a3, a3, -2   /* w = w - 2 */
++    or           t2, t0, t1
++    beqz         t2, 3f      /* if (t0 == 0) && (t1 == 0) */
++     addiu       a2, a2, 8
++    and          t2, t0, t1
++    beq          t2, t7, 1f  /* if (t0 == 0xffffffff) && (t1 == 0xffffffff) */
++     nop
++
++//if(ma)
++    lhu          t2, 0(a0)    /* t2 = dst */
++    lhu          t3, 2(a0)    /* t3 = dst */
++    MIPS_2xUN8x4_MUL_2xUN8x4 a1, a1, t0, t1, t4, t5, t9, s0, s1, s2, s3, s4, s5
++    MIPS_2xUN8x4_MUL_2xUN8   t0, t1, t8, t8, t0, t1, t9, s0, s1, s2, s3, s4, s5
++    not          t0, t0
++    not          t1, t1
++    CONVERT_2x0565_TO_2x8888 t2, t3, t2, t3, s7, s8, s0, s1, s2, s3
++    MIPS_2xUN8x4_MUL_2xUN8x4 t2, t3, t0, t1, t2, t3, t9, s0, s1, s2, s3, s4, s5
++    addu_s.qb    t2, t4, t2
++    addu_s.qb    t3, t5, t3
++    CONVERT_2x8888_TO_2x0565 t2, t3, t2, t3, s6, s7, s8, s0, s1
++    sh           t2, 0(a0)
++    sh           t3, 2(a0)
+     addiu        t1, a3, -1
+-    beqz         t1, 3f       /* last pixel */
+-     nop
+-    li           s0, 0xff     /* s0 = 0xff */
+-    addiu        s1, zero, -1 /* s1 = 0xffffffff */
+-
+-    beq          t8, s0, 2f   /* if (srca == 0xff) */
++    bgtz         t1, 0b
++     addiu       a0, a0, 4
++    b            4f
+      nop
+ 1:
++//if (t0 == 0xffffffff) && (t1 == 0xffffffff):
++    beq          t8, t6, 2f   /* if (srca == 0xff) */
++     nop
++    lhu          t2, 0(a0)    /* t2 = dst */
++    lhu          t3, 2(a0)    /* t3 = dst */
++    not          t0, a1
++    not          t1, a1
++    srl          t0, t0, 24
++    srl          t1, t1, 24
++    CONVERT_2x0565_TO_2x8888 t2, t3, t2, t3, s7, s8, s0, s1, s2, s3
++    MIPS_2xUN8x4_MUL_2xUN8   t2, t3, t0, t1, t2, t3, t9, s0, s1, s2, s3, s4, s5
++    addu_s.qb    t2, a1, t2
++    addu_s.qb    t3, a1, t3
++    CONVERT_2x8888_TO_2x0565 t2, t3, t2, t3, s6, s7, s8, s0, s1
++    sh           t2, 0(a0)
++    sh           t3, 2(a0)
++    addiu        t1, a3, -1
++    bgtz         t1, 0b
++     addiu       a0, a0, 4
++    b            4f
++     nop
++2:
++    CONVERT_1x8888_TO_1x0565 a1, t2, s0, s1
++    sh           t2, 0(a0)
++    sh           t2, 2(a0)
++3:
++    addiu        t1, a3, -1
++    bgtz         t1, 0b
++     addiu       a0, a0, 4
++
++4:
++    beqz         a3, 7f
++     nop
+                               /* a1 = src */
+     lw           t0, 0(a2)    /* t0 = mask */
+-    lw           t1, 4(a2)    /* t1 = mask */
+-    or           t2, t0, t1
+-    beqz         t2, 12f      /* if (t0 == 0) && (t1 == 0) */
+-     addiu       a2, a2, 8
+-    and          t3, t0, t1
+-    move         s2, a1       /* s2 = src */
+-    move         s3, a1       /* s3 = src */
+-    lhu          t2, 0(a0)    /* t2 = dst */
+-    beq          t3, s1, 11f  /* if (t0 == 0xffffffff) && (t1 == 0xffffffff) */
+-     lhu         t3, 2(a0)    /* t3 = dst */
+-    MIPS_2xUN8x4_MUL_2xUN8x4 a1, a1, t0, t1, s2, s3, t9, t4, s4, s5, s6, s7, s8
+-    MIPS_2xUN8x4_MUL_2xUN8   t0, t1, t8, t8, t0, t1, t9, t4, s4, s5, s6, s7, s8
+-11:
++    beqz         t0, 7f       /* if (t0 == 0) */
++     nop
++    beq          t0, t7, 5f  /* if (t0 == 0xffffffff) */
++     nop
++//if(ma)
++    lhu          t1, 0(a0)    /* t1 = dst */
++    MIPS_UN8x4_MUL_UN8x4     a1, t0, t2, t9, t3, t4, t5, s0
++    MIPS_UN8x4_MUL_UN8       t0, t8, t0, t9, t3, t4, t5
+     not          t0, t0
+-    not          t1, t1
+-    CONVERT_2x0565_TO_2x8888 t2, t3, s4, s5, t6, t7, t4, s6, s7, s8
+-    MIPS_2xUN8x4_MUL_2xUN8x4 s4, s5, t0, t1, s4, s5, t9, t4, s6, s7, s8, t0, t1
+-    addu_s.qb    s2, s2, s4
+-    addu_s.qb    s3, s3, s5
+-    CONVERT_2x8888_TO_2x0565 s2, s3, t2, t3, t5, t6, t7, s4, s5
+-    sh           t2, 0(a0)
+-    sh           t3, 2(a0)
+-12:
+-    addiu        a3, a3, -2
+-    addiu        t1, a3, -1
+-    bgtz         t1, 1b
+-     addiu       a0, a0, 4
+-    b            3f
+-     nop
+-2:
+-                              /* a1 = src */
+-    lw           t0, 0(a2)    /* t0 = mask */
+-    lw           t1, 4(a2)    /* t1 = mask */
+-    or           t2, t0, t1
+-    beqz         t2, 22f      /* if (t0 == 0) & (t1 == 0) */
+-     addiu       a2, a2, 8
+-    and          t3, t0, t1
+-    move         t2, a1
+-    beq          t3, s1, 21f  /* if (t0 == 0xffffffff) && (t1 == 0xffffffff) */
+-     move        t3, a1
+-    lhu          t2, 0(a0)    /* t2 = dst */
+-    lhu          t3, 2(a0)    /* t3 = dst */
+-    MIPS_2xUN8x4_MUL_2xUN8x4 a1, a1, t0, t1, s2, s3, t9, t4, s4, s5, s6, s7, s8
+-    not          t0, t0
+-    not          t1, t1
+-    CONVERT_2x0565_TO_2x8888 t2, t3, s4, s5, t6, t7, t4, s6, s7, s8
+-    MIPS_2xUN8x4_MUL_2xUN8x4 s4, s5, t0, t1, s4, s5, t9, t4, s6, s7, s8, t2, t3
+-    addu_s.qb    t2, s2, s4
+-    addu_s.qb    t3, s3, s5
+-21:
+-    CONVERT_2x8888_TO_2x0565 t2, t3, t0, t1, t5, t6, t7, s2, s3
+-    sh           t0, 0(a0)
+-    sh           t1, 2(a0)
+-22:
+-    addiu        a3, a3, -2
+-    addiu        t1, a3, -1
+-    bgtz         t1, 2b
+-     addiu       a0, a0, 4
+-3:
+-    blez         a3, 4f
+-     nop
+-                              /* a1 = src */
+-    lw           t1, 0(a2)    /* t1 = mask */
+-    beqz         t1, 4f
+-     nop
+-    move         t2, a1       /* t2 = src */
+-    beq          t1, t7, 31f
+-     lhu         t0, 0(a0)    /* t0 = dst */
+-
+-    MIPS_UN8x4_MUL_UN8x4     a1, t1, t2, t9, t3, t4, t5, t6
+-    MIPS_UN8x4_MUL_UN8       t1, t8, t1, t9, t3, t4, t5
+-31:
+-    not          t1, t1
+-    CONVERT_1x0565_TO_1x8888 t0, s1, s2, s3
+-    MIPS_UN8x4_MUL_UN8x4     s1, t1, t3, t9, t4, t5, t6, t7
+-    addu_s.qb    t0, t2, t3
+-    CONVERT_1x8888_TO_1x0565 t0, s1, s2, s3
+-    sh           s1, 0(a0)
+-4:
+-    RESTORE_REGS_FROM_STACK  20, s0, s1, s2, s3, s4, s5, s6, s7, s8
++    CONVERT_1x0565_TO_1x8888 t1, s1, s2, s3
++    MIPS_UN8x4_MUL_UN8x4     s1, t0, s1, t9, t3, t4, t5, s0
++    addu_s.qb    s1, t2, s1
++    CONVERT_1x8888_TO_1x0565 s1, t1, s0, s2
++    sh           t1, 0(a0)
++    RESTORE_REGS_FROM_STACK 20, s0, s1, s2, s3, s4, s5, s6, s7, s8
+     j            ra
+      nop
++5:
++//if (t0 == 0xffffffff)
++    beq          t8, t6, 6f   /* if (srca == 0xff) */
++     nop
++    lhu          t1, 0(a0)    /* t1 = dst */
++    not          t0, a1
++    srl          t0, t0, 24
++    CONVERT_1x0565_TO_1x8888 t1, s1, s2, s3
++    MIPS_UN8x4_MUL_UN8       s1, t0, s1, t9, t2, t3, t4
++    addu_s.qb    s1, a1, s1
++    CONVERT_1x8888_TO_1x0565 s1, t1, s0, s2
++    sh           t1, 0(a0)
++    RESTORE_REGS_FROM_STACK 20, s0, s1, s2, s3, s4, s5, s6, s7, s8
++    j            ra
++     nop
++6:
++    CONVERT_1x8888_TO_1x0565 a1, t1, s0, s2
++    sh           t1, 0(a0)
++7:
++    RESTORE_REGS_FROM_STACK 20, s0, s1, s2, s3, s4, s5, s6, s7, s8
++8:
++    j            ra
++     nop
+ 
+ END(pixman_composite_over_n_8888_0565_ca_asm_mips)
+ 
++LEAF_MIPS_DSPR2(pixman_composite_over_n_8_8_asm_mips)
++/*
++ * a0 - dst  (a8)
++ * a1 - src  (32bit constant)
++ * a2 - mask (a8)
++ * a3 - w
++ */
++
++    SAVE_REGS_ON_STACK 0, v0
++    li                t9, 0x00ff00ff
++    beqz              a3, 3f
++     nop
++    srl               v0, a3, 2   /* v0 = how many multiples of 4 dst pixels */
++    beqz              v0, 1f      /* branch if less than 4 src pixels */
++     nop
++
++    srl               t8, a1, 24
++    replv.ph          t8, t8
++
++0:
++    beqz              v0, 1f
++     addiu            v0, v0, -1
++    lbu               t0, 0(a2)
++    lbu               t1, 1(a2)
++    lbu               t2, 2(a2)
++    lbu               t3, 3(a2)
++    lbu               t4, 0(a0)
++    lbu               t5, 1(a0)
++    lbu               t6, 2(a0)
++    lbu               t7, 3(a0)
++
++    addiu             a2, a2, 4
++
++    precr_sra.ph.w    t1, t0, 0
++    precr_sra.ph.w    t3, t2, 0
++    precr_sra.ph.w    t5, t4, 0
++    precr_sra.ph.w    t7, t6, 0
++
++    precr.qb.ph       t0, t3, t1
++    precr.qb.ph       t1, t7, t5
++
++    muleu_s.ph.qbl    t2, t0, t8
++    muleu_s.ph.qbr    t3, t0, t8
++    shra_r.ph         t4, t2, 8
++    shra_r.ph         t5, t3, 8
++    and               t4, t4, t9
++    and               t5, t5, t9
++    addq.ph           t2, t2, t4
++    addq.ph           t3, t3, t5
++    shra_r.ph         t2, t2, 8
++    shra_r.ph         t3, t3, 8
++    precr.qb.ph       t0, t2, t3
++    not               t6, t0
++
++    preceu.ph.qbl     t7, t6
++    preceu.ph.qbr     t6, t6
++
++    muleu_s.ph.qbl    t2, t1, t7
++    muleu_s.ph.qbr    t3, t1, t6
++    shra_r.ph         t4, t2, 8
++    shra_r.ph         t5, t3, 8
++    and               t4, t4, t9
++    and               t5, t5, t9
++    addq.ph           t2, t2, t4
++    addq.ph           t3, t3, t5
++    shra_r.ph         t2, t2, 8
++    shra_r.ph         t3, t3, 8
++    precr.qb.ph       t1, t2, t3
++
++    addu_s.qb         t2, t0, t1
++
++    sb                t2, 0(a0)
++    srl               t2, t2, 8
++    sb                t2, 1(a0)
++    srl               t2, t2, 8
++    sb                t2, 2(a0)
++    srl               t2, t2, 8
++    sb                t2, 3(a0)
++    addiu             a3, a3, -4
++    b                 0b
++     addiu            a0, a0, 4
++
++1:
++    beqz              a3, 3f
++     nop
++    srl               t8, a1, 24
++2:
++    lbu               t0, 0(a2)
++    lbu               t1, 0(a0)
++    addiu             a2, a2, 1
++
++    mul               t2, t0, t8
++    shra_r.ph         t3, t2, 8
++    andi              t3, t3, 0x00ff
++    addq.ph           t2, t2, t3
++    shra_r.ph         t2, t2, 8
++    not               t3, t2
++    andi              t3, t3, 0x00ff
++
++
++    mul               t4, t1, t3
++    shra_r.ph         t5, t4, 8
++    andi              t5, t5, 0x00ff
++    addq.ph           t4, t4, t5
++    shra_r.ph         t4, t4, 8
++    andi              t4, t4, 0x00ff
++
++    addu_s.qb         t2, t2, t4
++    sb                t2, 0(a0)
++    addiu             a3, a3, -1
++    bnez              a3, 2b
++     addiu            a0, a0, 1
++
++3:
++    RESTORE_REGS_FROM_STACK 0, v0
++    j                 ra
++     nop
++
++END(pixman_composite_over_n_8_8_asm_mips)
++
+ LEAF_MIPS_DSPR2(pixman_composite_over_n_8_8888_asm_mips)
+ /*
+  * a0 - dst  (a8r8g8b8)
+@@ -1342,6 +2010,84 @@
+ 
+ END(pixman_composite_over_8888_8888_asm_mips)
+ 
++LEAF_MIPS_DSPR2(pixman_composite_over_8888_0565_asm_mips)
++/*
++ * a0 - dst  (r5g6b5)
++ * a1 - src  (a8r8g8b8)
++ * a2 - w
++ */
++
++    SAVE_REGS_ON_STACK 8, s0, s1, s2, s3, s4, s5
++    li           t4, 0x00ff00ff
++    li           s3, 0xf800f800
++    li           s4, 0x07e007e0
++    li           s5, 0x001F001F
++    beqz         a2, 3f
++     nop
++    addiu        t1, a2, -1
++    beqz         t1, 2f
++     nop
++1:
++    lw           t0, 0(a1) /* t0 = source      (a8r8g8b8) */
++    lw           t1, 4(a1) /* t1 = source      (a8r8g8b8) */
++    lhu          t2, 0(a0) /* t2 = destination (r5g6b5) */
++    lhu          t3, 2(a0) /* t3 = destination (r5g6b5) */
++    addiu        a1, a1, 8
++
++    not          t5, t0
++    srl          t5, t5, 24
++    not          t6, t1
++    srl          t6, t6, 24
++
++    or           t7, t5, t6
++    beqz         t7, 11f
++     or          t8, t0, t1
++    beqz         t8, 12f
++
++    CONVERT_2x0565_TO_2x8888 t2, t3, s0, s1, s4, s5, t7, t8, t9, s2
++    MIPS_2xUN8x4_MUL_2xUN8   s0, s1, t5, t6, t7, t8, t4, t9, t2, t3, s2, s0, s1
++
++    addu_s.qb    t0, t7, t0
++    addu_s.qb    t1, t8, t1
++11:
++    CONVERT_2x8888_TO_2x0565 t0, t1, t7, t8, s3, s4, s5, t2, t3
++    sh           t7, 0(a0)
++    sh           t8, 2(a0)
++12:
++    addiu        a2, a2, -2
++    addiu        t1, a2, -1
++    bgtz         t1, 1b
++     addiu       a0, a0, 4
++2:
++    beqz         a2, 3f
++     nop
++
++    lw           t0, 0(a1) /* t0 = source      (a8r8g8b8) */
++    lhu          t1, 0(a0) /* t1 = destination (r5g6b5) */
++    addiu        a1, a1, 4
++
++    not          t2, t0
++    srl          t2, t2, 24
++
++    beqz         t2, 21f
++     nop
++    beqz         t0, 3f
++
++    CONVERT_1x0565_TO_1x8888 t1, s0, t8, t9
++    MIPS_UN8x4_MUL_UN8       s0, t2, t3, t4, t5, t6, t7
++
++    addu_s.qb    t0, t3, t0
++21:
++    CONVERT_1x8888_TO_1x0565 t0, s0, t8, t9
++    sh           s0, 0(a0)
++
++3:
++    RESTORE_REGS_FROM_STACK 8, s0, s1, s2, s3, s4, s5
++    j            ra
++     nop
++
++END(pixman_composite_over_8888_0565_asm_mips)
++
+ LEAF_MIPS_DSPR2(pixman_composite_over_n_0565_asm_mips)
+ /*
+  * a0 - dst  (r5g6b5)
+@@ -2349,101 +3095,265 @@
+ LEAF_MIPS_DSPR2(pixman_composite_in_n_8_asm_mips)
+ /*
+  * a0 - dst  (a8)
+- * a1 - src  (a8r8g8b8)
++ * a1 - src  (32bit constant)
+  * a2 - w
+  */
+ 
+-    beqz              a2, 5f
++    li                t9, 0x00ff00ff
++    beqz              a2, 3f
+      nop
+-
+-    SAVE_REGS_ON_STACK 20, s0, s1, s2, s3, s4, s5, s6, s7
+-    move              t7, a1
+-    srl               t5, t7, 24
+-    replv.ph          t5, t5
+-    srl               t9, a2, 2   /* t1 = how many multiples of 4 src pixels */
+-    beqz              t9, 2f      /* branch if less than 4 src pixels */
++    srl               t7, a2, 2   /* t7 = how many multiples of 4 dst pixels */
++    beqz              t7, 1f      /* branch if less than 4 src pixels */
+      nop
+ 
+-1:
+-    addiu             t9, t9, -1
+-    addiu             a2, a2, -4
++    srl               t8, a1, 24
++    replv.ph          t8, t8
++
++0:
++    beqz              t7, 1f
++     addiu            t7, t7, -1
+     lbu               t0, 0(a0)
+     lbu               t1, 1(a0)
+     lbu               t2, 2(a0)
+     lbu               t3, 3(a0)
+ 
+-    muleu_s.ph.qbl    s0, t0, t5
+-    muleu_s.ph.qbr    s1, t0, t5
+-    muleu_s.ph.qbl    s2, t1, t5
+-    muleu_s.ph.qbr    s3, t1, t5
+-    muleu_s.ph.qbl    s4, t2, t5
+-    muleu_s.ph.qbr    s5, t2, t5
+-    muleu_s.ph.qbl    s6, t3, t5
+-    muleu_s.ph.qbr    s7, t3, t5
+-
+-    shrl.ph           t4, s0, 8
+-    shrl.ph           t6, s1, 8
+-    shrl.ph           t7, s2, 8
+-    shrl.ph           t8, s3, 8
+-    addq.ph           t0, s0, t4
+-    addq.ph           t1, s1, t6
+-    addq.ph           t2, s2, t7
+-    addq.ph           t3, s3, t8
+-    shra_r.ph         t0, t0, 8
+-    shra_r.ph         t1, t1, 8
++    precr_sra.ph.w    t1, t0, 0
++    precr_sra.ph.w    t3, t2, 0
++    precr.qb.ph       t0, t3, t1
++
++    muleu_s.ph.qbl    t2, t0, t8
++    muleu_s.ph.qbr    t3, t0, t8
++    shra_r.ph         t4, t2, 8
++    shra_r.ph         t5, t3, 8
++    and               t4, t4, t9
++    and               t5, t5, t9
++    addq.ph           t2, t2, t4
++    addq.ph           t3, t3, t5
+     shra_r.ph         t2, t2, 8
+     shra_r.ph         t3, t3, 8
+-    shrl.ph           t4, s4, 8
+-    shrl.ph           t6, s5, 8
+-    shrl.ph           t7, s6, 8
+-    shrl.ph           t8, s7, 8
+-    addq.ph           s0, s4, t4
+-    addq.ph           s1, s5, t6
+-    addq.ph           s2, s6, t7
+-    addq.ph           s3, s7, t8
+-    shra_r.ph         t4, s0, 8
+-    shra_r.ph         t6, s1, 8
+-    shra_r.ph         t7, s2, 8
+-    shra_r.ph         t8, s3, 8
+-
+-    precr.qb.ph       s0, t0, t1
+-    precr.qb.ph       s1, t2, t3
+-    precr.qb.ph       s2, t4, t6
+-    precr.qb.ph       s3, t7, t8
+-
+-    sb                s0, 0(a0)
+-    sb                s1, 1(a0)
+-    sb                s2, 2(a0)
+-    sb                s3, 3(a0)
+-    bgtz              t9, 1b
++    precr.qb.ph       t2, t2, t3
++
++    sb                t2, 0(a0)
++    srl               t2, t2, 8
++    sb                t2, 1(a0)
++    srl               t2, t2, 8
++    sb                t2, 2(a0)
++    srl               t2, t2, 8
++    sb                t2, 3(a0)
++    addiu             a2, a2, -4
++    b                 0b
+      addiu            a0, a0, 4
++
++1:
++    beqz              a2, 3f
++     nop
++    srl               t8, a1, 24
+ 2:
+-    beqz              a2, 4f
+-     nop
+-3:
+-    lbu               t1, 0(a0)
+-
+-    muleu_s.ph.qbl    t4, t1, t5
+-    muleu_s.ph.qbr    t7, t1, t5
+-    shrl.ph           t6, t4, 8
+-    shrl.ph           t0, t7, 8
+-    addq.ph           t8, t4, t6
+-    addq.ph           t9, t7, t0
+-    shra_r.ph         t8, t8, 8
+-    shra_r.ph         t9, t9, 8
+-    precr.qb.ph       t2, t8, t9
++    lbu               t0, 0(a0)
++
++    mul               t2, t0, t8
++    shra_r.ph         t3, t2, 8
++    andi              t3, t3, 0x00ff
++    addq.ph           t2, t2, t3
++    shra_r.ph         t2, t2, 8
++
+     sb                t2, 0(a0)
+     addiu             a2, a2, -1
+-    bnez              a2, 3b
++    bnez              a2, 2b
+      addiu            a0, a0, 1
+-4:
+-    RESTORE_REGS_FROM_STACK 20, s0, s1, s2, s3, s4, s5, s6, s7
+-5:
++
++3:
+     j                 ra
+      nop
+ 
+ END(pixman_composite_in_n_8_asm_mips)
+ 
++LEAF_MIPS_DSPR2(pixman_scaled_nearest_scanline_8888_8888_OVER_asm_mips)
++/*
++ * a0     - dst  (a8r8g8b8)
++ * a1     - src  (a8r8g8b8)
++ * a2     - w
++ * a3     - vx
++ * 16(sp) - unit_x
++ */
++
++    SAVE_REGS_ON_STACK 0, s0, s1, s2, s3
++    lw       t8, 16(sp) /* t8 = unit_x */
++    li       t6, 0x00ff00ff
++    beqz     a2, 3f
++     nop
++    addiu    t1, a2, -1
++    beqz     t1, 2f
++     nop
++1:
++    sra      t0, a3, 16 /* t0 = vx >> 16 */
++    sll      t0, t0, 2  /* t0 = t0 * 4 (a8r8g8b8) */
++    addu     t0, a1, t0
++    lw       t0, 0(t0)  /* t0 = source      (a8r8g8b8) */
++    addu     a3, a3, t8 /* a3 = vx + unit_x */
++
++    sra      t1, a3, 16 /* t0 = vx >> 16 */
++    sll      t1, t1, 2  /* t0 = t0 * 4 (a8r8g8b8) */
++    addu     t1, a1, t1
++    lw       t1, 0(t1)  /* t1 = source      (a8r8g8b8) */
++    addu     a3, a3, t8 /* a3 = vx + unit_x */
++
++    lw       t2, 0(a0)  /* t2 = destination (a8r8g8b8) */
++    lw       t3, 4(a0)  /* t3 = destination (a8r8g8b8) */
++
++    OVER_2x8888_2x8888 t0, t1, t2, t3, t4, t5, t6, t7, t9, s0, s1, s2, s3
++
++    sw       t4, 0(a0)
++    sw       t5, 4(a0)
++    addiu    a2, a2, -2
++    addiu    t1, a2, -1
++    bgtz     t1, 1b
++     addiu   a0, a0, 8
++2:
++    beqz     a2, 3f
++     nop
++    sra      t0, a3, 16 /* t0 = vx >> 16 */
++    sll      t0, t0, 2  /* t0 = t0 * 4 (a8r8g8b8) */
++    addu     t0, a1, t0
++    lw       t0, 0(t0)  /* t0 = source      (a8r8g8b8) */
++    lw       t1, 0(a0)  /* t1 = destination (a8r8g8b8) */
++    addu     a3, a3, t8 /* a3 = vx + unit_x */
++
++    OVER_8888_8888 t0, t1, t2, t6, t4, t5, t3, t7
++
++    sw       t2, 0(a0)
++3:
++    RESTORE_REGS_FROM_STACK 0, s0, s1, s2, s3
++    j        ra
++     nop
++
++END(pixman_scaled_nearest_scanline_8888_8888_OVER_asm_mips)
++
++LEAF_MIPS_DSPR2(pixman_scaled_nearest_scanline_8888_0565_OVER_asm_mips)
++/*
++ * a0     - dst  (r5g6b5)
++ * a1     - src  (a8r8g8b8)
++ * a2     - w
++ * a3     - vx
++ * 16(sp) - unit_x
++ */
++
++    SAVE_REGS_ON_STACK 24, s0, s1, s2, s3, s4, v0, v1
++    lw       t8, 40(sp) /* t8 = unit_x */
++    li       t4, 0x00ff00ff
++    li       t5, 0xf800f800
++    li       t6, 0x07e007e0
++    li       t7, 0x001F001F
++    beqz     a2, 3f
++     nop
++    addiu    t1, a2, -1
++    beqz     t1, 2f
++     nop
++1:
++    sra      t0, a3, 16 /* t0 = vx >> 16 */
++    sll      t0, t0, 2  /* t0 = t0 * 4 (a8r8g8b8) */
++    addu     t0, a1, t0
++    lw       t0, 0(t0)  /* t0 = source      (a8r8g8b8) */
++    addu     a3, a3, t8 /* a3 = vx + unit_x */
++    sra      t1, a3, 16 /* t0 = vx >> 16 */
++    sll      t1, t1, 2  /* t0 = t0 * 4 (a8r8g8b8) */
++    addu     t1, a1, t1
++    lw       t1, 0(t1)  /* t1 = source      (a8r8g8b8) */
++    addu     a3, a3, t8 /* a3 = vx + unit_x */
++    lhu      t2, 0(a0)  /* t2 = destination (r5g6b5) */
++    lhu      t3, 2(a0)  /* t3 = destination (r5g6b5) */
++
++    CONVERT_2x0565_TO_2x8888 t2, t3, v0, v1, t6, t7, s0, s1, s2, s3
++    OVER_2x8888_2x8888       t0, t1, v0, v1, t2, t3, t4, t9, s0, s1, s2, s3, s4
++    CONVERT_2x8888_TO_2x0565 t2, t3, v0, v1, t5, t6, t7, t9, s2
++
++    sh       v0, 0(a0)
++    sh       v1, 2(a0)
++    addiu    a2, a2, -2
++    addiu    t1, a2, -1
++    bgtz     t1, 1b
++     addiu   a0, a0, 4
++2:
++    beqz     a2, 3f
++     nop
++    sra      t0, a3, 16 /* t0 = vx >> 16 */
++    sll      t0, t0, 2  /* t0 = t0 * 4 (a8r8g8b8) */
++    addu     t0, a1, t0
++    lw       t0, 0(t0)  /* t0 = source      (a8r8g8b8) */
++    lhu      t1, 0(a0)  /* t1 = destination (r5g6b5) */
++    addu     a3, a3, t8 /* a3 = vx + unit_x */
++
++    CONVERT_1x0565_TO_1x8888 t1, t2, t5, t6
++    OVER_8888_8888           t0, t2, t1, t4, t3, t5, t6, t7
++    CONVERT_1x8888_TO_1x0565 t1, t2, t5, t6
++
++    sh       t2, 0(a0)
++3:
++    RESTORE_REGS_FROM_STACK 24, s0, s1, s2, s3, s4, v0, v1
++    j        ra
++     nop
++
++END(pixman_scaled_nearest_scanline_8888_0565_OVER_asm_mips)
++
++LEAF_MIPS_DSPR2(pixman_scaled_nearest_scanline_0565_8888_SRC_asm_mips)
++/*
++ * a0     - dst (a8r8g8b8)
++ * a1     - src (r5g6b5)
++ * a2     - w
++ * a3     - vx
++ * 16(sp) - unit_x
++ */
++
++    SAVE_REGS_ON_STACK 0, v0
++    beqz     a2, 3f
++     nop
++
++    lw       v0, 16(sp) /* v0 = unit_x */
++    addiu    t1, a2, -1
++    beqz     t1, 2f
++     nop
++
++    li       t4, 0x07e007e0
++    li       t5, 0x001F001F
++1:
++    sra      t0, a3, 16 /* t0 = vx >> 16 */
++    sll      t0, t0, 1  /* t0 = t0 * 2 ((r5g6b5)) */
++    addu     t0, a1, t0
++    lhu      t0, 0(t0)  /* t0 = source ((r5g6b5)) */
++    addu     a3, a3, v0 /* a3 = vx + unit_x */
++    sra      t1, a3, 16 /* t1 = vx >> 16 */
++    sll      t1, t1, 1  /* t1 = t1 * 2 ((r5g6b5)) */
++    addu     t1, a1, t1
++    lhu      t1, 0(t1)  /* t1 = source ((r5g6b5)) */
++    addu     a3, a3, v0 /* a3 = vx + unit_x */
++    addiu    a2, a2, -2
++
++    CONVERT_2x0565_TO_2x8888 t0, t1, t2, t3, t4, t5, t6, t7, t8, t9
++
++    sw       t2, 0(a0)
++    sw       t3, 4(a0)
++
++    addiu    t2, a2, -1
++    bgtz     t2, 1b
++     addiu   a0, a0, 8
++2:
++    beqz     a2, 3f
++     nop
++    sra      t0, a3, 16 /* t0 = vx >> 16 */
++    sll      t0, t0, 1  /* t0 = t0 * 2 ((r5g6b5)) */
++    addu     t0, a1, t0
++    lhu      t0, 0(t0)  /* t0 = source ((r5g6b5)) */
++
++    CONVERT_1x0565_TO_1x8888 t0, t1, t2, t3
++
++    sw       t1, 0(a0)
++3:
++    RESTORE_REGS_FROM_STACK 0, v0
++    j        ra
++     nop
++
++END(pixman_scaled_nearest_scanline_0565_8888_SRC_asm_mips)
++
+ LEAF_MIPS_DSPR2(pixman_scaled_nearest_scanline_8888_8_0565_OVER_asm_mips)
+ /*
+  * a0     - dst  (r5g6b5)
+diff -r b3bb2171ff2b -r 31ab78ee4ac9 gfx/cairo/libpixman/src/pixman-mips-dspr2-asm.h
+--- a/gfx/cairo/libpixman/src/pixman-mips-dspr2-asm.h	Fri Sep 27 19:35:44 2013 -0700
++++ b/gfx/cairo/libpixman/src/pixman-mips-dspr2-asm.h	Sat Sep 28 12:06:50 2013 +0800
+@@ -354,17 +354,16 @@
+                                 out1_565, out2_565,  \
+                                 maskR, maskG, maskB, \
+                                 scratch1, scratch2
+-    precrq.ph.w       \scratch1, \in2_8888, \in1_8888
+-    precr_sra.ph.w    \in2_8888, \in1_8888, 0
+-    shll.ph           \scratch1, \scratch1, 8
+-    srl               \in2_8888, \in2_8888, 3
+-    and               \scratch2, \in2_8888, \maskB
+-    and               \scratch1, \scratch1, \maskR
+-    srl               \in2_8888, \in2_8888, 2
+-    and               \out2_565, \in2_8888, \maskG
+-    or                \out2_565, \out2_565, \scratch2
+-    or                \out1_565, \out2_565, \scratch1
+-    srl               \out2_565, \out1_565, 16
++    precr.qb.ph    \scratch1, \in2_8888, \in1_8888
++    precrq.qb.ph   \in2_8888, \in2_8888, \in1_8888
++    and            \out1_565, \scratch1, \maskR
++    shrl.ph        \scratch1, \scratch1, 3
++    shll.ph        \in2_8888, \in2_8888, 3
++    and            \scratch1, \scratch1, \maskB
++    or             \out1_565, \out1_565, \scratch1
++    and            \in2_8888, \in2_8888, \maskG
++    or             \out1_565, \out1_565, \in2_8888
++    srl            \out2_565, \out1_565, 16
+ .endm
+ 
+ /*
+@@ -587,6 +586,36 @@
+     addu_s.qb          \out_8888, \out_8888, \s_8888
+ .endm
+ 
++/*
++ * OVER operation on two a8r8g8b8 source pixels (s1_8888 and s2_8888) and two
++ * a8r8g8b8 destination pixels (d1_8888 and d2_8888). It also requires maskLSR
++ * needed for rounding process. maskLSR must have following value:
++ *   li       maskLSR, 0x00ff00ff
++ */
++.macro OVER_2x8888_2x8888 s1_8888,   \
++                          s2_8888,   \
++                          d1_8888,   \
++                          d2_8888,   \
++                          out1_8888, \
++                          out2_8888, \
++                          maskLSR,   \
++                          scratch1, scratch2, scratch3, \
++                          scratch4, scratch5, scratch6
++    not                    \scratch1,  \s1_8888
++    srl                    \scratch1,  \scratch1,  24
++    not                    \scratch2,  \s2_8888
++    srl                    \scratch2,  \scratch2,  24
++    MIPS_2xUN8x4_MUL_2xUN8 \d1_8888,   \d2_8888, \
++                           \scratch1,  \scratch2,  \
++                           \out1_8888, \out2_8888, \
++                           \maskLSR, \
++                           \scratch3,  \scratch4, \scratch5, \
++                           \scratch6,  \d1_8888,  \d2_8888
++
++    addu_s.qb              \out1_8888, \out1_8888, \s1_8888
++    addu_s.qb              \out2_8888, \out2_8888, \s2_8888
++.endm
++
+ .macro MIPS_UN8x4_MUL_UN8_ADD_UN8x4 s_8888,   \
+                                     m_8,      \
+                                     d_8888,   \
+diff -r b3bb2171ff2b -r 31ab78ee4ac9 gfx/cairo/libpixman/src/pixman-mips-dspr2.c
+--- a/gfx/cairo/libpixman/src/pixman-mips-dspr2.c	Fri Sep 27 19:35:44 2013 -0700
++++ b/gfx/cairo/libpixman/src/pixman-mips-dspr2.c	Sat Sep 28 12:06:50 2013 +0800
+@@ -48,8 +48,20 @@
+                                     uint32_t, 1, uint32_t, 1)
+ PIXMAN_MIPS_BIND_FAST_PATH_SRC_DST (DO_FAST_MEMCPY, src_0888_0888,
+                                     uint8_t, 3, uint8_t, 3)
++#if defined(__MIPSEL__) || defined(__MIPSEL) || defined(_MIPSEL) || defined(MIPSEL)
++PIXMAN_MIPS_BIND_FAST_PATH_SRC_DST (0, src_0888_8888_rev,
++                                    uint8_t, 3, uint32_t, 1)
++PIXMAN_MIPS_BIND_FAST_PATH_SRC_DST (0, src_0888_0565_rev,
++                                    uint8_t, 3, uint16_t, 1)
++#endif
++PIXMAN_MIPS_BIND_FAST_PATH_SRC_DST (0, src_pixbuf_8888,
++                                    uint32_t, 1, uint32_t, 1)
++PIXMAN_MIPS_BIND_FAST_PATH_SRC_DST (0, src_rpixbuf_8888,
++                                    uint32_t, 1, uint32_t, 1)
+ PIXMAN_MIPS_BIND_FAST_PATH_SRC_DST (0, over_8888_8888,
+                                     uint32_t, 1, uint32_t, 1)
++PIXMAN_MIPS_BIND_FAST_PATH_SRC_DST (0, over_8888_0565,
++                                    uint32_t, 1, uint16_t, 1)
+ PIXMAN_MIPS_BIND_FAST_PATH_SRC_DST (0, add_8_8,
+                                     uint8_t, 1, uint8_t, 1)
+ PIXMAN_MIPS_BIND_FAST_PATH_SRC_DST (0, add_8888_8888,
+@@ -67,6 +79,8 @@
+                                        uint32_t, 1, uint32_t, 1)
+ PIXMAN_MIPS_BIND_FAST_PATH_N_MASK_DST (SKIP_ZERO_SRC, over_n_8888_0565_ca,
+                                        uint32_t, 1, uint16_t, 1)
++PIXMAN_MIPS_BIND_FAST_PATH_N_MASK_DST (SKIP_ZERO_SRC, over_n_8_8,
++                                       uint8_t, 1, uint8_t, 1)
+ PIXMAN_MIPS_BIND_FAST_PATH_N_MASK_DST (SKIP_ZERO_SRC, over_n_8_8888,
+                                        uint8_t, 1, uint32_t, 1)
+ PIXMAN_MIPS_BIND_FAST_PATH_N_MASK_DST (SKIP_ZERO_SRC, over_n_8_0565,
+@@ -111,6 +125,13 @@
+ PIXMAN_MIPS_BIND_FAST_PATH_SRC_MASK_DST (over_8888_8888_8888, uint32_t, 1,
+                                          uint32_t, 1, uint32_t, 1)
+ 
++PIXMAN_MIPS_BIND_SCALED_NEAREST_SRC_DST (8888_8888, OVER,
++                                         uint32_t, uint32_t)
++PIXMAN_MIPS_BIND_SCALED_NEAREST_SRC_DST (8888_0565, OVER,
++                                         uint32_t, uint16_t)
++PIXMAN_MIPS_BIND_SCALED_NEAREST_SRC_DST (0565_8888, SRC,
++                                         uint16_t, uint32_t)
++
+ PIXMAN_MIPS_BIND_SCALED_BILINEAR_SRC_DST (0, 8888_8888, SRC,
+                                           uint32_t, uint32_t)
+ PIXMAN_MIPS_BIND_SCALED_BILINEAR_SRC_DST (0, 8888_0565, SRC,
+@@ -278,6 +299,14 @@
+     PIXMAN_STD_FAST_PATH (SRC, x8r8g8b8, null, a8r8g8b8, mips_composite_src_x888_8888),
+     PIXMAN_STD_FAST_PATH (SRC, x8b8g8r8, null, a8b8g8r8, mips_composite_src_x888_8888),
+     PIXMAN_STD_FAST_PATH (SRC, r8g8b8,   null, r8g8b8,   mips_composite_src_0888_0888),
++#if defined(__MIPSEL__) || defined(__MIPSEL) || defined(_MIPSEL) || defined(MIPSEL)
++    PIXMAN_STD_FAST_PATH (SRC, b8g8r8,   null, x8r8g8b8, mips_composite_src_0888_8888_rev),
++    PIXMAN_STD_FAST_PATH (SRC, b8g8r8,   null, r5g6b5,   mips_composite_src_0888_0565_rev),
++#endif
++    PIXMAN_STD_FAST_PATH (SRC, pixbuf,   pixbuf,  a8r8g8b8, mips_composite_src_pixbuf_8888),
++    PIXMAN_STD_FAST_PATH (SRC, pixbuf,   pixbuf,  a8b8g8r8, mips_composite_src_rpixbuf_8888),
++    PIXMAN_STD_FAST_PATH (SRC, rpixbuf,  rpixbuf, a8r8g8b8, mips_composite_src_rpixbuf_8888),
++    PIXMAN_STD_FAST_PATH (SRC, rpixbuf,  rpixbuf, a8b8g8r8, mips_composite_src_pixbuf_8888),
+     PIXMAN_STD_FAST_PATH (SRC, solid,    a8,   a8r8g8b8, mips_composite_src_n_8_8888),
+     PIXMAN_STD_FAST_PATH (SRC, solid,    a8,   x8r8g8b8, mips_composite_src_n_8_8888),
+     PIXMAN_STD_FAST_PATH (SRC, solid,    a8,   a8b8g8r8, mips_composite_src_n_8_8888),
+@@ -290,6 +319,7 @@
+     PIXMAN_STD_FAST_PATH_CA (OVER, solid, a8b8g8r8, x8b8g8r8, mips_composite_over_n_8888_8888_ca),
+     PIXMAN_STD_FAST_PATH_CA (OVER, solid, a8r8g8b8, r5g6b5,   mips_composite_over_n_8888_0565_ca),
+     PIXMAN_STD_FAST_PATH_CA (OVER, solid, a8b8g8r8, b5g6r5,   mips_composite_over_n_8888_0565_ca),
++    PIXMAN_STD_FAST_PATH (OVER, solid,    a8,       a8,       mips_composite_over_n_8_8),
+     PIXMAN_STD_FAST_PATH (OVER, solid,    a8,       a8r8g8b8, mips_composite_over_n_8_8888),
+     PIXMAN_STD_FAST_PATH (OVER, solid,    a8,       x8r8g8b8, mips_composite_over_n_8_8888),
+     PIXMAN_STD_FAST_PATH (OVER, solid,    a8,       a8b8g8r8, mips_composite_over_n_8_8888),
+@@ -318,6 +348,8 @@
+     PIXMAN_STD_FAST_PATH (OVER, a8r8g8b8, null,     x8r8g8b8, mips_composite_over_8888_8888),
+     PIXMAN_STD_FAST_PATH (OVER, a8b8g8r8, null,     a8b8g8r8, mips_composite_over_8888_8888),
+     PIXMAN_STD_FAST_PATH (OVER, a8b8g8r8, null,     x8b8g8r8, mips_composite_over_8888_8888),
++    PIXMAN_STD_FAST_PATH (OVER, a8r8g8b8, null,     r5g6b5,   mips_composite_over_8888_0565),
++    PIXMAN_STD_FAST_PATH (OVER, a8b8g8r8, null,     b5g6r5,   mips_composite_over_8888_0565),
+     PIXMAN_STD_FAST_PATH (ADD,  solid,    a8,       a8,       mips_composite_add_n_8_8),
+     PIXMAN_STD_FAST_PATH (ADD,  solid,    a8,       a8r8g8b8, mips_composite_add_n_8_8888),
+     PIXMAN_STD_FAST_PATH (ADD,  solid,    a8,       a8b8g8r8, mips_composite_add_n_8_8888),
+@@ -340,6 +372,22 @@
+     PIXMAN_STD_FAST_PATH (OVER_REVERSE, solid, null, a8b8g8r8, mips_composite_over_reverse_n_8888),
+     PIXMAN_STD_FAST_PATH (IN,           solid, null, a8,       mips_composite_in_n_8),
+ 
++    PIXMAN_MIPS_SIMPLE_NEAREST_FAST_PATH (OVER, a8r8g8b8, a8r8g8b8, mips_8888_8888),
++    PIXMAN_MIPS_SIMPLE_NEAREST_FAST_PATH (OVER, a8b8g8r8, a8b8g8r8, mips_8888_8888),
++    PIXMAN_MIPS_SIMPLE_NEAREST_FAST_PATH (OVER, a8r8g8b8, x8r8g8b8, mips_8888_8888),
++    PIXMAN_MIPS_SIMPLE_NEAREST_FAST_PATH (OVER, a8b8g8r8, x8b8g8r8, mips_8888_8888),
++
++    PIXMAN_MIPS_SIMPLE_NEAREST_FAST_PATH (OVER, a8r8g8b8, r5g6b5, mips_8888_0565),
++    PIXMAN_MIPS_SIMPLE_NEAREST_FAST_PATH (OVER, a8b8g8r8, b5g6r5, mips_8888_0565),
++
++    PIXMAN_MIPS_SIMPLE_NEAREST_FAST_PATH (SRC, b5g6r5, x8b8g8r8, mips_0565_8888),
++    PIXMAN_MIPS_SIMPLE_NEAREST_FAST_PATH (SRC, r5g6b5, x8r8g8b8, mips_0565_8888),
++    /* Note: NONE repeat is not supported yet */
++    SIMPLE_NEAREST_FAST_PATH_COVER (SRC, r5g6b5, a8r8g8b8, mips_0565_8888),
++    SIMPLE_NEAREST_FAST_PATH_COVER (SRC, b5g6r5, a8b8g8r8, mips_0565_8888),
++    SIMPLE_NEAREST_FAST_PATH_PAD (SRC, r5g6b5, a8r8g8b8, mips_0565_8888),
++    SIMPLE_NEAREST_FAST_PATH_PAD (SRC, b5g6r5, a8b8g8r8, mips_0565_8888),
++
+     PIXMAN_MIPS_SIMPLE_NEAREST_A8_MASK_FAST_PATH (OVER, a8r8g8b8, r5g6b5, mips_8888_8_0565),
+     PIXMAN_MIPS_SIMPLE_NEAREST_A8_MASK_FAST_PATH (OVER, a8b8g8r8, b5g6r5, mips_8888_8_0565),
+ 
+diff -r b3bb2171ff2b -r 31ab78ee4ac9 gfx/cairo/libpixman/src/pixman-mips-dspr2.h
+--- a/gfx/cairo/libpixman/src/pixman-mips-dspr2.h	Fri Sep 27 19:35:44 2013 -0700
++++ b/gfx/cairo/libpixman/src/pixman-mips-dspr2.h	Sat Sep 28 12:06:50 2013 +0800
+@@ -246,6 +246,48 @@
+     }                                                                    \
+ }
+ 
++/****************************************************************************/
++
++#define PIXMAN_MIPS_BIND_SCALED_NEAREST_SRC_DST(name, op,                    \
++                                                src_type, dst_type)          \
++void                                                                         \
++pixman_scaled_nearest_scanline_##name##_##op##_asm_mips (                    \
++                                                   dst_type *       dst,     \
++                                                   const src_type * src,     \
++                                                   int32_t          w,       \
++                                                   pixman_fixed_t   vx,      \
++                                                   pixman_fixed_t   unit_x); \
++                                                                             \
++static force_inline void                                                     \
++scaled_nearest_scanline_mips_##name##_##op (dst_type *       pd,             \
++                                            const src_type * ps,             \
++                                            int32_t          w,              \
++                                            pixman_fixed_t   vx,             \
++                                            pixman_fixed_t   unit_x,         \
++                                            pixman_fixed_t   max_vx,         \
++                                            pixman_bool_t    zero_src)       \
++{                                                                            \
++    pixman_scaled_nearest_scanline_##name##_##op##_asm_mips (pd, ps, w,      \
++                                                             vx, unit_x);    \
++}                                                                            \
++                                                                             \
++FAST_NEAREST_MAINLOOP (mips_##name##_cover_##op,                             \
++                       scaled_nearest_scanline_mips_##name##_##op,           \
++                       src_type, dst_type, COVER)                            \
++FAST_NEAREST_MAINLOOP (mips_##name##_none_##op,                              \
++                       scaled_nearest_scanline_mips_##name##_##op,           \
++                       src_type, dst_type, NONE)                             \
++FAST_NEAREST_MAINLOOP (mips_##name##_pad_##op,                               \
++                       scaled_nearest_scanline_mips_##name##_##op,           \
++                       src_type, dst_type, PAD)
++
++/* Provide entries for the fast path table */
++#define PIXMAN_MIPS_SIMPLE_NEAREST_FAST_PATH(op,s,d,func)                    \
++    SIMPLE_NEAREST_FAST_PATH_COVER (op,s,d,func),                            \
++    SIMPLE_NEAREST_FAST_PATH_NONE (op,s,d,func),                             \
++    SIMPLE_NEAREST_FAST_PATH_PAD (op,s,d,func)
++
++
+ /*****************************************************************************/
+ 
+ #define PIXMAN_MIPS_BIND_SCALED_NEAREST_SRC_A8_DST(flags, name, op,           \
+diff -r b3bb2171ff2b -r 31ab78ee4ac9 gfx/cairo/libpixman/src/pixman-mmx.c
+--- a/gfx/cairo/libpixman/src/pixman-mmx.c	Fri Sep 27 19:35:44 2013 -0700
++++ b/gfx/cairo/libpixman/src/pixman-mmx.c	Sat Sep 28 12:06:50 2013 +0800
+@@ -44,8 +44,6 @@
+ #include "pixman-combine32.h"
+ #include "pixman-inlines.h"
+ 
+-#define no_vERBOSE
+-
+ #ifdef VERBOSE
+ #define CHECKPOINT() error_f ("at %s %d\n", __FUNCTION__, __LINE__)
+ #else
+diff -r b3bb2171ff2b -r 31ab78ee4ac9 gfx/cairo/libpixman/src/pixman-private.h
+--- a/gfx/cairo/libpixman/src/pixman-private.h	Fri Sep 27 19:35:44 2013 -0700
++++ b/gfx/cairo/libpixman/src/pixman-private.h	Sat Sep 28 12:06:50 2013 +0800
+@@ -1,3 +1,5 @@
++#include <float.h>
++
+ #ifndef PIXMAN_PRIVATE_H
+ #define PIXMAN_PRIVATE_H
+ 
+@@ -337,13 +339,12 @@
+  */
+ typedef struct
+ {
+-    uint32_t                left_ag;
+-    uint32_t                left_rb;
+-    uint32_t                right_ag;
+-    uint32_t                right_rb;
++    float		    a_s, a_b;
++    float		    r_s, r_b;
++    float		    g_s, g_b;
++    float		    b_s, b_b;
+     pixman_fixed_t	    left_x;
+     pixman_fixed_t          right_x;
+-    pixman_fixed_t          stepper;
+ 
+     pixman_gradient_stop_t *stops;
+     int                     num_stops;
+@@ -904,6 +905,8 @@
+ 
+ #define CLIP(v, low, high) ((v) < (low) ? (low) : ((v) > (high) ? (high) : (v)))
+ 
++#define FLOAT_IS_ZERO(f)     (-FLT_MIN < (f) && (f) < FLT_MIN)
++
+ /* Conversion between 8888 and 0565 */
+ 
+ static force_inline uint16_t
+@@ -1039,15 +1042,13 @@
+ 
+ #endif
+ 
+-#ifdef DEBUG
+-
+ void
+ _pixman_log_error (const char *function, const char *message);
+ 
+ #define return_if_fail(expr)                                            \
+     do                                                                  \
+     {                                                                   \
+-	if (!(expr))							\
++	if (unlikely (!(expr)))                                         \
+ 	{								\
+ 	    _pixman_log_error (FUNC, "The expression " # expr " was false"); \
+ 	    return;							\
+@@ -1058,7 +1059,7 @@
+ #define return_val_if_fail(expr, retval)                                \
+     do                                                                  \
+     {                                                                   \
+-	if (!(expr))                                                    \
++	if (unlikely (!(expr)))                                         \
+ 	{								\
+ 	    _pixman_log_error (FUNC, "The expression " # expr " was false"); \
+ 	    return (retval);						\
+@@ -1069,39 +1070,11 @@
+ #define critical_if_fail(expr)						\
+     do									\
+     {									\
+-	if (!(expr))							\
++	if (unlikely (!(expr)))                                         \
+ 	    _pixman_log_error (FUNC, "The expression " # expr " was false"); \
+     }									\
+     while (0)
+ 
+-
+-#else
+-
+-#define _pixman_log_error(f,m) do { } while (0)
+-
+-#define return_if_fail(expr)						\
+-    do                                                                  \
+-    {                                                                   \
+-	if (!(expr))							\
+-	    return;							\
+-    }                                                                   \
+-    while (0)
+-
+-#define return_val_if_fail(expr, retval)                                \
+-    do                                                                  \
+-    {                                                                   \
+-	if (!(expr))							\
+-	    return (retval);						\
+-    }                                                                   \
+-    while (0)
+-
+-#define critical_if_fail(expr)						\
+-    do									\
+-    {									\
+-    }									\
+-    while (0)
+-#endif
+-
+ /*
+  * Matrix
+  */
+diff -r b3bb2171ff2b -r 31ab78ee4ac9 gfx/cairo/libpixman/src/pixman-region.c
+--- a/gfx/cairo/libpixman/src/pixman-region.c	Fri Sep 27 19:35:44 2013 -0700
++++ b/gfx/cairo/libpixman/src/pixman-region.c	Sat Sep 28 12:06:50 2013 +0800
+@@ -1858,7 +1858,7 @@
+         else if (r2->x1 <= x1)
+         {
+             /*
+-	     * Subtrahend preceeds minuend: nuke left edge of minuend.
++	     * Subtrahend precedes minuend: nuke left edge of minuend.
+ 	     */
+             x1 = r2->x2;
+             if (x1 >= r1->x2)
+@@ -1982,7 +1982,7 @@
+     }
+ 
+     /* Add those rectangles in region 1 that aren't in region 2,
+-       do yucky substraction for overlaps, and
++       do yucky subtraction for overlaps, and
+        just throw away rectangles in region 2 that aren't in region 1 */
+     if (!pixman_op (reg_d, reg_m, reg_s, pixman_region_subtract_o, TRUE, FALSE))
+ 	return FALSE;
+@@ -2042,7 +2042,7 @@
+     }
+ 
+     /* Add those rectangles in region 1 that aren't in region 2,
+-     * do yucky substraction for overlaps, and
++     * do yucky subtraction for overlaps, and
+      * just throw away rectangles in region 2 that aren't in region 1
+      */
+     inv_reg.extents = *inv_rect;
+diff -r b3bb2171ff2b -r 31ab78ee4ac9 gfx/cairo/libpixman/src/pixman-sse2.c
+--- a/gfx/cairo/libpixman/src/pixman-sse2.c	Fri Sep 27 19:35:44 2013 -0700
++++ b/gfx/cairo/libpixman/src/pixman-sse2.c	Sat Sep 28 12:06:50 2013 +0800
+@@ -4558,7 +4558,7 @@
+ 	dst = dst_line;
+ 	dst_line += dst_stride;
+ 
+-	while (w && (unsigned long)dst & 15)
++	while (w && (uintptr_t)dst & 15)
+ 	{
+ 	    d = *dst;
+ 	    *dst++ =
+@@ -4617,7 +4617,7 @@
+ 	mask_line += mask_stride;
+ 	w = width;
+ 
+-	while (w && ((unsigned long)dst & 15))
++	while (w && ((uintptr_t)dst & 15))
+ 	{
+ 	    uint8_t m = *mask++;
+ 	    if (m)
+@@ -5554,19 +5554,27 @@
+ 			      scaled_nearest_scanline_sse2_8888_n_8888_OVER,
+ 			      uint32_t, uint32_t, uint32_t, NORMAL, TRUE, TRUE)
+ 
+-#define BMSK ((1 << BILINEAR_INTERPOLATION_BITS) - 1)
+-
+-#define BILINEAR_DECLARE_VARIABLES						\
++#if BILINEAR_INTERPOLATION_BITS < 8
++# define BILINEAR_DECLARE_VARIABLES						\
+     const __m128i xmm_wt = _mm_set_epi16 (wt, wt, wt, wt, wt, wt, wt, wt);	\
+     const __m128i xmm_wb = _mm_set_epi16 (wb, wb, wb, wb, wb, wb, wb, wb);	\
+-    const __m128i xmm_xorc8 = _mm_set_epi16 (0, 0, 0, 0, BMSK, BMSK, BMSK, BMSK);\
+-    const __m128i xmm_addc8 = _mm_set_epi16 (0, 0, 0, 0, 1, 1, 1, 1);		\
+-    const __m128i xmm_xorc7 = _mm_set_epi16 (0, BMSK, 0, BMSK, 0, BMSK, 0, BMSK);\
+-    const __m128i xmm_addc7 = _mm_set_epi16 (0, 1, 0, 1, 0, 1, 0, 1);		\
++    const __m128i xmm_addc = _mm_set_epi16 (0, 1, 0, 1, 0, 1, 0, 1);		\
++    const __m128i xmm_ux = _mm_set_epi16 (unit_x, -unit_x, unit_x, -unit_x,	\
++					  unit_x, -unit_x, unit_x, -unit_x);	\
++    const __m128i xmm_zero = _mm_setzero_si128 ();				\
++    __m128i xmm_x = _mm_set_epi16 (vx, -(vx + 1), vx, -(vx + 1),		\
++				   vx, -(vx + 1), vx, -(vx + 1))
++#else
++# define BILINEAR_DECLARE_VARIABLES						\
++    const __m128i xmm_wt = _mm_set_epi16 (wt, wt, wt, wt, wt, wt, wt, wt);	\
++    const __m128i xmm_wb = _mm_set_epi16 (wb, wb, wb, wb, wb, wb, wb, wb);	\
++    const __m128i xmm_addc = _mm_set_epi16 (0, 0, 0, 0, 1, 1, 1, 1);		\
+     const __m128i xmm_ux = _mm_set_epi16 (unit_x, unit_x, unit_x, unit_x,	\
+-					  unit_x, unit_x, unit_x, unit_x);	\
++					  -unit_x, -unit_x, -unit_x, -unit_x);	\
+     const __m128i xmm_zero = _mm_setzero_si128 ();				\
+-    __m128i xmm_x = _mm_set_epi16 (vx, vx, vx, vx, vx, vx, vx, vx)
++    __m128i xmm_x = _mm_set_epi16 (vx, vx, vx, vx,				\
++				   -(vx + 1), -(vx + 1), -(vx + 1), -(vx + 1))
++#endif
+ 
+ #define BILINEAR_INTERPOLATE_ONE_PIXEL(pix)					\
+ do {										\
+@@ -5585,8 +5593,8 @@
+     if (BILINEAR_INTERPOLATION_BITS < 8)					\
+     {										\
+ 	/* calculate horizontal weights */					\
+-	xmm_wh = _mm_add_epi16 (xmm_addc7, _mm_xor_si128 (xmm_xorc7,		\
+-		   _mm_srli_epi16 (xmm_x, 16 - BILINEAR_INTERPOLATION_BITS)));	\
++	xmm_wh = _mm_add_epi16 (xmm_addc, _mm_srli_epi16 (xmm_x,		\
++					16 - BILINEAR_INTERPOLATION_BITS));	\
+ 	xmm_x = _mm_add_epi16 (xmm_x, xmm_ux);					\
+ 	/* horizontal interpolation */						\
+ 	a = _mm_madd_epi16 (_mm_unpackhi_epi16 (_mm_shuffle_epi32 (		\
+@@ -5595,8 +5603,8 @@
+     else									\
+     {										\
+ 	/* calculate horizontal weights */					\
+-	xmm_wh = _mm_add_epi16 (xmm_addc8, _mm_xor_si128 (xmm_xorc8,		\
+-		_mm_srli_epi16 (xmm_x, 16 - BILINEAR_INTERPOLATION_BITS)));	\
++	xmm_wh = _mm_add_epi16 (xmm_addc, _mm_srli_epi16 (xmm_x,		\
++					16 - BILINEAR_INTERPOLATION_BITS));	\
+ 	xmm_x = _mm_add_epi16 (xmm_x, xmm_ux);					\
+ 	/* horizontal interpolation */						\
+ 	xmm_lo = _mm_mullo_epi16 (a, xmm_wh);					\
+diff -r b3bb2171ff2b -r 31ab78ee4ac9 gfx/cairo/libpixman/src/pixman-utils.c
+--- a/gfx/cairo/libpixman/src/pixman-utils.c	Fri Sep 27 19:35:44 2013 -0700
++++ b/gfx/cairo/libpixman/src/pixman-utils.c	Sat Sep 28 12:06:50 2013 +0800
+@@ -293,8 +293,6 @@
+     return get_implementation ();
+ }
+ 
+-#ifdef DEBUG
+-
+ void
+ _pixman_log_error (const char *function, const char *message)
+ {
+@@ -311,5 +309,3 @@
+ 	n_messages++;
+     }
+ }
+-
+-#endif
+diff -r b3bb2171ff2b -r 31ab78ee4ac9 gfx/cairo/libpixman/src/pixman-version.h
+--- a/gfx/cairo/libpixman/src/pixman-version.h	Fri Sep 27 19:35:44 2013 -0700
++++ b/gfx/cairo/libpixman/src/pixman-version.h	Sat Sep 28 12:06:50 2013 +0800
+@@ -32,10 +32,10 @@
+ #endif
+ 
+ #define PIXMAN_VERSION_MAJOR 0
+-#define PIXMAN_VERSION_MINOR 27
+-#define PIXMAN_VERSION_MICRO 1
++#define PIXMAN_VERSION_MINOR 30
++#define PIXMAN_VERSION_MICRO 2
+ 
+-#define PIXMAN_VERSION_STRING "0.27.1"
++#define PIXMAN_VERSION_STRING "0.30.2"
+ 
+ #define PIXMAN_VERSION_ENCODE(major, minor, micro) (	\
+ 	  ((major) * 10000)				\
+diff -r b3bb2171ff2b -r 31ab78ee4ac9 gfx/cairo/libpixman/src/pixman-vmx.c
+--- a/gfx/cairo/libpixman/src/pixman-vmx.c	Fri Sep 27 19:35:44 2013 -0700
++++ b/gfx/cairo/libpixman/src/pixman-vmx.c	Sat Sep 28 12:06:50 2013 +0800
+@@ -25,7 +25,9 @@
+  * Based on fbmmx.c by Owen Taylor, Søren Sandmann and Nicholas Miell
+  */
+ 
++#ifdef HAVE_CONFIG_H
+ #include <config.h>
++#endif
+ #include "pixman-private.h"
+ #include "pixman-combine32.h"
+ #include <altivec.h>
