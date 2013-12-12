@@ -1,0 +1,90 @@
+diff -ruNa old/security/build/Makefile.in new/security/build/Makefile.in
+--- old/security/build/Makefile.in	Wed Jul 31 02:41:14 2013
++++ new/security/build/Makefile.in	Wed Aug  7 22:48:26 2013
+@@ -496,3 +496,17 @@
+ # Work around NSS build system race condition creating certdata.c in
+ # security/nss/lib/ckfw/builtins. See bug #836220.
+ libs-nss/lib$(if $(MOZ_FOLD_LIBS),/ckfw): $(call mkdir_deps,../nss/lib/ckfw/builtins)
++
++LDFLAGS += -opt:ref,icf -LARGEADDRESSAWARE
++
++ifdef MOZ_PROFILE_GENERATE
++CFLAGS += $(PROFILE_GEN_CFLAGS)
++LDFLAGS += $(PROFILE_GEN_LDFLAGS)
++DLLFLAGS += $(PROFILE_GEN_LDFLAGS)
++endif # MOZ_PROFILE_GENERATE
++
++ifdef MOZ_PROFILE_USE
++CFLAGS += $(PROFILE_USE_CFLAGS)
++LDFLAGS += $(PROFILE_USE_LDFLAGS)
++DLLFLAGS += $(PROFILE_USE_LDFLAGS)
++endif # MOZ_PROFILE_USE
+diff -ruNa old/security/nss/coreconf/WIN32.mk new/security/nss/coreconf/WIN32.mk
+--- old/security/nss/coreconf/WIN32.mk	Wed Jul 31 02:41:16 2013
++++ new/security/nss/coreconf/WIN32.mk	Wed Aug  7 22:49:53 2013
+@@ -125,9 +125,9 @@
+     ifdef BUILD_OPT
+ 	OS_CFLAGS  += -MD
+ 	ifeq (11,$(ALLOW_OPT_CODE_SIZE)$(OPT_CODE_SIZE))
+-		OPTIMIZER += -O1
++		OPTIMIZER += -O2 -Ot -Oi -Ob2 -Oy -GT -Gy -GF -GS- -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -GL
+ 	else
+-		OPTIMIZER += -O2
++		OPTIMIZER += -O2 -Ot -Oi -Ob2 -Oy -GT -Gy -GF -GS- -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -GL
+ 	endif
+ 	DEFINES    += -UDEBUG -U_DEBUG -DNDEBUG
+ 	DLLFLAGS   += -OUT:"$@"
+diff -ruNa old/security/nss/coreconf/command.mk new/security/nss/coreconf/command.mk
+--- old/security/nss/coreconf/command.mk	Wed Jul 31 02:41:16 2013
++++ new/security/nss/coreconf/command.mk	Wed Aug  7 22:50:42 2013
+@@ -11,7 +11,7 @@
+ AS            = $(CC)
+ ASFLAGS      += $(CFLAGS)
+ CCF           = $(CC) $(CFLAGS)
+-LINK_DLL      = $(LINK) $(OS_DLLFLAGS) $(DLLFLAGS)
++LINK_DLL      = $(LINK) $(OS_DLLFLAGS) $(DLLFLAGS) -opt:ref,icf -LARGEADDRESSAWARE 
+ LINK_EXE      = $(LINK) $(OS_LFLAGS) $(LFLAGS)
+ CFLAGS        = $(OPTIMIZER) $(OS_CFLAGS) $(XP_DEFINE) $(DEFINES) $(INCLUDES) \
+ 		$(XCFLAGS)
+diff -ruNa old/security/nss/lib/freebl/Makefile new/security/nss/lib/freebl/Makefile
+--- old/security/nss/lib/freebl/Makefile	Wed Aug  7 22:39:51 2013
++++ new/security/nss/lib/freebl/Makefile	Wed Aug  7 22:51:53 2013
+@@ -132,7 +132,7 @@
+     DEFINES += -DMP_ASSEMBLY_MULTIPLY -DMP_ASSEMBLY_SQUARE 
+     DEFINES += -DMP_ASSEMBLY_DIV_2DX1D -DMP_USE_UINT_DIGIT -DMP_NO_MP_WORD
+     ifdef BUILD_OPT
+-	OPTIMIZER += -Ox  # maximum optimization for freebl
++	OPTIMIZER += -O2 -Ot -Oi -Ob2 -Oy -GT -Gy -GF -GS- -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -GL  # maximum optimization for freebl
+     endif
+ endif
+ else
+@@ -144,7 +144,7 @@
+ else
+ # MSVC
+     ifdef BUILD_OPT
+-	OPTIMIZER += -Ox  # maximum optimization for freebl
++	OPTIMIZER += -O2 -Ot -Oi -Ob2 -Oy -GT -Gy -GF -GS- -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -GL  # maximum optimization for freebl
+     endif
+     ASFILES  = arcfour-amd64-masm.asm mpi_amd64_masm.asm mp_comba_amd64_masm.asm
+     DEFINES += -DNSS_BEVAND_ARCFOUR -DMPI_AMD64 -DMP_ASSEMBLY_MULTIPLY
+diff -ruNa old/security/nss/lib/freebl/mpi/Makefile.win new/security/nss/lib/freebl/mpi/Makefile.win
+--- old/security/nss/lib/freebl/mpi/Makefile.win	Wed Jul 31 02:41:16 2013
++++ new/security/nss/lib/freebl/mpi/Makefile.win	Wed Aug  7 22:52:51 2013
+@@ -35,7 +35,7 @@
+ 
+ ifeq ($(CPU_ARCH),x86_64)
+ AS_SRCS = mpi_x86_64.asm
+-CFLAGS = -O2 -Z7 -MD -W3 -nologo -DXP_PC -UDEBUG -U_DEBUG -DNDEBUG \
++CFLAGS = -O2 -Ot -Oi -Ob2 -Oy -GT -Gy -GF -GS- -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -GL -Z7 -MD -W3 -nologo -DXP_PC -UDEBUG -U_DEBUG -DNDEBUG \
+  -DWIN32 -D_WIN64 -D_AMD64_ -D_M_AMD64 -D_WINDOWS -DWIN95 $(MPICMN)
+ ASFLAGS = -Cp -Sn -Zi -I.
+ else
+@@ -48,7 +48,7 @@
+  -DWIN32 -D_WINDOWS -DWIN95 $(MPICMN)
+ #CFLAGS = -Od -Z7 -MD -W3 -nologo -D_X86_ -DXP_PC -UDEBUG -U_DEBUG -DNDEBUG \
+  -DWIN32 -D_WINDOWS -DWIN95 $(MPICMN)
+-CFLAGS = -O2 -Z7 -MD -W3 -nologo -D_X86_ -DXP_PC -UDEBUG -U_DEBUG -DNDEBUG \
++CFLAGS = -O2 -Ot -Oi -Ob2 -Oy -GT -Gy -GF -GS- -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -GL -Z7 -MD -W3 -nologo -D_X86_ -DXP_PC -UDEBUG -U_DEBUG -DNDEBUG \
+  -DWIN32 -D_WINDOWS -DWIN95 $(MPICMN)
+ ASFLAGS = -Cp -Sn -Zi -coff -I. 
+ endif

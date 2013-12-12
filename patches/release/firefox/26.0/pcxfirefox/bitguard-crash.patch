@@ -1,0 +1,12 @@
+diff -ruNa old/tookit/xre/nsWindowsDllBlocklist.cpp new/tookit/xre/nsWindowsDllBlocklist.cpp
+--- old/toolkit/xre/nsWindowsDllBlocklist.cpp	Tue Dec  3 13:18:00 2013
++++ new/toolkit/xre/nsWindowsDllBlocklist.cpp	Thu Dec  5 20:11:08 2013
+@@ -132,7 +132,7 @@
+   { "prnx.dll", MAKE_VERSION(1, 3, 334, 9) },
+ 
+   // bug 925459, bitguard crashes
+-  { "bitguard.dll", MAKE_VERSION(2, 6, 1694, 24) },
++  { "bitguard.dll", ALL_VERSIONS },
+ 
+   // bug 812683 - crashes in Windows library when Asus Gamer OSD is installed
+   // Software is discontinued/unsupported

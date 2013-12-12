@@ -1,0 +1,15 @@
+diff -ruNa old/toolkit/xre/nsAppRunner.cpp new/toolkit/xre/nsAppRunner.cpp
+--- old/toolkit/xre/nsAppRunner.cpp	Wed Jul 31 02:41:20 2013
++++ new/toolkit/xre/nsAppRunner.cpp	Fri Aug  9 02:17:37 2013
+@@ -3227,8 +3227,9 @@
+   gShutdownChecks = SCM_CRASH;
+ #else
+   const char* releaseChannel = NS_STRINGIFY(MOZ_UPDATE_CHANNEL);
+-  if (strcmp(releaseChannel, "nightly") == 0 ||
+-      strcmp(releaseChannel, "default") == 0) {
++//  if (strcmp(releaseChannel, "nightly") == 0 ||
++//      strcmp(releaseChannel, "default") == 0) {
++    if (strcmp(releaseChannel, "nightly") == 0 ) {
+     gShutdownChecks = SCM_RECORD;
+   } else {
+     gShutdownChecks = SCM_NOTHING;

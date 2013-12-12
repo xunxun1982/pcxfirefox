@@ -1,0 +1,96 @@
+# pcxfirefox patch
+# User xunxun
+# Date 2013022303:00
+# Make builders use -fp:fast safely
+diff -ruNa old/db/sqlite3/src/Makefile.in new/db/sqlite3/src/Makefile.in
+--- old/db/sqlite3/src/Makefile.in	Tue Jun 18 19:01:16 2013
++++ new/db/sqlite3/src/Makefile.in	Sun Jun 30 11:31:09 2013
+@@ -138,3 +138,6 @@
+        $(srcdir)/sqlite.def | sed -e '1,/^EXPORTS$$/ d' -e 's,sqlite3,_\0,' \
+        -e 's,\ DATA.*$$,,' >> $(DEF_FILE)
+ endif
++
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff -ruNa old/dom/plugins/ipc/hangui/Makefile.in new/dom/plugins/ipc/hangui/Makefile.in
+--- old/dom/plugins/ipc/hangui/Makefile.in	Tue Jun 18 19:01:18 2013
++++ new/dom/plugins/ipc/hangui/Makefile.in	Sun Jun 30 11:31:23 2013
+@@ -41,3 +41,5 @@
+ 
+ include $(topsrcdir)/config/rules.mk
+ 
++CFLAGS   += -fp:precise -Qfast_transcendentals
++CXXFLAGS += -fp:precise -Qfast_transcendentals
+diff -ruNa old/ipc/app/Makefile.in new/ipc/app/Makefile.in
+--- old/ipc/app/Makefile.in	Tue Jun 18 19:01:24 2013
++++ new/ipc/app/Makefile.in	Sun Jun 30 11:31:23 2013
+@@ -98,3 +98,6 @@
+ 	$(NSINSTALL) $(PROGRAM) $(DIST)/bin/$(PROGRAM).app/Contents/MacOS
+ 	$(RM) $(DIST)/bin/$(PROGRAM)
+ endif #}
++
++CFLAGS   += -fp:precise -Qfast_transcendentals
++CXXFLAGS += -fp:precise -Qfast_transcendentals
+diff -ruNa old/js/src/Makefile.in new/js/src/Makefile.in
+--- old/js/src/Makefile.in	Tue Jun 18 19:01:24 2013
++++ new/js/src/Makefile.in	Sun Jun 30 11:31:09 2013
+@@ -721,7 +721,8 @@
+ # Prevent floating point errors caused by VC++ optimizations
+ ifdef _MSC_VER
+ # XXX We should add this to CXXFLAGS, too?
+-CFLAGS += -fp:precise
++CFLAGS += -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+ 
+ ifeq ($(CPU_ARCH),x86)
+ # Workaround compiler bug on PGO (Bug 721284)
+diff -ruNa old/memory/build/Makefile.in new/memory/build/Makefile.in
+--- old/memory/build/Makefile.in	Tue Jun 18 19:01:36 2013
++++ new/memory/build/Makefile.in	Sun Jun 30 11:31:09 2013
+@@ -59,3 +59,6 @@
+ endif
+ 
+ include $(topsrcdir)/config/rules.mk
++
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff -ruNa old/memory/jemalloc/Makefile.in new/memory/jemalloc/Makefile.in
+--- old/memory/jemalloc/Makefile.in	Tue Jun 18 19:01:36 2013
++++ new/memory/jemalloc/Makefile.in	Sun Jun 30 11:31:10 2013
+@@ -48,3 +48,6 @@
+ endif
+ 
+ DEFINES += -Dabort=moz_abort
++
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff -ruNa old/memory/jemalloc/src/Makefile.in new/memory/jemalloc/src/Makefile.in
+--- old/memory/jemalloc/src/Makefile.in	Tue Jun 18 19:01:36 2013
++++ new/memory/jemalloc/src/Makefile.in	Sun Jun 30 11:31:10 2013
+@@ -321,3 +321,6 @@
+ $(cfgoutputs_out) $(cfghdrs_out) : $(objroot)config.stamp
+ 	@true
+ endif
++
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff -ruNa old/memory/mozjemalloc/Makefile.in new/memory/mozjemalloc/Makefile.in
+--- old/memory/mozjemalloc/Makefile.in	Tue Jun 18 19:01:36 2013
++++ new/memory/mozjemalloc/Makefile.in	Sun Jun 30 11:31:10 2013
+@@ -49,3 +49,6 @@
+ DEFINES += -DMOZ_JEMALLOC_IMPL
+ 
+ include $(topsrcdir)/config/rules.mk
++
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff -ruNa old/nsprpub/pr/src/misc/Makefile.in new/nsprpub/pr/src/misc/Makefile.in
+--- old/nsprpub/pr/src/misc/Makefile.in	Tue Jun 18 19:01:38 2013
++++ new/nsprpub/pr/src/misc/Makefile.in	Sun Jun 30 11:31:10 2013
+@@ -77,4 +77,5 @@
+ 
+ export:: $(TARGETS)
+ 
+-
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals

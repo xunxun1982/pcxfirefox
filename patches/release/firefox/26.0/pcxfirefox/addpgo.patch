@@ -1,0 +1,657 @@
+diff -ruNa mozilla-release/browser/app/moz.build mozilla-release-fix/browser/app/moz.build
+--- mozilla-release/browser/app/moz.build	Fri Dec  6 00:07:22 2013
++++ mozilla-release-fix/browser/app/moz.build	Fri Dec  6 12:26:19 2013
+@@ -11,3 +11,5 @@
+ CPP_SOURCES += [
+     'nsBrowserApp.cpp',
+ ]
++
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/browser/components/about/moz.build mozilla-release-fix/browser/components/about/moz.build
+--- mozilla-release/browser/components/about/moz.build	Fri Dec  6 00:07:22 2013
++++ mozilla-release-fix/browser/components/about/moz.build	Fri Dec  6 12:27:50 2013
+@@ -16,3 +16,4 @@
+ 
+ LIBRARY_NAME = 'browserabout_s'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/browser/components/build/moz.build mozilla-release-fix/browser/components/build/moz.build
+--- mozilla-release/browser/components/build/moz.build	Fri Dec  6 00:07:22 2013
++++ mozilla-release-fix/browser/components/build/moz.build	Fri Dec  6 12:26:19 2013
+@@ -16,3 +16,4 @@
+ 
+ LIBRARY_NAME = 'browsercomps'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/browser/components/dirprovider/moz.build mozilla-release-fix/browser/components/dirprovider/moz.build
+--- mozilla-release/browser/components/dirprovider/moz.build	Fri Dec  6 00:07:22 2013
++++ mozilla-release-fix/browser/components/dirprovider/moz.build	Fri Dec  6 12:26:19 2013
+@@ -18,3 +18,4 @@
+ 
+ LIBRARY_NAME = 'browserdir_s'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/browser/components/feeds/src/Makefile.in mozilla-release-fix/browser/components/feeds/src/Makefile.in
+--- mozilla-release/browser/components/feeds/src/Makefile.in	Fri Dec  6 00:07:22 2013
++++ mozilla-release-fix/browser/components/feeds/src/Makefile.in	Fri Dec  6 12:28:45 2013
+@@ -12,3 +12,4 @@
+ 
+ 
+ LOCAL_INCLUDES = -I$(srcdir)/../../build
++
+diff -ruNa mozilla-release/browser/components/feeds/src/moz.build mozilla-release-fix/browser/components/feeds/src/moz.build
+--- mozilla-release/browser/components/feeds/src/moz.build	Fri Dec  6 00:07:22 2013
++++ mozilla-release-fix/browser/components/feeds/src/moz.build	Fri Dec  6 12:29:07 2013
+@@ -22,3 +22,4 @@
+ 
+ LIBRARY_NAME = 'browser_feeds_s'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/browser/components/migration/src/Makefile.in mozilla-release-fix/browser/components/migration/src/Makefile.in
+--- mozilla-release/browser/components/migration/src/Makefile.in	Fri Dec  6 00:07:22 2013
++++ mozilla-release-fix/browser/components/migration/src/Makefile.in	Fri Dec  6 12:30:07 2013
+@@ -14,3 +14,4 @@
+ ifeq (cocoa,$(MOZ_WIDGET_TOOLKIT))
+ DEFINES += -DHAS_SAFARI_MIGRATOR
+ endif
++
+diff -ruNa mozilla-release/browser/components/migration/src/moz.build mozilla-release-fix/browser/components/migration/src/moz.build
+--- mozilla-release/browser/components/migration/src/moz.build	Fri Dec  6 00:07:22 2013
++++ mozilla-release-fix/browser/components/migration/src/moz.build	Fri Dec  6 12:30:41 2013
+@@ -42,3 +42,4 @@
+     'MigrationUtils.jsm',
+ ]
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/browser/components/shell/src/moz.build mozilla-release-fix/browser/components/shell/src/moz.build
+--- mozilla-release/browser/components/shell/src/moz.build	Fri Dec  6 00:07:22 2013
++++ mozilla-release-fix/browser/components/shell/src/moz.build	Fri Dec  6 12:26:19 2013
+@@ -26,3 +26,5 @@
+     'nsSetDefaultBrowser.js',
+     'nsSetDefaultBrowser.manifest',
+ ]
++
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/db/sqlite3/src/moz.build mozilla-release-fix/db/sqlite3/src/moz.build
+--- mozilla-release/db/sqlite3/src/moz.build	Fri Dec  6 00:07:26 2013
++++ mozilla-release-fix/db/sqlite3/src/moz.build	Fri Dec  6 12:26:19 2013
+@@ -16,3 +16,4 @@
+     'sqlite3.c',
+ ]
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/gfx/angle/src/libEGL/moz.build mozilla-release-fix/gfx/angle/src/libEGL/moz.build
+--- mozilla-release/gfx/angle/src/libEGL/moz.build	Fri Dec  6 00:07:32 2013
++++ mozilla-release-fix/gfx/angle/src/libEGL/moz.build	Fri Dec  6 12:26:19 2013
+@@ -24,3 +24,5 @@
+ ]
+ 
+ LIBRARY_NAME = 'libEGL'
++
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/gfx/angle/src/libGLESv2/moz.build mozilla-release-fix/gfx/angle/src/libGLESv2/moz.build
+--- mozilla-release/gfx/angle/src/libGLESv2/moz.build	Fri Dec  6 00:07:32 2013
++++ mozilla-release-fix/gfx/angle/src/libGLESv2/moz.build	Fri Dec  6 12:26:19 2013
+@@ -178,3 +178,5 @@
+ ]
+ 
+ LIBRARY_NAME = 'libGLESv2'
++
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/gfx/ipc/moz.build mozilla-release-fix/gfx/ipc/moz.build
+--- mozilla-release/gfx/ipc/moz.build	Fri Dec  6 00:07:32 2013
++++ mozilla-release-fix/gfx/ipc/moz.build	Fri Dec  6 12:26:19 2013
+@@ -32,3 +32,4 @@
+ 
+ LIBRARY_NAME = 'gfxipc_s'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/gfx/ycbcr/moz.build mozilla-release-fix/gfx/ycbcr/moz.build
+--- mozilla-release/gfx/ycbcr/moz.build	Fri Dec  6 00:07:32 2013
++++ mozilla-release-fix/gfx/ycbcr/moz.build	Fri Dec  6 12:26:19 2013
+@@ -73,3 +73,4 @@
+ 
+ LIBXUL_LIBRARY = True
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/hal/moz.build mozilla-release-fix/hal/moz.build
+--- mozilla-release/hal/moz.build	Fri Dec  6 00:07:32 2013
++++ mozilla-release-fix/hal/moz.build	Fri Dec  6 12:26:19 2013
+@@ -156,3 +156,4 @@
+ 
+ LIBRARY_NAME = 'hal_s'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/image/build/moz.build mozilla-release-fix/image/build/moz.build
+--- mozilla-release/image/build/moz.build	Fri Dec  6 00:07:32 2013
++++ mozilla-release-fix/image/build/moz.build	Fri Dec  6 12:26:19 2013
+@@ -16,3 +16,4 @@
+ 
+ LIBXUL_LIBRARY = True
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/image/decoders/icon/moz.build mozilla-release-fix/image/decoders/icon/moz.build
+--- mozilla-release/image/decoders/icon/moz.build	Fri Dec  6 00:07:32 2013
++++ mozilla-release-fix/image/decoders/icon/moz.build	Fri Dec  6 12:26:19 2013
+@@ -22,3 +22,4 @@
+ 
+ LIBXUL_LIBRARY = True
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/image/decoders/icon/win/moz.build mozilla-release-fix/image/decoders/icon/win/moz.build
+--- mozilla-release/image/decoders/icon/win/moz.build	Fri Dec  6 00:07:32 2013
++++ mozilla-release-fix/image/decoders/icon/win/moz.build	Fri Dec  6 12:26:19 2013
+@@ -16,3 +16,4 @@
+ 
+ LIBXUL_LIBRARY = True
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/image/decoders/moz.build mozilla-release-fix/image/decoders/moz.build
+--- mozilla-release/image/decoders/moz.build	Fri Dec  6 00:07:32 2013
++++ mozilla-release-fix/image/decoders/moz.build	Fri Dec  6 12:26:19 2013
+@@ -45,3 +45,4 @@
+     'iccjpeg.c',
+ ]
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/image/encoders/bmp/moz.build mozilla-release-fix/image/encoders/bmp/moz.build
+--- mozilla-release/image/encoders/bmp/moz.build	Fri Dec  6 00:07:32 2013
++++ mozilla-release-fix/image/encoders/bmp/moz.build	Fri Dec  6 12:26:19 2013
+@@ -16,3 +16,4 @@
+ 
+ LIBXUL_LIBRARY = True
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/image/encoders/ico/moz.build mozilla-release-fix/image/encoders/ico/moz.build
+--- mozilla-release/image/encoders/ico/moz.build	Fri Dec  6 00:07:32 2013
++++ mozilla-release-fix/image/encoders/ico/moz.build	Fri Dec  6 12:26:19 2013
+@@ -16,3 +16,4 @@
+ 
+ LIBXUL_LIBRARY = True
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/image/encoders/jpeg/moz.build mozilla-release-fix/image/encoders/jpeg/moz.build
+--- mozilla-release/image/encoders/jpeg/moz.build	Fri Dec  6 00:07:32 2013
++++ mozilla-release-fix/image/encoders/jpeg/moz.build	Fri Dec  6 12:26:19 2013
+@@ -16,3 +16,4 @@
+ 
+ LIBXUL_LIBRARY = True
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/image/encoders/moz.build mozilla-release-fix/image/encoders/moz.build
+--- mozilla-release/image/encoders/moz.build	Fri Dec  6 00:07:32 2013
++++ mozilla-release-fix/image/encoders/moz.build	Fri Dec  6 12:26:19 2013
+@@ -10,3 +10,5 @@
+     'jpeg',
+     'bmp',
+ ]
++
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/image/encoders/png/moz.build mozilla-release-fix/image/encoders/png/moz.build
+--- mozilla-release/image/encoders/png/moz.build	Fri Dec  6 00:07:32 2013
++++ mozilla-release-fix/image/encoders/png/moz.build	Fri Dec  6 12:26:19 2013
+@@ -16,3 +16,4 @@
+ 
+ LIBXUL_LIBRARY = True
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/image/src/moz.build mozilla-release-fix/image/src/moz.build
+--- mozilla-release/image/src/moz.build	Fri Dec  6 00:07:32 2013
++++ mozilla-release-fix/image/src/moz.build	Fri Dec  6 12:26:19 2013
+@@ -46,3 +46,4 @@
+ 
+ LIBRARY_NAME = 'imglib2_s'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/ipc/app/moz.build mozilla-release-fix/ipc/app/moz.build
+--- mozilla-release/ipc/app/moz.build	Fri Dec  6 00:07:36 2013
++++ mozilla-release-fix/ipc/app/moz.build	Fri Dec  6 12:26:19 2013
+@@ -16,3 +16,5 @@
+     CPP_SOURCES += [
+         'MozillaRuntimeMain.cpp',
+     ]
++
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/layout/media/moz.build mozilla-release-fix/layout/media/moz.build
+--- mozilla-release/layout/media/moz.build	Fri Dec  6 00:07:42 2013
++++ mozilla-release-fix/layout/media/moz.build	Fri Dec  6 12:26:19 2013
+@@ -8,3 +8,4 @@
+ 
+ LIBRARY_NAME = 'gkmedias'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/media/kiss_fft/moz.build mozilla-release-fix/media/kiss_fft/moz.build
+--- mozilla-release/media/kiss_fft/moz.build	Fri Dec  6 00:07:48 2013
++++ mozilla-release-fix/media/kiss_fft/moz.build	Fri Dec  6 12:26:19 2013
+@@ -18,3 +18,4 @@
+ 
+ LIBRARY_NAME = 'kiss_fft'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/memory/build/moz.build mozilla-release-fix/memory/build/moz.build
+--- mozilla-release/memory/build/moz.build	Fri Dec  6 00:07:50 2013
++++ mozilla-release-fix/memory/build/moz.build	Fri Dec  6 12:26:19 2013
+@@ -33,3 +33,4 @@
+ 
+ LIBRARY_NAME = 'memory'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/memory/jemalloc/moz.build mozilla-release-fix/memory/jemalloc/moz.build
+--- mozilla-release/memory/jemalloc/moz.build	Fri Dec  6 00:07:50 2013
++++ mozilla-release-fix/memory/jemalloc/moz.build	Fri Dec  6 12:26:19 2013
+@@ -40,3 +40,4 @@
+ 
+ LIBRARY_NAME = 'jemalloc'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/memory/mozalloc/moz.build mozilla-release-fix/memory/mozalloc/moz.build
+--- mozilla-release/memory/mozalloc/moz.build	Fri Dec  6 00:07:50 2013
++++ mozilla-release-fix/memory/mozalloc/moz.build	Fri Dec  6 12:26:19 2013
+@@ -43,3 +43,4 @@
+ 
+ LIBRARY_NAME = 'mozalloc'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/memory/mozjemalloc/moz.build mozilla-release-fix/memory/mozjemalloc/moz.build
+--- mozilla-release/memory/mozjemalloc/moz.build	Fri Dec  6 00:07:50 2013
++++ mozilla-release-fix/memory/mozjemalloc/moz.build	Fri Dec  6 12:26:19 2013
+@@ -16,3 +16,4 @@
+     ]
+     LIBRARY_NAME = 'jemalloc'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/memory/replace/dmd/moz.build mozilla-release-fix/memory/replace/dmd/moz.build
+--- mozilla-release/memory/replace/dmd/moz.build	Fri Dec  6 00:07:50 2013
++++ mozilla-release-fix/memory/replace/dmd/moz.build	Fri Dec  6 12:26:19 2013
+@@ -22,3 +22,4 @@
+ 
+ LIBRARY_NAME = 'dmd'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/memory/replace/dummy/moz.build mozilla-release-fix/memory/replace/dummy/moz.build
+--- mozilla-release/memory/replace/dummy/moz.build	Fri Dec  6 00:07:50 2013
++++ mozilla-release-fix/memory/replace/dummy/moz.build	Fri Dec  6 12:26:19 2013
+@@ -13,3 +13,4 @@
+ 
+ LIBRARY_NAME = 'replace_malloc'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/memory/replace/jemalloc/moz.build mozilla-release-fix/memory/replace/jemalloc/moz.build
+--- mozilla-release/memory/replace/jemalloc/moz.build	Fri Dec  6 00:07:50 2013
++++ mozilla-release-fix/memory/replace/jemalloc/moz.build	Fri Dec  6 12:26:19 2013
+@@ -22,3 +22,4 @@
+ 
+ LIBRARY_NAME = 'replace_jemalloc'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/memory/replace/moz.build mozilla-release-fix/memory/replace/moz.build
+--- mozilla-release/memory/replace/moz.build	Fri Dec  6 00:07:50 2013
++++ mozilla-release-fix/memory/replace/moz.build	Fri Dec  6 12:26:19 2013
+@@ -7,3 +7,5 @@
+ # Build jemalloc3 as a replace-malloc lib when building with mozjemalloc
+ if not CONFIG['MOZ_JEMALLOC']:
+     DIRS += ['jemalloc']
++
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/mfbt/moz.build mozilla-release-fix/mfbt/moz.build
+--- mozilla-release/mfbt/moz.build	Fri Dec  6 00:07:50 2013
++++ mozilla-release-fix/mfbt/moz.build	Fri Dec  6 12:26:19 2013
+@@ -10,3 +10,4 @@
+ 
+ LIBRARY_NAME = 'mfbt'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/modules/libbz2/src/moz.build mozilla-release-fix/modules/libbz2/src/moz.build
+--- mozilla-release/modules/libbz2/src/moz.build	Fri Dec  6 00:07:52 2013
++++ mozilla-release-fix/modules/libbz2/src/moz.build	Fri Dec  6 12:26:19 2013
+@@ -36,3 +36,4 @@
+     'randtable.c',
+ ]
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/modules/zlib/src/moz.build mozilla-release-fix/modules/zlib/src/moz.build
+--- mozilla-release/modules/zlib/src/moz.build	Fri Dec  6 00:07:52 2013
++++ mozilla-release-fix/modules/zlib/src/moz.build	Fri Dec  6 12:26:19 2013
+@@ -14,3 +14,4 @@
+ 
+ LIBRARY_NAME = 'mozz'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/mozglue/build/moz.build mozilla-release-fix/mozglue/build/moz.build
+--- mozilla-release/mozglue/build/moz.build	Fri Dec  6 00:07:52 2013
++++ mozilla-release-fix/mozglue/build/moz.build	Fri Dec  6 12:26:19 2013
+@@ -53,3 +53,4 @@
+ 
+ LIBRARY_NAME = 'mozglue'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/netwerk/protocol/about/moz.build mozilla-release-fix/netwerk/protocol/about/moz.build
+--- mozilla-release/netwerk/protocol/about/moz.build	Fri Dec  6 00:07:52 2013
++++ mozilla-release-fix/netwerk/protocol/about/moz.build	Fri Dec  6 12:26:19 2013
+@@ -30,3 +30,4 @@
+ 
+ LIBRARY_NAME = 'nkabout_s'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/netwerk/protocol/data/moz.build mozilla-release-fix/netwerk/protocol/data/moz.build
+--- mozilla-release/netwerk/protocol/data/moz.build	Fri Dec  6 00:07:52 2013
++++ mozilla-release-fix/netwerk/protocol/data/moz.build	Fri Dec  6 12:26:19 2013
+@@ -17,3 +17,4 @@
+ 
+ LIBXUL_LIBRARY = True
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/netwerk/protocol/viewsource/moz.build mozilla-release-fix/netwerk/protocol/viewsource/moz.build
+--- mozilla-release/netwerk/protocol/viewsource/moz.build	Fri Dec  6 00:07:52 2013
++++ mozilla-release-fix/netwerk/protocol/viewsource/moz.build	Fri Dec  6 12:26:19 2013
+@@ -23,3 +23,4 @@
+ 
+ LIBXUL_LIBRARY = True
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/netwerk/protocol/wyciwyg/moz.build mozilla-release-fix/netwerk/protocol/wyciwyg/moz.build
+--- mozilla-release/netwerk/protocol/wyciwyg/moz.build	Fri Dec  6 00:07:52 2013
++++ mozilla-release-fix/netwerk/protocol/wyciwyg/moz.build	Fri Dec  6 12:26:19 2013
+@@ -35,3 +35,4 @@
+ 
+ LIBRARY_NAME = 'nkwyciwyg_s'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/netwerk/socket/moz.build mozilla-release-fix/netwerk/socket/moz.build
+--- mozilla-release/netwerk/socket/moz.build	Fri Dec  6 00:07:52 2013
++++ mozilla-release-fix/netwerk/socket/moz.build	Fri Dec  6 12:26:19 2013
+@@ -29,3 +29,4 @@
+ 
+ LIBXUL_LIBRARY = True
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/netwerk/system/win32/moz.build mozilla-release-fix/netwerk/system/win32/moz.build
+--- mozilla-release/netwerk/system/win32/moz.build	Fri Dec  6 00:07:52 2013
++++ mozilla-release-fix/netwerk/system/win32/moz.build	Fri Dec  6 12:26:19 2013
+@@ -17,3 +17,4 @@
+ 
+ LIBXUL_LIBRARY = True
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/nsprpub/lib/ds/Makefile.in mozilla-release-fix/nsprpub/lib/ds/Makefile.in
+--- mozilla-release/nsprpub/lib/ds/Makefile.in	Fri Dec  6 00:07:52 2013
++++ mozilla-release-fix/nsprpub/lib/ds/Makefile.in	Fri Dec  6 12:26:19 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ INCLUDES = -I$(dist_includedir) -I$(topsrcdir)/pr/include
+diff -ruNa mozilla-release/nsprpub/lib/libc/src/Makefile.in mozilla-release-fix/nsprpub/lib/libc/src/Makefile.in
+--- mozilla-release/nsprpub/lib/libc/src/Makefile.in	Fri Dec  6 00:07:52 2013
++++ mozilla-release-fix/nsprpub/lib/libc/src/Makefile.in	Fri Dec  6 12:26:19 2013
+@@ -13,6 +13,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ INCLUDES = -I$(dist_includedir)
+diff -ruNa mozilla-release/nsprpub/lib/prstreams/Makefile.in mozilla-release-fix/nsprpub/lib/prstreams/Makefile.in
+--- mozilla-release/nsprpub/lib/prstreams/Makefile.in	Fri Dec  6 00:07:52 2013
++++ mozilla-release-fix/nsprpub/lib/prstreams/Makefile.in	Fri Dec  6 12:26:19 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ ifeq ($(OS_ARCH), IRIX)
+diff -ruNa mozilla-release/nsprpub/pr/src/Makefile.in mozilla-release-fix/nsprpub/pr/src/Makefile.in
+--- mozilla-release/nsprpub/pr/src/Makefile.in	Fri Dec  6 00:07:54 2013
++++ mozilla-release-fix/nsprpub/pr/src/Makefile.in	Fri Dec  6 12:26:19 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ DIRS = io linking malloc md memory misc threads
+diff -ruNa mozilla-release/nsprpub/pr/src/bthreads/Makefile.in mozilla-release-fix/nsprpub/pr/src/bthreads/Makefile.in
+--- mozilla-release/nsprpub/pr/src/bthreads/Makefile.in	Fri Dec  6 00:07:54 2013
++++ mozilla-release-fix/nsprpub/pr/src/bthreads/Makefile.in	Fri Dec  6 12:26:19 2013
+@@ -13,6 +13,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ include $(srcdir)/bsrcs.mk
+diff -ruNa mozilla-release/nsprpub/pr/src/cplus/Makefile.in mozilla-release-fix/nsprpub/pr/src/cplus/Makefile.in
+--- mozilla-release/nsprpub/pr/src/cplus/Makefile.in	Fri Dec  6 00:07:54 2013
++++ mozilla-release-fix/nsprpub/pr/src/cplus/Makefile.in	Fri Dec  6 12:26:19 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ CXXSRCS =           \
+diff -ruNa mozilla-release/nsprpub/pr/src/io/Makefile.in mozilla-release-fix/nsprpub/pr/src/io/Makefile.in
+--- mozilla-release/nsprpub/pr/src/io/Makefile.in	Fri Dec  6 00:07:54 2013
++++ mozilla-release-fix/nsprpub/pr/src/io/Makefile.in	Fri Dec  6 12:26:19 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ CSRCS = \
+diff -ruNa mozilla-release/nsprpub/pr/src/linking/Makefile.in mozilla-release-fix/nsprpub/pr/src/linking/Makefile.in
+--- mozilla-release/nsprpub/pr/src/linking/Makefile.in	Fri Dec  6 00:07:54 2013
++++ mozilla-release-fix/nsprpub/pr/src/linking/Makefile.in	Fri Dec  6 12:26:19 2013
+@@ -13,6 +13,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ CSRCS =           \
+diff -ruNa mozilla-release/nsprpub/pr/src/malloc/Makefile.in mozilla-release-fix/nsprpub/pr/src/malloc/Makefile.in
+--- mozilla-release/nsprpub/pr/src/malloc/Makefile.in	Fri Dec  6 00:07:54 2013
++++ mozilla-release-fix/nsprpub/pr/src/malloc/Makefile.in	Fri Dec  6 12:26:19 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ TARGETS	= $(OBJS)
+diff -ruNa mozilla-release/nsprpub/pr/src/md/Makefile.in mozilla-release-fix/nsprpub/pr/src/md/Makefile.in
+--- mozilla-release/nsprpub/pr/src/md/Makefile.in	Fri Dec  6 00:07:54 2013
++++ mozilla-release-fix/nsprpub/pr/src/md/Makefile.in	Fri Dec  6 12:26:19 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ DIRS = $(PR_MD_ARCH_DIR)
+diff -ruNa mozilla-release/nsprpub/pr/src/md/windows/Makefile.in mozilla-release-fix/nsprpub/pr/src/md/windows/Makefile.in
+--- mozilla-release/nsprpub/pr/src/md/windows/Makefile.in	Fri Dec  6 00:07:54 2013
++++ mozilla-release-fix/nsprpub/pr/src/md/windows/Makefile.in	Fri Dec  6 12:26:19 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ ifeq (,$(filter-out WIN95 WINCE WINMO, $(OS_TARGET)))
+diff -ruNa mozilla-release/nsprpub/pr/src/memory/Makefile.in mozilla-release-fix/nsprpub/pr/src/memory/Makefile.in
+--- mozilla-release/nsprpub/pr/src/memory/Makefile.in	Fri Dec  6 00:07:54 2013
++++ mozilla-release-fix/nsprpub/pr/src/memory/Makefile.in	Fri Dec  6 12:26:19 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ CSRCS = prseg.c prshm.c prshma.c
+diff -ruNa mozilla-release/nsprpub/pr/src/misc/Makefile.in mozilla-release-fix/nsprpub/pr/src/misc/Makefile.in
+--- mozilla-release/nsprpub/pr/src/misc/Makefile.in	Fri Dec  6 00:07:54 2013
++++ mozilla-release-fix/nsprpub/pr/src/misc/Makefile.in	Fri Dec  6 12:26:19 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ CSRCS = \
+diff -ruNa mozilla-release/nsprpub/pr/src/pthreads/Makefile.in mozilla-release-fix/nsprpub/pr/src/pthreads/Makefile.in
+--- mozilla-release/nsprpub/pr/src/pthreads/Makefile.in	Fri Dec  6 00:07:54 2013
++++ mozilla-release-fix/nsprpub/pr/src/pthreads/Makefile.in	Fri Dec  6 12:26:19 2013
+@@ -13,6 +13,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ CSRCS = \
+diff -ruNa mozilla-release/nsprpub/pr/src/threads/Makefile.in mozilla-release-fix/nsprpub/pr/src/threads/Makefile.in
+--- mozilla-release/nsprpub/pr/src/threads/Makefile.in	Fri Dec  6 00:07:54 2013
++++ mozilla-release-fix/nsprpub/pr/src/threads/Makefile.in	Fri Dec  6 12:26:19 2013
+@@ -12,6 +12,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ ifdef USE_PTHREADS
+diff -ruNa mozilla-release/nsprpub/pr/src/threads/combined/Makefile.in mozilla-release-fix/nsprpub/pr/src/threads/combined/Makefile.in
+--- mozilla-release/nsprpub/pr/src/threads/combined/Makefile.in	Fri Dec  6 00:07:54 2013
++++ mozilla-release-fix/nsprpub/pr/src/threads/combined/Makefile.in	Fri Dec  6 12:26:19 2013
+@@ -13,6 +13,8 @@
+ 
+ include $(MOD_DEPTH)/config/autoconf.mk
+ 
++MSVC_ENABLE_PGO := 1
++
+ include $(topsrcdir)/config/config.mk
+ 
+ ifdef USE_PTHREADS
+diff -ruNa mozilla-release/parser/htmlparser/src/moz.build mozilla-release-fix/parser/htmlparser/src/moz.build
+--- mozilla-release/parser/htmlparser/src/moz.build	Fri Dec  6 00:07:54 2013
++++ mozilla-release-fix/parser/htmlparser/src/moz.build	Fri Dec  6 12:26:19 2013
+@@ -26,3 +26,4 @@
+ 
+ LIBXUL_LIBRARY = True
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/security/manager/ssl/src/moz.build mozilla-release-fix/security/manager/ssl/src/moz.build
+--- mozilla-release/security/manager/ssl/src/moz.build	Fri Dec  6 00:07:54 2013
++++ mozilla-release-fix/security/manager/ssl/src/moz.build	Fri Dec  6 12:26:19 2013
+@@ -91,3 +91,4 @@
+ 
+ LIBXUL_LIBRARY = True
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/startupcache/moz.build mozilla-release-fix/startupcache/moz.build
+--- mozilla-release/startupcache/moz.build	Fri Dec  6 00:07:56 2013
++++ mozilla-release-fix/startupcache/moz.build	Fri Dec  6 12:26:19 2013
+@@ -28,3 +28,4 @@
+ 
+ LIBXUL_LIBRARY = True
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/storage/src/moz.build mozilla-release-fix/storage/src/moz.build
+--- mozilla-release/storage/src/moz.build	Fri Dec  6 00:07:56 2013
++++ mozilla-release-fix/storage/src/moz.build	Fri Dec  6 12:26:19 2013
+@@ -41,3 +41,4 @@
+ 
+ LIBXUL_LIBRARY = True
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/xpcom/glue/moz.build mozilla-release-fix/xpcom/glue/moz.build
+--- mozilla-release/xpcom/glue/moz.build	Fri Dec  6 00:08:00 2013
++++ mozilla-release-fix/xpcom/glue/moz.build	Fri Dec  6 12:26:19 2013
+@@ -97,3 +97,5 @@
+ ]
+ 
+ LIBRARY_NAME = 'xpcomglue_s'
++
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/xpcom/glue/nomozalloc/moz.build mozilla-release-fix/xpcom/glue/nomozalloc/moz.build
+--- mozilla-release/xpcom/glue/nomozalloc/moz.build	Fri Dec  6 00:08:00 2013
++++ mozilla-release-fix/xpcom/glue/nomozalloc/moz.build	Fri Dec  6 12:26:19 2013
+@@ -18,3 +18,4 @@
+ 
+ LIBRARY_NAME = 'xpcomglue_s_nomozalloc'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/xpcom/glue/standalone/moz.build mozilla-release-fix/xpcom/glue/standalone/moz.build
+--- mozilla-release/xpcom/glue/standalone/moz.build	Fri Dec  6 00:08:00 2013
++++ mozilla-release-fix/xpcom/glue/standalone/moz.build	Fri Dec  6 12:26:19 2013
+@@ -25,3 +25,5 @@
+ EXPORTS += [
+     'nsXPCOMGlue.h',
+ ]
++
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/xpcom/glue/standalone/staticruntime/moz.build mozilla-release-fix/xpcom/glue/standalone/staticruntime/moz.build
+--- mozilla-release/xpcom/glue/standalone/staticruntime/moz.build	Fri Dec  6 00:08:00 2013
++++ mozilla-release-fix/xpcom/glue/standalone/staticruntime/moz.build	Fri Dec  6 12:26:19 2013
+@@ -17,3 +17,4 @@
+ 
+ LIBRARY_NAME = 'xpcomglue_staticruntime'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/xpcom/glue/staticruntime/moz.build mozilla-release-fix/xpcom/glue/staticruntime/moz.build
+--- mozilla-release/xpcom/glue/staticruntime/moz.build	Fri Dec  6 00:08:00 2013
++++ mozilla-release-fix/xpcom/glue/staticruntime/moz.build	Fri Dec  6 12:26:19 2013
+@@ -18,3 +18,4 @@
+ 
+ LIBRARY_NAME = 'xpcomglue_staticruntime_s'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/xpcom/reflect/xptcall/src/md/win32/moz.build mozilla-release-fix/xpcom/reflect/xptcall/src/md/win32/moz.build
+--- mozilla-release/xpcom/reflect/xptcall/src/md/win32/moz.build	Fri Dec  6 00:08:00 2013
++++ mozilla-release-fix/xpcom/reflect/xptcall/src/md/win32/moz.build	Fri Dec  6 12:26:19 2013
+@@ -38,3 +38,4 @@
+ 
+ LIBRARY_NAME = 'xptcmd'
+ 
++MSVC_ENABLE_PGO = True
+diff -ruNa mozilla-release/xpcom/typelib/xpt/src/moz.build mozilla-release-fix/xpcom/typelib/xpt/src/moz.build
+--- mozilla-release/xpcom/typelib/xpt/src/moz.build	Fri Dec  6 00:08:00 2013
++++ mozilla-release-fix/xpcom/typelib/xpt/src/moz.build	Fri Dec  6 12:26:19 2013
+@@ -16,3 +16,4 @@
+ 
+ LIBXUL_LIBRARY = True
+ 
++MSVC_ENABLE_PGO = True

@@ -1,0 +1,25 @@
+diff -ruNa old/browser/branding/official/pref/firefox-branding.js new/browser/branding/official/pref/firefox-branding.js
+--- old/browser/branding/official/pref/firefox-branding.js	Fri Sep  6 09:17:56 2013
++++ new/browser/branding/official/pref/firefox-branding.js	Sun Sep  8 22:18:46 2013
+@@ -22,3 +22,21 @@
+ pref("browser.search.param.yahoo-fr", "moz35");
+ pref("browser.search.param.yahoo-fr-cjkt", "moz35"); // now unused
+ pref("browser.search.param.yahoo-fr-ja", "mozff");
++
++//pcxfirefox tweak
++//browser
++pref("browser.download.manager.scanWhenDone", false);
++pref("browser.download.useDownloadDir", false);
++pref("browser.tabs.closeWindowWithLastTab", false);
++//dom
++pref("dom.max_chrome_script_run_time", 90);
++pref("dom.max_script_run_time", 20);
++pref("dom.popup_maximum", 5);
++//datareporting
++pref("datareporting.healthreport.uploadEnabled", false);
++pref("datareporting.healthreport.logging.consoleEnabled", false);
++pref("datareporting.policy.dataSubmissionEnabled", false);
++//special
++pref("pdfjs.disabled", false);
++pref("config.trim_on_minimize", false);
++pref("plugin.expose_full_path", true);

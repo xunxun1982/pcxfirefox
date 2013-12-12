@@ -1,0 +1,282 @@
+diff -ruNa mozilla-beta/configure.in mozilla-beta-intel/configure.in
+--- mozilla-beta/configure.in	Tue Oct  1 17:52:00 2013
++++ mozilla-beta-intel/configure.in	Fri Oct  4 10:49:32 2013
+@@ -408,14 +408,14 @@
+         changequote([,])
+ 
+         # Determine compiler version
+-        CC_VERSION=`"${CC}" -v 2>&1 | sed -nre "$_MSVC_VER_FILTER"`
++        CC_VERSION=`"cl" -v 2>&1 | sed -nre "$_MSVC_VER_FILTER"`
+         _CC_MAJOR_VERSION=`echo ${CC_VERSION} | $AWK -F\. '{ print $1 }'`
+         _CC_MINOR_VERSION=`echo ${CC_VERSION} | $AWK -F\. '{ print $2 }'`
+         _CC_RELEASE=`echo ${CC_VERSION} | $AWK -F\. '{ print $3 }'`
+         _CC_BUILD=`echo ${CC_VERSION} | $AWK -F\. '{ print $4 }'`
+         _MSC_VER=${_CC_MAJOR_VERSION}${_CC_MINOR_VERSION}
+ 
+-        CXX_VERSION=`"${CXX}" -v 2>&1 | sed -nre "$_MSVC_VER_FILTER"`
++        CXX_VERSION=`"cl" -v 2>&1 | sed -nre "$_MSVC_VER_FILTER"`
+         _CXX_MAJOR_VERSION=`echo ${CXX_VERSION} | $AWK -F\. '{ print $1 }'`
+ 
+         if test "$_CC_MAJOR_VERSION" != "$_CXX_MAJOR_VERSION"; then
+@@ -1676,7 +1676,7 @@
+ case "$host" in
+ *mingw*)
+     if test -n "$_WIN32_MSVC"; then
+-        HOST_AR=lib
++        HOST_AR=xilib
+         HOST_AR_FLAGS='-NOLOGO -OUT:"$@"'
+         HOST_CFLAGS="$HOST_CFLAGS -TC -nologo -Fd\$(HOST_PDBFILE)"
+         HOST_RANLIB='echo ranlib'
+@@ -1685,7 +1685,7 @@
+     fi
+     HOST_CFLAGS="$HOST_CFLAGS -DXP_WIN32 -DXP_WIN -DWIN32 -D_WIN32 -DNO_X11 -D_CRT_SECURE_NO_WARNINGS"
+     HOST_NSPR_MDCPUCFG='\"md/_winnt.cfg\"'
+-    HOST_OPTIMIZE_FLAGS="${HOST_OPTIMIZE_FLAGS=-O2}"
++    HOST_OPTIMIZE_FLAGS="${HOST_OPTIMIZE_FLAGS=-O3 -fp:precise}"
+     HOST_BIN_SUFFIX=.exe
+     case "$host" in
+     *mingw*)
+@@ -2020,7 +2020,7 @@
+         if test "$AS_BIN"; then
+             AS="$(basename "$AS_BIN")"
+         fi
+-        AR='lib'
++        AR='xilib'
+         AR_FLAGS='-NOLOGO -OUT:"$@"'
+         AR_EXTRACT=
+         RANLIB='echo not_ranlib'
+diff -ruNa mozilla-beta/js/src/configure.in mozilla-beta-intel/js/src/configure.in
+--- mozilla-beta/js/src/configure.in	Tue Oct  1 17:52:32 2013
++++ mozilla-beta-intel/js/src/configure.in	Fri Oct  4 10:49:32 2013
+@@ -397,14 +397,14 @@
+         changequote([,])
+ 
+         # Determine compiler version
+-        CC_VERSION=`"${CC}" -v 2>&1 | sed -nre "$_MSVC_VER_FILTER"`
++        CC_VERSION=`"cl" -v 2>&1 | sed -nre "$_MSVC_VER_FILTER"`
+         _CC_MAJOR_VERSION=`echo ${CC_VERSION} | $AWK -F\. '{ print $1 }'`
+         _CC_MINOR_VERSION=`echo ${CC_VERSION} | $AWK -F\. '{ print $2 }'`
+         _CC_RELEASE=`echo ${CC_VERSION} | $AWK -F\. '{ print $3 }'`
+         _CC_BUILD=`echo ${CC_VERSION} | $AWK -F\. '{ print $4 }'`
+         _MSC_VER=${_CC_MAJOR_VERSION}${_CC_MINOR_VERSION}
+ 
+-        CXX_VERSION=`"${CXX}" -v 2>&1 | sed -nre "$_MSVC_VER_FILTER"`
++        CXX_VERSION=`"cl" -v 2>&1 | sed -nre "$_MSVC_VER_FILTER"`
+         _CXX_MAJOR_VERSION=`echo ${CXX_VERSION} | $AWK -F\. '{ print $1 }'`
+ 
+         if test "$_CC_MAJOR_VERSION" != "$_CXX_MAJOR_VERSION"; then
+@@ -3938,7 +3938,7 @@
+ 
+ JS_NATIVE_EDITLINE=
+ EDITLINE_LIBS=
+-JS_DISABLE_SHELL=
++JS_DISABLE_SHELL=1
+ 
+ case "$target" in
+ *-mingw*)
+diff -ruNa mozilla-beta/mozglue/build/SSE.cpp mozilla-beta-intel/mozglue/build/SSE.cpp
+--- mozilla-beta/mozglue/build/SSE.cpp	Tue Oct  1 17:53:30 2013
++++ mozilla-beta-intel/mozglue/build/SSE.cpp	Fri Oct  4 10:49:32 2013
+@@ -121,10 +121,12 @@
+ #if !defined(MOZILLA_PRESUME_SSE)
+   bool sse_enabled = has_cpuid_bit(1u, edx, (1u<<25));
+ #endif
++__declspec(dllexport) bool sse_enabled = has_cpuid_bit(1u, edx, (1u<<25));
+ 
+ #if !defined(MOZILLA_PRESUME_SSE2)
+   bool sse2_enabled = has_cpuid_bit(1u, edx, (1u<<26));
+ #endif
++__declspec(dllexport) bool sse2_enabled = has_cpuid_bit(1u, edx, (1u<<26));
+ 
+ #if !defined(MOZILLA_PRESUME_SSE3)
+   bool sse3_enabled = has_cpuid_bit(1u, ecx, (1u<<0));
+diff -ruNa mozilla-beta/nsprpub/config/autoconf.mk.in mozilla-beta-intel/nsprpub/config/autoconf.mk.in
+--- mozilla-beta/nsprpub/config/autoconf.mk.in	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-intel/nsprpub/config/autoconf.mk.in	Fri Oct  4 10:49:32 2013
+@@ -60,14 +60,14 @@
+ 
+ AS		= @AS@
+ ASFLAGS		= @ASFLAGS@
+-CC		= @CC@
+-CCC		= @CXX@
++CC		= icl
++CCC		= icl
+ NS_USE_GCC	= @GNU_CC@
+ GCC_USE_GNU_LD	= @GCC_USE_GNU_LD@
+ MSC_VER		= @MSC_VER@
+-AR		= @AR@
++AR		= xilib -NOLOGO -OUT:"$@"
+ AR_FLAGS	= @AR_FLAGS@
+-LD		= @LD@
++LD		= xilink
+ RANLIB		= @RANLIB@
+ PERL		= @PERL@
+ RC		= @RC@
+diff -ruNa mozilla-beta/nsprpub/lib/ds/plarena.c mozilla-beta-intel/nsprpub/lib/ds/plarena.c
+--- mozilla-beta/nsprpub/lib/ds/plarena.c	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-intel/nsprpub/lib/ds/plarena.c	Fri Oct  4 10:49:32 2013
+@@ -8,6 +8,9 @@
+  * "Fast Allocation and Deallocation of Memory Based on Object Lifetimes"
+  * David R. Hanson, Software -- Practice and Experience, Vol. 20(1).
+  */
++
++#define _NSPR_BUILD_
++
+ #include <stdlib.h>
+ #include <string.h>
+ #include "plarena.h"
+diff -ruNa mozilla-beta/nsprpub/lib/ds/plds.def mozilla-beta-intel/nsprpub/lib/ds/plds.def
+--- mozilla-beta/nsprpub/lib/ds/plds.def	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-intel/nsprpub/lib/ds/plds.def	Fri Oct  4 10:49:32 2013
+@@ -40,7 +40,6 @@
+ PL_HashTableRemove;
+ PL_InitArenaPool;
+ PL_NewHashTable;
+-libVersionPoint;
+ ;+    local: *;
+ ;+};
+ ;+
+diff -ruNa mozilla-beta/nsprpub/lib/ds/plhash.c mozilla-beta-intel/nsprpub/lib/ds/plhash.c
+--- mozilla-beta/nsprpub/lib/ds/plhash.c	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-intel/nsprpub/lib/ds/plhash.c	Fri Oct  4 10:49:32 2013
+@@ -6,6 +6,9 @@
+ /*
+  * PL hash table package.
+  */
++
++#define _NSPR_BUILD_
++
+ #include "plhash.h"
+ #include "prbit.h"
+ #include "prlog.h"
+diff -ruNa mozilla-beta/nsprpub/lib/libc/src/plc.def mozilla-beta-intel/nsprpub/lib/libc/src/plc.def
+--- mozilla-beta/nsprpub/lib/libc/src/plc.def	Tue Oct  1 17:53:34 2013
++++ mozilla-beta-intel/nsprpub/lib/libc/src/plc.def	Fri Oct  4 10:49:32 2013
+@@ -57,7 +57,6 @@
+ PL_strrchr;
+ PL_strrstr;
+ PL_strstr;
+-libVersionPoint;
+ ;+    local: *;
+ ;+};
+ ;+
+diff -ruNa mozilla-beta/security/build/Makefile.in mozilla-beta-intel/security/build/Makefile.in
+--- mozilla-beta/security/build/Makefile.in	Tue Oct  1 17:53:36 2013
++++ mozilla-beta-intel/security/build/Makefile.in	Fri Oct  4 10:49:32 2013
+@@ -387,7 +387,7 @@
+ NSS_STATIC_LIBS_DEFS := $(wildcard $(addprefix $(srcdir)/../,$(NSS_STATIC_LIBS:.$(LIB_SUFFIX)=.def)))
+ DEFFILE = nss3.def
+ 
+-nss3.def: $(NSS_STATIC_LIBS_DEFS) $(DEPTH)/db/sqlite3/src/sqlite-processed.def
++nss3.def: $(NSS_STATIC_LIBS_DEFS) $(DEPTH)/db/sqlite3/src/sqlite-processed.def $(DEPTH)/nsprpub/pr/src/nspr.def $(DEPTH)/nsprpub/lib/libc/src/plc.def $(DEPTH)/nsprpub/lib/ds/plds.def
+ 	echo LIBRARY nss3$(DLL_SUFFIX) > $@.tmp
+ 	echo EXPORTS >> $@.tmp
+ 	grep -v -h -e ^LIBRARY -e ^EXPORTS -e ^\; $^ >> $@.tmp
+diff -ruNa mozilla-beta/security/nss/coreconf/WIN32.mk mozilla-beta-intel/security/nss/coreconf/WIN32.mk
+--- mozilla-beta/security/nss/coreconf/WIN32.mk	Tue Oct  1 17:53:38 2013
++++ mozilla-beta-intel/security/nss/coreconf/WIN32.mk	Fri Oct  4 10:49:32 2013
+@@ -21,17 +21,17 @@
+ 	RC           = windres.exe -O coff --use-temp-file
+ 	LINK_DLL      = $(CC) $(OS_DLLFLAGS) $(DLLFLAGS)
+ else
+-	CC           = cl
+-	CCC          = cl
+-	LINK         = link
+-	AR           = lib
++	CC           = icl
++	CCC          = icl
++	LINK         = xilink
++	AR           = xilib
+ 	AR          += -NOLOGO -OUT:"$@"
+ 	RANLIB       = echo
+ 	BSDECHO      = echo
+ 	RC           = rc.exe
+ 	MT           = mt.exe
+ 	# Determine compiler version
+-	CC_VERSION  := $(shell $(CC) 2>&1 | sed -ne \
++	CC_VERSION  := $(shell cl 2>&1 | sed -ne \
+ 		's|.* \([0-9]\+\.[0-9]\+\.[0-9]\+\(\.[0-9]\+\)\?\).*|\1|p')
+ 	# Change the dots to spaces.
+ 	_CC_VERSION_WORDS := $(subst ., ,$(CC_VERSION))
+@@ -125,9 +125,9 @@
+     ifdef BUILD_OPT
+ 	OS_CFLAGS  += -MD
+ 	ifeq (11,$(ALLOW_OPT_CODE_SIZE)$(OPT_CODE_SIZE))
+-		OPTIMIZER += -O1
++		OPTIMIZER += -O3 -fp:precise -QaxSSE2,SSE3,SSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2,CORE-AVX-I -arch:SSE3 -Qipo
+ 	else
+-		OPTIMIZER += -O2
++		OPTIMIZER += -O3 -fp:precise -QaxSSE2,SSE3,SSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2,CORE-AVX-I -arch:SSE3 -Qipo
+ 	endif
+ 	DEFINES    += -UDEBUG -U_DEBUG -DNDEBUG
+ 	DLLFLAGS   += -OUT:"$@"
+diff -ruNa mozilla-beta/security/nss/coreconf/command.mk mozilla-beta-intel/security/nss/coreconf/command.mk
+--- mozilla-beta/security/nss/coreconf/command.mk	Tue Oct  1 17:53:38 2013
++++ mozilla-beta-intel/security/nss/coreconf/command.mk	Fri Oct  4 10:49:32 2013
+@@ -11,7 +11,7 @@
+ AS            = $(CC)
+ ASFLAGS      += $(CFLAGS)
+ CCF           = $(CC) $(CFLAGS)
+-LINK_DLL      = $(LINK) $(OS_DLLFLAGS) $(DLLFLAGS)
++LINK_DLL      = $(LINK) $(OS_DLLFLAGS) $(DLLFLAGS) -opt:ref,icf -LARGEADDRESSAWARE
+ LINK_EXE      = $(LINK) $(OS_LFLAGS) $(LFLAGS)
+ CFLAGS        = $(OPTIMIZER) $(OS_CFLAGS) $(XP_DEFINE) $(DEFINES) $(INCLUDES) \
+ 		$(XCFLAGS)
+diff -ruNa mozilla-beta/security/nss/lib/freebl/Makefile mozilla-beta-intel/security/nss/lib/freebl/Makefile
+--- mozilla-beta/security/nss/lib/freebl/Makefile	Tue Oct  1 17:53:40 2013
++++ mozilla-beta-intel/security/nss/lib/freebl/Makefile	Fri Oct  4 10:49:32 2013
+@@ -133,7 +133,7 @@
+     DEFINES += -DMP_ASSEMBLY_MULTIPLY -DMP_ASSEMBLY_SQUARE 
+     DEFINES += -DMP_ASSEMBLY_DIV_2DX1D -DMP_USE_UINT_DIGIT -DMP_NO_MP_WORD
+     ifdef BUILD_OPT
+-	OPTIMIZER += -Ox  # maximum optimization for freebl
++	OPTIMIZER += -O3 -fp:precise -QaxSSE2,SSE3,SSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2,CORE-AVX-I -arch:SSE3 -D_NSPR_BUILD_ -Qipo # maximum optimization for freebl
+     endif
+ endif
+ else
+@@ -145,7 +145,7 @@
+ else
+ # MSVC
+     ifdef BUILD_OPT
+-	OPTIMIZER += -Ox  # maximum optimization for freebl
++	OPTIMIZER += -O3 -fp:precise -QaxSSE2,SSE3,SSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2,CORE-AVX-I -arch:SSE3 -D_NSPR_BUILD_ -Qipo # maximum optimization for freebl
+     endif
+     ASFILES  = arcfour-amd64-masm.asm mpi_amd64_masm.asm mp_comba_amd64_masm.asm
+     DEFINES += -DNSS_BEVAND_ARCFOUR -DMPI_AMD64 -DMP_ASSEMBLY_MULTIPLY
+diff -ruNa mozilla-beta/security/nss/lib/libpkix/pkix_pl_nss/module/pkix_pl_colcertstore.c mozilla-beta-intel/security/nss/lib/libpkix/pkix_pl_nss/module/pkix_pl_colcertstore.c
+--- mozilla-beta/security/nss/lib/libpkix/pkix_pl_nss/module/pkix_pl_colcertstore.c	Tue Oct  1 17:53:40 2013
++++ mozilla-beta-intel/security/nss/lib/libpkix/pkix_pl_nss/module/pkix_pl_colcertstore.c	Fri Oct  4 10:49:32 2013
+@@ -8,6 +8,8 @@
+  *
+  */
+ 
++#define _NSPR_BUILD_
++
+ #include "pkix_pl_colcertstore.h"
+ 
+ /*
+diff -ruNa mozilla-beta/security/nss/lib/ssl/sslsnce.c mozilla-beta-intel/security/nss/lib/ssl/sslsnce.c
+--- mozilla-beta/security/nss/lib/ssl/sslsnce.c	Tue Oct  1 17:53:40 2013
++++ mozilla-beta-intel/security/nss/lib/ssl/sslsnce.c	Fri Oct  4 10:49:32 2013
+@@ -42,6 +42,9 @@
+  *     srvNameCacheEntry        srvNameData[ numSrvNameCacheEntries ];
+  * } cacheMemCacheData;
+  */
++
++#define _NSPR_BUILD_
++
+ #include "seccomon.h"
+ 
+ #if defined(XP_UNIX) || defined(XP_WIN32) || defined (XP_OS2) || defined(XP_BEOS)
+diff -ruNa mozilla-beta/security/nss/lib/util/secload.c mozilla-beta-intel/security/nss/lib/util/secload.c
+--- mozilla-beta/security/nss/lib/util/secload.c	Tue Oct  1 17:53:40 2013
++++ mozilla-beta-intel/security/nss/lib/util/secload.c	Fri Oct  4 10:49:32 2013
+@@ -2,6 +2,8 @@
+  * License, v. 2.0. If a copy of the MPL was not distributed with this
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
++#define _NSPR_BUILD_
++
+ #include "secport.h"
+ #include "nspr.h"
+

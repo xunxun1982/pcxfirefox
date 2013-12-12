@@ -1,0 +1,21 @@
+diff -ruNa old/content/svg/content/src/SVGFETurbulenceElement.cpp new/content/svg/content/src/SVGFETurbulenceElement.cpp
+--- old/content/svg/content/src/SVGFETurbulenceElement.cpp	2013-10-01 17:52:04 +0800
++++ new/content/svg/content/src/SVGFETurbulenceElement.cpp	2013-10-06 19:12:13 +0800
+@@ -332,7 +332,7 @@
+     if (aBaseFreqX != 0.0) {
+       double loFreq = double (floor(aTileWidth * aBaseFreqX)) / aTileWidth;
+       double hiFreq = double (ceil(aTileWidth * aBaseFreqX)) / aTileWidth;
+-      if (aBaseFreqX / loFreq < hiFreq / aBaseFreqX)
++      if (aBaseFreqX * aBaseFreqX < hiFreq * loFreq)
+         aBaseFreqX = loFreq;
+       else
+         aBaseFreqX = hiFreq;
+@@ -340,7 +340,7 @@
+     if (aBaseFreqY != 0.0) {
+       double loFreq = double (floor(aTileHeight * aBaseFreqY)) / aTileHeight;
+       double hiFreq = double (ceil(aTileHeight * aBaseFreqY)) / aTileHeight;
+-      if (aBaseFreqY / loFreq < hiFreq / aBaseFreqY)
++      if (aBaseFreqY * aBaseFreqY < loFreq * hiFreq)
+         aBaseFreqY = loFreq;
+       else
+         aBaseFreqY = hiFreq;

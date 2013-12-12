@@ -1,0 +1,2937 @@
+diff -ruNa mozilla-release/browser/branding/aurora/configure.sh mozilla-release-fix/browser/branding/aurora/configure.sh
+--- mozilla-release/browser/branding/aurora/configure.sh	Tue Dec  3 13:17:24 2013
++++ mozilla-release-fix/browser/branding/aurora/configure.sh	Thu Dec  5 18:58:10 2013
+@@ -3,3 +3,4 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ MOZ_APP_DISPLAYNAME=Aurora
++MOZ_UA_BUILDID=20100101
+diff -ruNa mozilla-release/browser/branding/nightly/configure.sh mozilla-release-fix/browser/branding/nightly/configure.sh
+--- mozilla-release/browser/branding/nightly/configure.sh	Tue Dec  3 13:17:24 2013
++++ mozilla-release-fix/browser/branding/nightly/configure.sh	Thu Dec  5 18:58:10 2013
+@@ -3,3 +3,4 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ MOZ_APP_DISPLAYNAME=Nightly
++MOZ_UA_BUILDID=20100101
+diff -ruNa mozilla-release/content/base/src/nsContentUtils.cpp mozilla-release-fix/content/base/src/nsContentUtils.cpp
+--- mozilla-release/content/base/src/nsContentUtils.cpp	Tue Dec  3 13:17:26 2013
++++ mozilla-release-fix/content/base/src/nsContentUtils.cpp	Thu Dec  5 18:58:10 2013
+@@ -3108,6 +3108,10 @@
+   return sConsoleService->LogMessage(errorObject);
+ }
+ 
++#ifdef _MSC_VER
++#pragma optimize("g", off)
++#endif
++
+ bool
+ nsContentUtils::IsChromeDoc(nsIDocument *aDocument)
+ {
+@@ -3121,6 +3125,10 @@
+   return aDocument->NodePrincipal() == systemPrincipal;
+ }
+ 
++#ifdef _MSC_VER
++#pragma optimize("g", on)
++#endif
++
+ bool
+ nsContentUtils::IsChildOfSameType(nsIDocument* aDoc)
+ {
+@@ -3399,6 +3407,9 @@
+ }
+ 
+ /* static */
++#ifdef _MSC_VER
++#pragma inline_recursion(on)
++#endif
+ Element*
+ nsContentUtils::MatchElementId(nsIContent *aContent, const nsIAtom* aId)
+ {
+@@ -3412,8 +3423,14 @@
+ 
+   return nullptr;
+ }
++#ifdef _MSC_VER
++#pragma inline_recursion(off)
++#endif
+ 
+ /* static */
++#ifdef _MSC_VER
++#pragma inline_recursion(on)
++#endif
+ Element *
+ nsContentUtils::MatchElementId(nsIContent *aContent, const nsAString& aId)
+ {
+@@ -3428,6 +3445,9 @@
+ 
+   return MatchElementId(aContent, id);
+ }
++#ifdef _MSC_VER
++#pragma inline_recursion(off)
++#endif
+ 
+ // Convert the string from the given charset to Unicode.
+ /* static */
+diff -ruNa mozilla-release/content/canvas/src/CanvasRenderingContext2D.cpp mozilla-release-fix/content/canvas/src/CanvasRenderingContext2D.cpp
+--- mozilla-release/content/canvas/src/CanvasRenderingContext2D.cpp	Tue Dec  3 13:17:26 2013
++++ mozilla-release-fix/content/canvas/src/CanvasRenderingContext2D.cpp	Thu Dec  5 18:58:10 2013
+@@ -3537,29 +3537,7 @@
+   // inherited from Thebes canvas and is no longer true
+   uint8_t* dst = data + dstWriteRect.y * (aWidth * 4) + dstWriteRect.x * 4;
+ 
+-  for (int32_t j = 0; j < dstWriteRect.height; ++j) {
+-    for (int32_t i = 0; i < dstWriteRect.width; ++i) {
+-      // XXX Is there some useful swizzle MMX we can use here?
+-#ifdef IS_LITTLE_ENDIAN
+-      uint8_t b = *src++;
+-      uint8_t g = *src++;
+-      uint8_t r = *src++;
+-      uint8_t a = *src++;
+-#else
+-      uint8_t a = *src++;
+-      uint8_t r = *src++;
+-      uint8_t g = *src++;
+-      uint8_t b = *src++;
+-#endif
+-      // Convert to non-premultiplied color
+-      *dst++ = gfxUtils::sUnpremultiplyTable[a * 256 + r];
+-      *dst++ = gfxUtils::sUnpremultiplyTable[a * 256 + g];
+-      *dst++ = gfxUtils::sUnpremultiplyTable[a * 256 + b];
+-      *dst++ = a;
+-    }
+-    src += srcStride - (dstWriteRect.width * 4);
+-    dst += (aWidth * 4) - (dstWriteRect.width * 4);
+-  }
++  GetImageData_component(src, dst, dstWriteRect.width, dstWriteRect.height, srcStride, aWidth * 4);
+ 
+   *aRetval = darray;
+   return NS_OK;
+@@ -3690,27 +3668,7 @@
+   uint8_t *src = aData;
+   uint8_t *dst = imgsurf->Data();
+ 
+-  for (uint32_t j = 0; j < h; j++) {
+-    for (uint32_t i = 0; i < w; i++) {
+-      uint8_t r = *src++;
+-      uint8_t g = *src++;
+-      uint8_t b = *src++;
+-      uint8_t a = *src++;
+-
+-      // Convert to premultiplied color (losslessly if the input came from getImageData)
+-#ifdef IS_LITTLE_ENDIAN
+-      *dst++ = gfxUtils::sPremultiplyTable[a * 256 + b];
+-      *dst++ = gfxUtils::sPremultiplyTable[a * 256 + g];
+-      *dst++ = gfxUtils::sPremultiplyTable[a * 256 + r];
+-      *dst++ = a;
+-#else
+-      *dst++ = a;
+-      *dst++ = gfxUtils::sPremultiplyTable[a * 256 + r];
+-      *dst++ = gfxUtils::sPremultiplyTable[a * 256 + g];
+-      *dst++ = gfxUtils::sPremultiplyTable[a * 256 + b];
+-#endif
+-    }
+-  }
++  PutImageData_component(src, dst, w, h, w * 4, w * 4);
+ 
+   EnsureTarget();
+   if (!IsTargetValid()) {
+diff -ruNa mozilla-release/content/canvas/src/CanvasUtils.cpp mozilla-release-fix/content/canvas/src/CanvasUtils.cpp
+--- mozilla-release/content/canvas/src/CanvasUtils.cpp	Tue Dec  3 13:17:26 2013
++++ mozilla-release-fix/content/canvas/src/CanvasUtils.cpp	Thu Dec  5 18:58:10 2013
+@@ -3,6 +3,22 @@
+  * License, v. 2.0. If a copy of the MPL was not distributed with this
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
++#if defined(TT_MEMUTIL) && defined(_MSC_VER)
++#include <omp.h>
++#endif
++
++#if _MSC_VER == 1400
++#include <emmintrin.h>
++extern "C" {
++  extern __m128i _mm_shuffle_epi8(__m128i a, __m128i b);
++  extern __m128i _mm_alignr_epi8(__m128i a, __m128i b, const int ralign);
++}
++#else
++#include <tmmintrin.h>
++#endif
++#include "mozilla/SSE.h"
++#include "gfxUtils.h"
++
+ #include <stdlib.h>
+ #include <stdarg.h>
+ 
+@@ -83,6 +99,259 @@
+         return false;
+     }
+     return true;
++}
++
++void
++GetImageData_component(uint8_t* _src, uint8_t* _dst,
++                       int32_t width, int32_t height,
++                       uint32_t srcStride, uint32_t dstStride)
++{
++    uint8_t *srcFirst = _src;
++    uint8_t *dstFirst = _dst;
++
++#if defined(TT_MEMUTIL) && defined(_MSC_VER)
++    int omp_thread_counts = omp_get_max_threads();
++
++#pragma omp parallel for schedule(guided) default(none) \
++shared(srcFirst, dstFirst, width, height, srcStride, dstStride, gfxUtils::sUnpremultiplyTable) \
++if (omp_thread_counts >= 2 && \
++    height >= (int32_t)omp_thread_counts && \
++    width * height >= 4096)
++#endif // defined(TT_MEMUTIL) && defined(_MSC_VER)
++    for (int32_t j = 0; j < height; ++j) {
++        uint8_t *src = srcFirst + (srcStride * j);
++        uint8_t *dst = dstFirst + (dstStride * j);
++
++        for (int32_t i = 0; i < width; ++i) {
++            // XXX Is there some useful swizzle MMX we can use here?
++#ifdef IS_LITTLE_ENDIAN
++            uint8_t b = *src++;
++            uint8_t g = *src++;
++            uint8_t r = *src++;
++            uint8_t a = *src++;
++#else
++            uint8_t a = *src++;
++            uint8_t r = *src++;
++            uint8_t g = *src++;
++            uint8_t b = *src++;
++#endif
++            // Convert to non-premultiplied color
++            *dst++ = gfxUtils::sUnpremultiplyTable[a * 256 + r];
++            *dst++ = gfxUtils::sUnpremultiplyTable[a * 256 + g];
++            *dst++ = gfxUtils::sUnpremultiplyTable[a * 256 + b];
++            *dst++ = a;
++        }
++    }
++}
++
++void
++PutImageData_component(uint8_t* _src, uint8_t* _dst,
++                       int32_t width, int32_t height,
++                       uint32_t srcStride, uint32_t dstStride)
++{
++    uint8_t *srcFirst = _src;
++    uint8_t *dstFirst = _dst;
++
++#if (_MSC_VER != 1400) || !defined(_M_AMD64)
++    if (mozilla::supports_ssse3()) {
++        static const __m128i msk_alpha = _mm_set1_epi32(0xFF000000);
++        static const __m128i sfl_alphaLo = _mm_set_epi8(0x80, 7, 0x80, 7, 0x80, 7, 0x80, 7, 0x80, 3, 0x80, 3, 0x80, 3, 0x80, 3);
++        static const __m128i sfl_alphaHi = _mm_set_epi8(0x80, 15, 0x80, 15, 0x80, 15, 0x80, 15, 0x80, 11, 0x80, 11, 0x80, 11, 0x80, 11);
++        static const __m128i word_add = _mm_set1_epi16(0x00FF);
++        static const __m128i word_mul = _mm_set_epi16(0, 257, 257, 257, 0, 257, 257, 257);
++        static const __m128i sfl_bgra = _mm_set_epi8(15, 12, 13, 14, 11, 8, 9, 10, 7, 4, 5, 6, 3, 0, 1, 2);
++
++#if defined(TT_MEMUTIL) && defined(_MSC_VER)
++        int omp_thread_counts = omp_get_max_threads();
++
++#pragma omp parallel for schedule(guided) default(none) \
++shared(srcFirst, dstFirst, width, height, srcStride, dstStride, gfxUtils::sPremultiplyTable) \
++if (omp_thread_counts >= 2 && \
++    height >= (int32_t)omp_thread_counts && \
++    width * height >= 12000)
++#endif // defined(TT_MEMUTIL) && defined(_MSC_VER)
++        for (int j = 0; j < height; j++) {
++            uint8_t *src = srcFirst + (srcStride * j);
++            uint8_t *dst = dstFirst + (dstStride * j);
++            int32_t i = width;
++
++            while (i >= 1 && ((unsigned)dst & 15)) {
++                uint8_t r = *src++;
++                uint8_t g = *src++;
++                uint8_t b = *src++;
++                uint8_t a = *src++;
++
++                // Convert to premultiplied color (losslessly if the input came from getImageData)
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + b];
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + g];
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + r];
++                *dst++ = a;
++                i -= 1;
++            }
++
++            const int srcMissalignedBytes = ((unsigned)src & 15);
++
++            if (srcMissalignedBytes == 0) {
++                while (i >= 4) {
++                    __m128i xmb = _mm_load_si128((__m128i*)src);
++                    __m128i xmwLo = _mm_unpacklo_epi8(xmb, _mm_setzero_si128());
++                    __m128i xmwHi = _mm_unpackhi_epi8(xmb, _mm_setzero_si128());
++
++                    __m128i xmwAlpha = _mm_and_si128(xmb, msk_alpha);
++                    __m128i xmwAlphaLo = _mm_shuffle_epi8(xmb, sfl_alphaLo);
++                    __m128i xmwAlphaHi = _mm_shuffle_epi8(xmb, sfl_alphaHi);
++
++                    xmwLo = _mm_mullo_epi16(xmwLo, xmwAlphaLo);
++                    xmwLo = _mm_adds_epu16(xmwLo, word_add);
++                    xmwLo = _mm_mulhi_epu16(xmwLo, word_mul);
++
++                    xmwHi = _mm_mullo_epi16(xmwHi, xmwAlphaHi);
++                    xmwHi = _mm_adds_epu16(xmwHi, word_add);
++                    xmwHi = _mm_mulhi_epu16(xmwHi, word_mul);
++
++                    __m128i xmRes = _mm_packus_epi16(xmwLo, xmwHi);
++                    xmRes = _mm_or_si128(xmRes, xmwAlpha);
++                    xmRes = _mm_shuffle_epi8(xmRes, sfl_bgra);
++                    _mm_store_si128((__m128i*)dst, xmRes);
++
++                    src += 16;
++                    dst += 16;
++                    i -= 4;
++                }
++            } else {
++                __m128i xmLoadPre = _mm_load_si128((__m128i*)(src - srcMissalignedBytes));
++
++                while (i >= 4) {
++                    __m128i xmLoadNext = _mm_load_si128((__m128i*)(src - srcMissalignedBytes + 16));
++                    __m128i xmb;
++
++                    switch (srcMissalignedBytes) {
++                    case 1:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 1);
++                        break;
++                    case 2:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 2);
++                        break;
++                    case 3:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 3);
++                        break;
++                    case 4:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 4);
++                        break;
++                    case 5:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 5);
++                        break;
++                    case 6:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 6);
++                        break;
++                    case 7:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 7);
++                        break;
++                    case 8:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 8);
++                        break;
++                    case 9:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 9);
++                        break;
++                    case 10:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 10);
++                        break;
++                    case 11:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 11);
++                        break;
++                    case 12:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 12);
++                        break;
++                    case 13:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 13);
++                        break;
++                    case 14:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 14);
++                        break;
++                    case 15:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 15);
++                        break;
++                    }
++                    xmLoadPre = xmLoadNext;
++
++                    __m128i xmwLo = _mm_unpacklo_epi8(xmb, _mm_setzero_si128());
++                    __m128i xmwHi = _mm_unpackhi_epi8(xmb, _mm_setzero_si128());
++
++                    __m128i xmwAlpha = _mm_and_si128(xmb, msk_alpha);
++                    __m128i xmwAlphaLo = _mm_shuffle_epi8(xmb, sfl_alphaLo);
++                    __m128i xmwAlphaHi = _mm_shuffle_epi8(xmb, sfl_alphaHi);
++
++                    xmwLo = _mm_mullo_epi16(xmwLo, xmwAlphaLo);
++                    xmwLo = _mm_adds_epu16(xmwLo, word_add);
++                    xmwLo = _mm_mulhi_epu16(xmwLo, word_mul);
++
++                    xmwHi = _mm_mullo_epi16(xmwHi, xmwAlphaHi);
++                    xmwHi = _mm_adds_epu16(xmwHi, word_add);
++                    xmwHi = _mm_mulhi_epu16(xmwHi, word_mul);
++
++                    __m128i xmRes = _mm_packus_epi16(xmwLo, xmwHi);
++                    xmRes = _mm_or_si128(xmRes, xmwAlpha);
++                    xmRes = _mm_shuffle_epi8(xmRes, sfl_bgra);
++                    _mm_store_si128((__m128i*)dst, xmRes);
++
++                    src += 16;
++                    dst += 16;
++                    i -= 4;
++                }
++            }
++
++            while (i >= 1) {
++                uint8_t r = *src++;
++                uint8_t g = *src++;
++                uint8_t b = *src++;
++                uint8_t a = *src++;
++
++                // Convert to premultiplied color (losslessly if the input came from getImageData)
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + b];
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + g];
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + r];
++                *dst++ = a;
++                i -= 1;
++            }
++        }
++    } else
++#endif // (_MSC_VER != 1400) || !defined(_M_AMD64)
++    {
++#if defined(TT_MEMUTIL) && defined(_MSC_VER)
++        int omp_thread_counts = omp_get_max_threads();
++
++#pragma omp parallel for schedule(guided) default(none) \
++shared(srcFirst, dstFirst, width, height, srcStride, dstStride, gfxUtils::sPremultiplyTable) \
++if (omp_thread_counts >= 2 && \
++    height >= (int32_t)omp_thread_counts && \
++    width * height >= 4096)
++#endif // defined(TT_MEMUTIL) && defined(_MSC_VER)
++        for (int64_t j = 0; j < height; j++) {
++            uint8_t *src = srcFirst + (srcStride * j);
++            uint8_t *dst = dstFirst + (dstStride * j);
++
++            for (int32_t i = 0; i < width; i++) {
++                // XXX Is there some useful swizzle MMX we can use here?
++                uint8_t r = *src++;
++                uint8_t g = *src++;
++                uint8_t b = *src++;
++                uint8_t a = *src++;
++
++                // Convert to premultiplied color (losslessly if the input came from getImageData)
++#ifdef IS_LITTLE_ENDIAN
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + b];
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + g];
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + r];
++                *dst++ = a;
++#else
++                *dst++ = a;
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + r];
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + g];
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + b];
++#endif
++            }
++        }
++    }
+ }
+ 
+ } // namespace CanvasUtils
+diff -ruNa mozilla-release/content/canvas/src/CanvasUtils.h mozilla-release-fix/content/canvas/src/CanvasUtils.h
+--- mozilla-release/content/canvas/src/CanvasUtils.h	Tue Dec  3 13:17:26 2013
++++ mozilla-release-fix/content/canvas/src/CanvasUtils.h	Thu Dec  5 18:58:10 2013
+@@ -24,6 +24,14 @@
+ namespace CanvasUtils {
+ 
+ 
++void GetImageData_component(uint8_t* _src, uint8_t* _dst,
++                            int32_t width, int32_t height,
++                            uint32_t srcStride, uint32_t dstStride);
++
++void PutImageData_component(uint8_t* _src, uint8_t* _dst,
++                            int32_t width, int32_t height,
++                            uint32_t srcStride, uint32_t dstStride);
++
+ // Check that the rectangle [x,y,w,h] is a subrectangle of [0,0,realWidth,realHeight]
+ 
+ inline bool CheckSaneSubrectSize(int32_t x, int32_t y, int32_t w, int32_t h,
+diff -ruNa mozilla-release/content/canvas/src/Makefile.in mozilla-release-fix/content/canvas/src/Makefile.in
+--- mozilla-release/content/canvas/src/Makefile.in	Tue Dec  3 13:17:26 2013
++++ mozilla-release-fix/content/canvas/src/Makefile.in	Thu Dec  5 18:59:25 2013
+@@ -24,3 +24,9 @@
+ 		-I$(srcdir)/../../../dom/base \
+ 		-I$(topsrcdir)/content/xul/content/src \
+ 		$(NULL)
++
++ifdef _MSC_VER
++ifneq (,$(filter -DTT_MEMUTIL,$(MOZ_OPTIMIZE_FLAGS)))
++CanvasUtils.$(OBJ_SUFFIX): COMPILE_CXXFLAGS += -GL- -openmp
++endif
++endif
+diff -ruNa mozilla-release/content/media/Makefile.in mozilla-release-fix/content/media/Makefile.in
+--- mozilla-release/content/media/Makefile.in	Tue Dec  3 13:17:28 2013
++++ mozilla-release-fix/content/media/Makefile.in	Thu Dec  5 18:58:10 2013
+@@ -23,3 +23,9 @@
+ CXXFLAGS += $(GSTREAMER_CFLAGS)
+ 
+ AudioNodeEngineNEON.$(OBJ_SUFFIX): CXXFLAGS += -mfpu=neon
++
++# Optimizer bug with MSVC PGO
++ifeq (WINNT_1,$(OS_ARCH)_$(MOZ_PROFILE_GENERATE)$(MOZ_PROFILE_USE))
++AudioStream.$(OBJ_SUFFIX): COMPILE_CXXFLAGS += -GL-
++endif
++
+diff -ruNa mozilla-release/dom/plugins/base/nsPluginNativeWindowWin.cpp mozilla-release-fix/dom/plugins/base/nsPluginNativeWindowWin.cpp
+--- mozilla-release/dom/plugins/base/nsPluginNativeWindowWin.cpp	Tue Dec  3 13:17:30 2013
++++ mozilla-release-fix/dom/plugins/base/nsPluginNativeWindowWin.cpp	Thu Dec  5 18:58:10 2013
+@@ -36,7 +36,18 @@
+    && nsMinorVersion(suppliedV) >= nsMinorVersion(requiredV))
+ 
+ 
+-#define NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION TEXT("MozillaPluginWindowPropertyAssociation")
++class CAtom_MozillaPluginWindowPropertyAssociation {
++public:
++  CAtom_MozillaPluginWindowPropertyAssociation() {
++    atom = ::GlobalAddAtomW(L"MozillaPluginWindowPropertyAssociation");
++  }
++  ~CAtom_MozillaPluginWindowPropertyAssociation() {
++    ::GlobalDeleteAtom(atom);
++  }
++  ATOM atom;
++};
++static CAtom_MozillaPluginWindowPropertyAssociation gaMpwpa;
++#define NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION ((LPCWSTR)(DWORD)gaMpwpa.atom)
+ #define NS_PLUGIN_CUSTOM_MSG_ID TEXT("MozFlashUserRelay")
+ #define WM_USER_FLASH WM_USER+1
+ static UINT sWM_FLASHBOUNCEMSG = 0;
+@@ -193,7 +204,7 @@
+  */
+ static LRESULT CALLBACK PluginWndProcInternal(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+ {
+-  nsPluginNativeWindowWin * win = (nsPluginNativeWindowWin *)::GetProp(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
++  nsPluginNativeWindowWin * win = (nsPluginNativeWindowWin *)::GetPropW(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
+   if (!win)
+     return TRUE;
+ 
+@@ -395,7 +406,7 @@
+                        LONG_PTR newLong)
+ {
+   nsPluginNativeWindowWin * win =
+-    (nsPluginNativeWindowWin *)GetProp(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
++    (nsPluginNativeWindowWin *)GetPropW(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
+   if (!win || (win && win->mPluginType != nsPluginType_Flash) ||
+       (nIndex == GWLP_WNDPROC &&
+        newLong == reinterpret_cast<LONG_PTR>(PluginWndProc)))
+@@ -423,7 +434,7 @@
+ 
+   // We already checked this in SetWindowLongHookCheck
+   nsPluginNativeWindowWin * win =
+-    (nsPluginNativeWindowWin *)GetProp(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
++    (nsPluginNativeWindowWin *)GetPropW(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
+ 
+   // Hook our subclass back up, just like we do on setwindow.
+   win->SetPrevWindowProc(
+@@ -452,7 +463,7 @@
+ 
+   // We already checked this in SetWindowLongHookCheck
+   nsPluginNativeWindowWin * win =
+-    (nsPluginNativeWindowWin *)GetProp(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
++    (nsPluginNativeWindowWin *)GetPropW(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
+ 
+   // Hook our subclass back up, just like we do on setwindow.   
+   win->SetPrevWindowProc(
+@@ -695,10 +706,10 @@
+   if (!mPluginWinProc)
+     return NS_ERROR_FAILURE;
+ 
+-  DebugOnly<nsPluginNativeWindowWin *> win = (nsPluginNativeWindowWin *)::GetProp(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
++  DebugOnly<nsPluginNativeWindowWin *> win = (nsPluginNativeWindowWin *)::GetPropW(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
+   NS_ASSERTION(!win || (win == this), "plugin window already has property and this is not us");
+   
+-  if (!::SetProp(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION, (HANDLE)this))
++  if (!::SetPropW(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION, (HANDLE)this))
+     return NS_ERROR_FAILURE;
+ 
+   return NS_OK;
+@@ -712,7 +723,7 @@
+   // remove window property
+   HWND hWnd = (HWND)window;
+   if (IsWindow(hWnd))
+-    ::RemoveProp(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
++    ::RemovePropW(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
+ 
+   // restore the original win proc
+   // but only do this if this were us last time
+diff -ruNa mozilla-release/gfx/2d/2D.h mozilla-release-fix/gfx/2d/2D.h
+--- mozilla-release/gfx/2d/2D.h	Tue Dec  3 13:17:34 2013
++++ mozilla-release-fix/gfx/2d/2D.h	Thu Dec  5 18:58:10 2013
+@@ -23,6 +23,8 @@
+ // solution.
+ #include "mozilla/RefPtr.h"
+ 
++#include <string.h>
++
+ #ifdef MOZ_ENABLE_FREETYPE
+ #include <string>
+ #endif
+@@ -842,8 +844,12 @@
+    * Set a transform on the surface, this transform is applied at drawing time
+    * to both the mask and source of the operation.
+    */
+-  virtual void SetTransform(const Matrix &aTransform)
+-    { mTransform = aTransform; mTransformDirty = true; }
++  virtual void SetTransform(const Matrix &aTransform) {
++    if (memcmp(&mTransform, &aTransform, sizeof(Matrix)) != 0) {
++      mTransform = aTransform;
++      mTransformDirty = true;
++    }
++  }
+ 
+   SurfaceFormat GetFormat() { return mFormat; }
+ 
+@@ -916,6 +922,7 @@
+ {
+ public:
+   static bool HasSSE2();
++  static bool HasSSSE3();
+ 
+   static TemporaryRef<DrawTarget> CreateDrawTargetForCairoSurface(cairo_surface_t* aSurface, const IntSize& aSize);
+ 
+diff -ruNa mozilla-release/gfx/2d/BaseRect.h mozilla-release-fix/gfx/2d/BaseRect.h
+--- mozilla-release/gfx/2d/BaseRect.h	Tue Dec  3 13:17:34 2013
++++ mozilla-release-fix/gfx/2d/BaseRect.h	Thu Dec  5 18:58:10 2013
+@@ -10,6 +10,9 @@
+ #include <algorithm>
+ #include "nsDebug.h"
+ 
++#include <stddef.h>
++#include <emmintrin.h>
++
+ namespace mozilla {
+ namespace gfx {
+ 
+@@ -50,6 +53,45 @@
+       x(aX), y(aY), width(aWidth), height(aHeight)
+   {
+   }
++  BaseRect(const __m128i& a128i)
++  {
++    _mm_storeu_si128((__m128i *)&x, a128i);
++  }
++
++  bool IsInt32x4() const {
++    return _is_int32<T>::value &&
++           offsetof(Sub, x) == offsetof(Sub, y) - 4 &&
++           offsetof(Sub, x) == offsetof(Sub, width) - 8 &&
++           offsetof(Sub, x) == offsetof(Sub, height) - 12;
++  }
++  template <typename T>
++  struct _is_int32 {
++    enum { value = false };
++  };
++  template <>
++  struct _is_int32<long> {
++    enum { value = (sizeof(long) == 4) };
++  };
++  template <>
++  struct _is_int32<long const> {
++    enum { value = (sizeof(long) == 4) };
++  };
++  template <>
++  struct _is_int32<int> {
++    enum { value = (sizeof(int) == 4) };
++  };
++  template <>
++  struct _is_int32<int const> {
++    enum { value = (sizeof(int) == 4) };
++  };
++  template <>
++  struct _is_int32<long long> {
++    enum { value = (sizeof(long long) == 4) };
++  };
++  template <>
++  struct _is_int32<long long const> {
++    enum { value = (sizeof(long long) == 4) };
++  };
+ 
+   // Emptiness. An empty rect is one that has no area, i.e. its height or width
+   // is <= 0
+diff -ruNa mozilla-release/gfx/2d/Blur.cpp mozilla-release-fix/gfx/2d/Blur.cpp
+--- mozilla-release/gfx/2d/Blur.cpp	Tue Dec  3 13:17:34 2013
++++ mozilla-release-fix/gfx/2d/Blur.cpp	Thu Dec  5 18:58:10 2013
+@@ -13,6 +13,7 @@
+ #include "mozilla/CheckedInt.h"
+ #include "mozilla/Constants.h"
+ #include "mozilla/Util.h"
++#include "nsAutoPtr.h"
+ 
+ #include "2D.h"
+ #include "Tools.h"
+@@ -35,13 +36,15 @@
+  * XXX shouldn't we pass stride in separately here?
+  */
+ static void
+-BoxBlurHorizontal(unsigned char* aInput,
+-                  unsigned char* aOutput,
++BoxBlurHorizontal(unsigned char* TT_RESTRICTED_PTR aInput,
++                  unsigned char* TT_RESTRICTED_PTR aOutput,
+                   int32_t aLeftLobe,
+                   int32_t aRightLobe,
+                   int32_t aWidth,
+                   int32_t aRows,
+-                  const IntRect& aSkipRect)
++                  const IntRect& aSkipRect,
++                  int32_t* TT_RESTRICTED_PTR aLasts,
++                  int32_t* TT_RESTRICTED_PTR aNexts)
+ {
+     MOZ_ASSERT(aWidth > 0);
+ 
+@@ -54,6 +57,12 @@
+     }
+     uint32_t reciprocal = uint32_t((uint64_t(1) << 32) / boxSize);
+ 
++    for (int32_t x = 0; x < aWidth; x++) {
++        int32_t tmp = x - aLeftLobe;
++        aLasts[x] = max(tmp, 0);
++        aNexts[x] = min(tmp + boxSize, aWidth - 1);
++    }
++
+     for (int32_t y = 0; y < aRows; y++) {
+         // Check whether the skip rect intersects this row. If the skip
+         // rect covers the whole surface in this row, we can avoid
+@@ -95,14 +104,11 @@
+                     alphaSum += aInput[aWidth * y + pos];
+                 }
+             }
+-            int32_t tmp = x - aLeftLobe;
+-            int32_t last = max(tmp, 0);
+-            int32_t next = min(tmp + boxSize, aWidth - 1);
+ 
+             aOutput[aWidth * y + x] = (uint64_t(alphaSum) * reciprocal) >> 32;
+ 
+-            alphaSum += aInput[aWidth * y + next] -
+-                        aInput[aWidth * y + last];
++            alphaSum += aInput[aWidth * y + aNexts[x]] -
++                        aInput[aWidth * y + aLasts[x]];
+         }
+     }
+ }
+@@ -113,13 +119,15 @@
+  * XXX shouldn't we pass stride in separately here?
+  */
+ static void
+-BoxBlurVertical(unsigned char* aInput,
+-                unsigned char* aOutput,
++BoxBlurVertical(unsigned char* TT_RESTRICTED_PTR aInput,
++                unsigned char* TT_RESTRICTED_PTR aOutput,
+                 int32_t aTopLobe,
+                 int32_t aBottomLobe,
+                 int32_t aWidth,
+                 int32_t aRows,
+-                const IntRect& aSkipRect)
++                const IntRect& aSkipRect,
++                int32_t* TT_RESTRICTED_PTR aLasts,
++                int32_t* TT_RESTRICTED_PTR aNexts)
+ {
+     MOZ_ASSERT(aRows > 0);
+ 
+@@ -132,6 +140,12 @@
+     }
+     uint32_t reciprocal = uint32_t((uint64_t(1) << 32) / boxSize);
+ 
++    for (int32_t y = 0; y < aRows; y++) {
++        int32_t tmp = y - aTopLobe;
++        aLasts[y] = max(tmp, 0);
++        aNexts[y] = min(tmp + boxSize, aRows - 1);
++    }
++
+     for (int32_t x = 0; x < aWidth; x++) {
+         bool inSkipRectX = x >= aSkipRect.x &&
+                            x < aSkipRect.XMost();
+@@ -166,14 +180,11 @@
+                     alphaSum += aInput[aWidth * pos + x];
+                 }
+             }
+-            int32_t tmp = y - aTopLobe;
+-            int32_t last = max(tmp, 0);
+-            int32_t next = min(tmp + boxSize, aRows - 1);
+ 
+             aOutput[aWidth * y + x] = (uint64_t(alphaSum) * reciprocal) >> 32;
+ 
+-            alphaSum += aInput[aWidth * next + x] -
+-                        aInput[aWidth * last + x];
++            alphaSum += aInput[aWidth * aNexts[y] + x] -
++                        aInput[aWidth * aLasts[y] + x];
+         }
+     }
+ }
+@@ -500,21 +511,31 @@
+       uint8_t* tmpData = new uint8_t[szB];
+       memset(tmpData, 0, szB);
+ 
++      size_t szLastsNexts = 0;
++      if (mBlurRadius.width > 0) {
++        szLastsNexts = stride;
++      }
++      if (mBlurRadius.height > 0) {
++        szLastsNexts = max<size_t>(szLastsNexts, GetSize().height);
++      }
++      nsAutoArrayPtr<int32_t> tmpLasts(new int32_t[szLastsNexts]);
++      nsAutoArrayPtr<int32_t> tmpNexts(new int32_t[szLastsNexts]);
++
+       uint8_t* a = aData;
+       uint8_t* b = tmpData;
+       if (mBlurRadius.width > 0) {
+-        BoxBlurHorizontal(a, b, horizontalLobes[0][0], horizontalLobes[0][1], stride, GetSize().height, mSkipRect);
+-        BoxBlurHorizontal(b, a, horizontalLobes[1][0], horizontalLobes[1][1], stride, GetSize().height, mSkipRect);
+-        BoxBlurHorizontal(a, b, horizontalLobes[2][0], horizontalLobes[2][1], stride, GetSize().height, mSkipRect);
++        BoxBlurHorizontal(a, b, horizontalLobes[0][0], horizontalLobes[0][1], stride, GetSize().height, mSkipRect, tmpLasts, tmpNexts);
++        BoxBlurHorizontal(b, a, horizontalLobes[1][0], horizontalLobes[1][1], stride, GetSize().height, mSkipRect, tmpLasts, tmpNexts);
++        BoxBlurHorizontal(a, b, horizontalLobes[2][0], horizontalLobes[2][1], stride, GetSize().height, mSkipRect, tmpLasts, tmpNexts);
+       } else {
+         a = tmpData;
+         b = aData;
+       }
+       // The result is in 'b' here.
+       if (mBlurRadius.height > 0) {
+-        BoxBlurVertical(b, a, verticalLobes[0][0], verticalLobes[0][1], stride, GetSize().height, mSkipRect);
+-        BoxBlurVertical(a, b, verticalLobes[1][0], verticalLobes[1][1], stride, GetSize().height, mSkipRect);
+-        BoxBlurVertical(b, a, verticalLobes[2][0], verticalLobes[2][1], stride, GetSize().height, mSkipRect);
++        BoxBlurVertical(b, a, verticalLobes[0][0], verticalLobes[0][1], stride, GetSize().height, mSkipRect, tmpLasts, tmpNexts);
++        BoxBlurVertical(a, b, verticalLobes[1][0], verticalLobes[1][1], stride, GetSize().height, mSkipRect, tmpLasts, tmpNexts);
++        BoxBlurVertical(b, a, verticalLobes[2][0], verticalLobes[2][1], stride, GetSize().height, mSkipRect, tmpLasts, tmpNexts);
+       } else {
+         a = b;
+       }
+diff -ruNa mozilla-release/gfx/2d/DrawTargetD2D.cpp mozilla-release-fix/gfx/2d/DrawTargetD2D.cpp
+--- mozilla-release/gfx/2d/DrawTargetD2D.cpp	Tue Dec  3 13:17:34 2013
++++ mozilla-release-fix/gfx/2d/DrawTargetD2D.cpp	Thu Dec  5 18:58:10 2013
+@@ -18,6 +18,15 @@
+ 
+ #include <dwrite.h>
+ 
++#if _MSC_VER == 1400
++#include <emmintrin.h>
++extern "C" {
++  extern __m128i _mm_shuffle_epi8(__m128i a, __m128i b);
++}
++#else
++#include <tmmintrin.h>
++#endif
++
+ typedef HRESULT (WINAPI*D2D1CreateFactoryFunc)(
+     D2D1_FACTORY_TYPE factoryType,
+     REFIID iid,
+@@ -2284,6 +2293,12 @@
+   return nullptr;
+ }
+ 
++static const float f_zero = 0;
++static const float f_one = 1.0f;
++static const __m128 xm_4095_rcp_mul = _mm_set_ss(1.0f / 4095);
++static const __m128 xm_255x4 = _mm_set1_ps(255.0f);
++static const __m128i sfl_pack4 = _mm_set_epi8(0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 12, 0, 4, 8);
++    
+ TemporaryRef<ID3D10Texture2D>
+ DrawTargetD2D::CreateGradientTexture(const GradientStopsD2D *aStops)
+ {
+@@ -2293,10 +2308,68 @@
+   rawStops.resize(aStops->mStopCollection->GetGradientStopCount());
+   aStops->mStopCollection->GetGradientStops(&rawStops.front(), rawStops.size());
+ 
+-  std::vector<unsigned char> textureData;
+-  textureData.resize(4096 * 4);
+-  unsigned char *texData = &textureData.front();
++  unsigned char *textureData = new unsigned char [4096 * 4];
++  unsigned char *texData = textureData;
++
++#if (_MSC_VER != 1400) || !defined(_M_AMD64)
++if (Factory::HasSSE2()) {
++  bool has_ssse3 = Factory::HasSSSE3();
++  __m128 prevColorPos = _mm_load_ss(&f_zero);
++  __m128 nextColorPos = _mm_load_ss(&f_one);
++  __m128 prevColor = _mm_loadu_ps((float*)&rawStops[0].color);
++  __m128 nextColor = prevColor;
++
++  if (rawStops.size() >= 2) {
++    nextColor = _mm_loadu_ps((float*)&rawStops[1].color);
++    nextColorPos = _mm_load_ss(&rawStops[1].position);
++  }
++
++  uint32_t stopPosition = 2;
++  __m128 interp_rcp_mul = _mm_div_ss(_mm_load_ss(&f_one), _mm_sub_ss(nextColorPos, prevColorPos));
+ 
++  // Not the most optimized way but this will do for now.
++  for (int i = 0; i < 4096; i++) {
++    // The 4095 seems a little counter intuitive, but we want the gradient
++    // color at offset 0 at the first pixel, and at offset 1.0f at the last
++    // pixel.
++    __m128 pos;
++    pos = _mm_cvtsi32_ss(pos, i);
++    pos = _mm_mul_ss(pos, xm_4095_rcp_mul);
++
++    if (_mm_comigt_ss(pos, nextColorPos)) {
++      prevColor = nextColor;
++      prevColorPos = nextColorPos;
++      if (rawStops.size() > stopPosition) {
++        nextColor = _mm_loadu_ps((float*)&rawStops[stopPosition].color);
++        nextColorPos = _mm_load_ss(&rawStops[stopPosition++].position);
++      } else {
++        nextColorPos = _mm_load_ss(&f_one);
++      }
++      interp_rcp_mul = _mm_div_ss(_mm_load_ss(&f_one), _mm_sub_ss(nextColorPos, prevColorPos));
++    }
++
++    __m128 interp = _mm_mul_ss(_mm_sub_ss(pos, prevColorPos), interp_rcp_mul);
++    interp = _mm_shuffle_ps(interp, interp, _MM_SHUFFLE(0, 0, 0, 0));
++
++    __m128 newColor = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(nextColor, prevColor), interp), prevColor);
++    newColor = _mm_mul_ps(newColor, xm_255x4);
++
++    if (has_ssse3) {
++      __m128i xmResult = _mm_cvttps_epi32(newColor);
++      xmResult = _mm_shuffle_epi8(xmResult, sfl_pack4);
++      *((uint32_t*)&texData[i * 4]) = _mm_cvtsi128_si32(xmResult);
++    } else
++    {
++      newColor = _mm_shuffle_ps(newColor, newColor, _MM_SHUFFLE(3, 0, 1, 2));
++      __m128i xmResult = _mm_cvttps_epi32(newColor);
++      xmResult = _mm_packs_epi32(xmResult, _mm_setzero_si128());
++      xmResult = _mm_packus_epi16(xmResult, _mm_setzero_si128());
++      *((uint32_t*)&texData[i * 4]) = _mm_cvtsi128_si32(xmResult);
++    }
++  }
++} else
++#endif  // (_MSC_VER != 1400) || !defined(_M_AMD64)
++{
+   float prevColorPos = 0;
+   float nextColorPos = 1.0f;
+   D2D1_COLOR_F prevColor = rawStops[0].color;
+@@ -2345,13 +2418,16 @@
+     texData[i * 4 + 2] = (char)(255.0f * newColor.r);
+     texData[i * 4 + 3] = (char)(255.0f * newColor.a);
+   }
++}
+ 
+   D3D10_SUBRESOURCE_DATA data;
+-  data.pSysMem = &textureData.front();
++  data.pSysMem = textureData;
+   data.SysMemPitch = 4096 * 4;
+ 
+   RefPtr<ID3D10Texture2D> tex;
+   mDevice->CreateTexture2D(&desc, &data, byRef(tex));
++
++  delete [] textureData;
+ 
+   return tex;
+ }
+diff -ruNa mozilla-release/gfx/2d/Factory.cpp mozilla-release-fix/gfx/2d/Factory.cpp
+--- mozilla-release/gfx/2d/Factory.cpp	Tue Dec  3 13:17:34 2013
++++ mozilla-release-fix/gfx/2d/Factory.cpp	Thu Dec  5 18:58:10 2013
+@@ -178,6 +178,19 @@
+ #endif
+ }
+ 
++bool
++Factory::HasSSSE3()
++{
++#if defined(__SSSE3__)
++  // gcc with -mssse3
++  return true;
++#elif defined(HAVE_CPU_DETECTION)
++  return HasCPUIDBit(1u, ecx, (1u<<9));
++#else
++  return false;
++#endif
++}
++
+ TemporaryRef<DrawTarget>
+ Factory::CreateDrawTarget(BackendType aBackend, const IntSize &aSize, SurfaceFormat aFormat)
+ {
+diff -ruNa mozilla-release/gfx/2d/SSEHelpers.h mozilla-release-fix/gfx/2d/SSEHelpers.h
+--- mozilla-release/gfx/2d/SSEHelpers.h	Tue Dec  3 13:17:34 2013
++++ mozilla-release-fix/gfx/2d/SSEHelpers.h	Thu Dec  5 18:58:10 2013
+@@ -5,6 +5,24 @@
+ #include <xmmintrin.h>
+ #include <emmintrin.h>
+ 
++/* VC8 doesn't support some SSE2 built-in functions, so we define them here. */
++#if defined(_MSC_VER) && (_MSC_VER < 1500)
++MOZ_ALWAYS_INLINE __m128 _mm_castsi128_ps(__m128i a)
++{
++  return *(__m128 *)&a;
++}
++
++MOZ_ALWAYS_INLINE __m128i _mm_castpd_si128(__m128d a)
++{
++  return *(__m128i *)&a;
++}
++
++MOZ_ALWAYS_INLINE __m128i _mm_castps_si128(__m128 a)
++{
++  return *(__m128i *)&a;
++}
++#endif
++
+ /* Before Nehalem _mm_loadu_si128 could be very slow, this trick is a little
+  * faster. Once enough people are on architectures where _mm_loadu_si128 is
+  * fast we can migrate to it.
+diff -ruNa mozilla-release/gfx/cairo/cairo/src/cairo-d2d-private.h mozilla-release-fix/gfx/cairo/cairo/src/cairo-d2d-private.h
+--- mozilla-release/gfx/cairo/cairo/src/cairo-d2d-private.h	Tue Dec  3 13:17:34 2013
++++ mozilla-release-fix/gfx/cairo/cairo/src/cairo-d2d-private.h	Thu Dec  5 18:58:10 2013
+@@ -42,6 +42,7 @@
+ #include <d2d1.h>
+ #include <d3d10.h>
+ #include <dxgi.h>
++#include <list>
+ 
+ #include "cairoint.h"
+ #include "cairo-surface-clipper-private.h"
+@@ -73,6 +74,18 @@
+     int mVRAMUsage;
+ };
+ 
++typedef struct
++{
++    RefPtr<ID2D1RadialGradientBrush> radialGradientBrush;
++    RefPtr<ID2D1GradientStopCollection> radialGradientStopCollection;
++} radial_gradient;
++
++typedef struct
++{
++    RefPtr<ID2D1LinearGradientBrush> linearGradientBrush;
++    RefPtr<ID2D1GradientStopCollection> linearGradientStopCollection;
++} linear_gradient;
++
+ const unsigned int TEXT_TEXTURE_WIDTH = 2048;
+ const unsigned int TEXT_TEXTURE_HEIGHT = 512;
+ typedef struct _cairo_d2d_device cairo_d2d_device_t;
+@@ -130,6 +143,12 @@
+     RefPtr<ID2D1BitmapBrush> bitmapBrush;
+     /** Brush used for solid colors */
+     RefPtr<ID2D1SolidColorBrush> solidColorBrush;
++
++    /** Brush used for radial gradients */
++    std::list<radial_gradient> mRadialGradientCache;
++    /** Brush used for linear gradients */
++    std::list<linear_gradient> mLinearGradientCache;
++
+     /** Indicates if our render target is currently in drawing mode */
+     bool isDrawing;
+     /** Indicates if text rendering is initialized */
+diff -ruNa mozilla-release/gfx/cairo/cairo/src/cairo-d2d-surface.cpp mozilla-release-fix/gfx/cairo/cairo/src/cairo-d2d-surface.cpp
+--- mozilla-release/gfx/cairo/cairo/src/cairo-d2d-surface.cpp	Tue Dec  3 13:17:34 2013
++++ mozilla-release-fix/gfx/cairo/cairo/src/cairo-d2d-surface.cpp	Thu Dec  5 18:58:10 2013
+@@ -1541,19 +1541,54 @@
+ 	return NULL;
+     }
+ 
+-    RefPtr<ID2D1GradientStopCollection> stopCollection;
+-    d2dsurf->rt->CreateGradientStopCollection(stops, num_stops, &stopCollection);
+-    RefPtr<ID2D1RadialGradientBrush> brush;
+-
+-    d2dsurf->rt->CreateRadialGradientBrush(D2D1::RadialGradientBrushProperties(center,
+-									       origin,
+-									       outer_radius,
+-									       outer_radius),
+-					   brushProps,
+-					   stopCollection,
+-					   &brush);
++    std::list<radial_gradient>::iterator iterRadialGradient = d2dsurf->mRadialGradientCache.end();
++
++    if (d2dsurf->mRadialGradientCache.size() > 0) {
++        for (std::list<radial_gradient>::iterator iter = d2dsurf->mRadialGradientCache.begin();
++             iter != d2dsurf->mRadialGradientCache.end(); iter++) {
++            UINT32 nCount = (*iter).radialGradientStopCollection->GetGradientStopCount();
++
++            if (nCount == num_stops &&
++                nCount > 0) {
++                D2D1_GRADIENT_STOP *gradientStopsOld = new D2D1_GRADIENT_STOP[nCount];
++
++                (*iter).radialGradientStopCollection->GetGradientStops(gradientStopsOld, nCount);
++                bool stopCollectionEqual = (memcmp(gradientStopsOld, stops, sizeof(D2D1_GRADIENT_STOP) * nCount) == 0);
++                delete [] gradientStopsOld;
++                if (stopCollectionEqual) {
++                    iterRadialGradient = iter;
++                    break;
++                }
++            }
++        }
++    }
++
++    if (iterRadialGradient != d2dsurf->mRadialGradientCache.end()) {
++        (*iterRadialGradient).radialGradientBrush->SetOpacity(brushProps.opacity);
++        (*iterRadialGradient).radialGradientBrush->SetTransform(&brushProps.transform);
++        (*iterRadialGradient).radialGradientBrush->SetCenter(center);
++        (*iterRadialGradient).radialGradientBrush->SetGradientOriginOffset(origin);
++        (*iterRadialGradient).radialGradientBrush->SetRadiusX(outer_radius);
++        (*iterRadialGradient).radialGradientBrush->SetRadiusY(outer_radius);
++    } else {
++        radial_gradient rg;
++
++        d2dsurf->rt->CreateGradientStopCollection(stops, num_stops, &rg.radialGradientStopCollection);
++        d2dsurf->rt->CreateRadialGradientBrush(D2D1::RadialGradientBrushProperties(center,
++            origin,
++            outer_radius,
++            outer_radius),
++            brushProps,
++            rg.radialGradientStopCollection,
++            &rg.radialGradientBrush);
++
++        iterRadialGradient = d2dsurf->mRadialGradientCache.insert(d2dsurf->mRadialGradientCache.begin(), rg);
++        if (d2dsurf->mRadialGradientCache.size() > 50) {
++            d2dsurf->mRadialGradientCache.pop_back();
++        }
++    }
+     delete [] stops;
+-    return brush;
++    return (*iterRadialGradient).radialGradientBrush;
+ }
+ 
+ static RefPtr<ID2D1Brush>
+@@ -1718,16 +1753,50 @@
+ 	stops[source_pattern->base.n_stops + 1].position = 1.0f;
+ 	stops[source_pattern->base.n_stops + 1].color = D2D1::ColorF(0, 0);
+     }
+-    RefPtr<ID2D1GradientStopCollection> stopCollection;
+-    d2dsurf->rt->CreateGradientStopCollection(stops, num_stops, &stopCollection);
+-    RefPtr<ID2D1LinearGradientBrush> brush;
+-    d2dsurf->rt->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(D2D1::Point2F((FLOAT)p1.x, (FLOAT)p1.y),
+-									       D2D1::Point2F((FLOAT)p2.x, (FLOAT)p2.y)),
+-					   brushProps,
+-					   stopCollection,
+-					   &brush);
++
++    std::list<linear_gradient>::iterator iterLinearGradient = d2dsurf->mLinearGradientCache.end();
++
++    if (d2dsurf->mLinearGradientCache.size() > 0) {
++        for (std::list<linear_gradient>::iterator iter = d2dsurf->mLinearGradientCache.begin();
++             iter != d2dsurf->mLinearGradientCache.end(); iter++) {
++            UINT32 nCount = (*iter).linearGradientStopCollection->GetGradientStopCount();
++
++            if (nCount == num_stops &&
++                nCount > 0) {
++                D2D1_GRADIENT_STOP *gradientStopsOld = new D2D1_GRADIENT_STOP[nCount];
++
++                (*iter).linearGradientStopCollection->GetGradientStops(gradientStopsOld, nCount);
++                bool stopCollectionEqual = (memcmp(gradientStopsOld, stops, sizeof(D2D1_GRADIENT_STOP) * nCount) == 0);
++                delete [] gradientStopsOld;
++                if (stopCollectionEqual) {
++                    iterLinearGradient = iter;
++                    break;
++                }
++            }
++        }
++    }
++
++    if (iterLinearGradient != d2dsurf->mLinearGradientCache.end()) {
++        (*iterLinearGradient).linearGradientBrush->SetOpacity(brushProps.opacity);
++        (*iterLinearGradient).linearGradientBrush->SetTransform(&brushProps.transform);
++        (*iterLinearGradient).linearGradientBrush->SetStartPoint(D2D1::Point2F((FLOAT)p1.x, (FLOAT)p1.y));
++        (*iterLinearGradient).linearGradientBrush->SetEndPoint(D2D1::Point2F((FLOAT)p2.x, (FLOAT)p2.y));
++    } else {
++        linear_gradient lg;
++
++        d2dsurf->rt->CreateGradientStopCollection(stops, num_stops, &lg.linearGradientStopCollection);
++        d2dsurf->rt->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(D2D1::Point2F((FLOAT)p1.x, (FLOAT)p1.y), D2D1::Point2F((FLOAT)p2.x, (FLOAT)p2.y)),
++            brushProps,
++            lg.linearGradientStopCollection,
++            &lg.linearGradientBrush);
++
++        iterLinearGradient = d2dsurf->mLinearGradientCache.insert(d2dsurf->mLinearGradientCache.begin(), lg);
++        if (d2dsurf->mLinearGradientCache.size() > 100) {
++            d2dsurf->mLinearGradientCache.pop_back();
++        }
++    }
+     delete [] stops;
+-    return brush;
++    return (*iterLinearGradient).linearGradientBrush;
+ }
+ 
+ /**
+diff -ruNa mozilla-release/gfx/cairo/cairo/src/cairo-wideint-type-private.h mozilla-release-fix/gfx/cairo/cairo/src/cairo-wideint-type-private.h
+--- mozilla-release/gfx/cairo/cairo/src/cairo-wideint-type-private.h	Tue Dec  3 13:17:34 2013
++++ mozilla-release-fix/gfx/cairo/cairo/src/cairo-wideint-type-private.h	Thu Dec  5 18:58:10 2013
+@@ -50,14 +50,7 @@
+ #elif HAVE_SYS_INT_TYPES_H
+ # include <sys/int_types.h>
+ #elif defined(_MSC_VER)
+-  typedef __int8 int8_t;
+-  typedef unsigned __int8 uint8_t;
+-  typedef __int16 int16_t;
+-  typedef unsigned __int16 uint16_t;
+-  typedef __int32 int32_t;
+-  typedef unsigned __int32 uint32_t;
+-  typedef __int64 int64_t;
+-  typedef unsigned __int64 uint64_t;
++# include <stdint.h>
+ #ifndef _UINTPTR_T_DEFINED
+ #ifdef _WIN64
+   typedef unsigned __int64 uintptr_t;
+diff -ruNa mozilla-release/gfx/cairo/libpixman/src/Makefile.in mozilla-release-fix/gfx/cairo/libpixman/src/Makefile.in
+--- mozilla-release/gfx/cairo/libpixman/src/Makefile.in	Tue Dec  3 13:17:34 2013
++++ mozilla-release-fix/gfx/cairo/libpixman/src/Makefile.in	Thu Dec  5 18:58:10 2013
+@@ -112,10 +112,23 @@
+ CFLAGS += -Wno-missing-field-initializers
+ endif # GNU_CC
+ 
++ifdef _MSC_VER
++ifneq (,$(filter -DTT_MEMUTIL,$(MOZ_OPTIMIZE_FLAGS)))
++OPENMP_FLAGS_TT = -GL- -openmp
++else
++OPENMP_FLAGS_TT =
++endif
++pixman-implementation.$(OBJ_SUFFIX): COMPILE_CFLAGS += $(OPENMP_FLAGS_TT)
++
++pixman-general.$(OBJ_SUFFIX): COMPILE_CFLAGS += $(OPENMP_FLAGS_TT)
++
++pixman-trap.$(OBJ_SUFFIX): COMPILE_CFLAGS += $(OPENMP_FLAGS_TT)
++endif
++
+ # special rule for pixman-mmx to get the right cflags
+ pixman-mmx.$(OBJ_SUFFIX): COMPILE_CFLAGS += $(MMX_CFLAGS)
+ 
+-pixman-sse2.$(OBJ_SUFFIX): COMPILE_CFLAGS += $(SSE2_CFLAGS)
++pixman-sse2.$(OBJ_SUFFIX): COMPILE_CFLAGS += $(SSE2_CFLAGS) $(OPENMP_FLAGS_TT)
+ 
+ pixman-arm-neon.$(OBJ_SUFFIX): COMPILE_CFLAGS += $(ARM_NEON_CFLAGS)
+ 
+diff -ruNa mozilla-release/gfx/cairo/libpixman/src/pixman-edge.c mozilla-release-fix/gfx/cairo/libpixman/src/pixman-edge.c
+--- mozilla-release/gfx/cairo/libpixman/src/pixman-edge.c	Tue Dec  3 13:17:34 2013
++++ mozilla-release-fix/gfx/cairo/libpixman/src/pixman-edge.c	Thu Dec  5 18:58:10 2013
+@@ -166,6 +166,8 @@
+     uint32_t *buf = (image)->bits.bits;
+     int stride = (image)->bits.rowstride;
+     int width = (image)->bits.width;
++    pixman_fixed_t rx_old = 0;
++    int rxs_old = 0, rxi_old = 0;
+ 
+     line = buf + pixman_fixed_to_int (y) * stride;
+ 
+@@ -197,12 +199,29 @@
+             int lxs, rxs;
+ 
+             /* Find pixel bounds for span. */
+-            lxi = pixman_fixed_to_int (lx);
+-            rxi = pixman_fixed_to_int (rx);
+-
+             /* Sample coverage for edge pixels */
+-            lxs = RENDER_SAMPLES_X (lx, 8);
+-            rxs = RENDER_SAMPLES_X (rx, 8);
++            if (lx == 0)
++            {
++                lxi = 0;
++                lxs = 0;
++            }
++            else
++            {
++                lxi = pixman_fixed_to_int (lx);
++                lxs = RENDER_SAMPLES_X (lx, 8);
++            }
++
++            if (rx == rx_old)
++            {
++                rxi = rxi_old;
++                rxs = rxs_old;
++            }
++            else
++            {
++                rxi_old = rxi = pixman_fixed_to_int (rx);
++                rxs_old = rxs = RENDER_SAMPLES_X (rx, 8);
++                rx_old = rx;
++            }
+ 
+             /* Add coverage across row */
+             if (lxi == rxi)
+diff -ruNa mozilla-release/gfx/cairo/libpixman/src/pixman-implementation.c mozilla-release-fix/gfx/cairo/libpixman/src/pixman-implementation.c
+--- mozilla-release/gfx/cairo/libpixman/src/pixman-implementation.c	Tue Dec  3 13:17:34 2013
++++ mozilla-release-fix/gfx/cairo/libpixman/src/pixman-implementation.c	Thu Dec  5 18:58:10 2013
+@@ -27,6 +27,14 @@
+ #include <stdlib.h>
+ #include "pixman-private.h"
+ 
++#if defined(TT_MEMUTIL) && defined(_MSC_VER)
++#include <omp.h>
++#endif
++
++#ifdef _MSC_VER
++#include <windows.h>
++#endif
++
+ pixman_implementation_t *
+ _pixman_implementation_create (pixman_implementation_t *fallback,
+ 			       const pixman_fast_path_t *fast_paths)
+@@ -376,10 +384,183 @@
+     return FALSE;
+ }
+ 
++#ifdef _MSC_VER
++
++#ifdef TT_MEMUTIL
++uint32_t dwNonTemporalDataSizeMin = NON_TEMPORAL_STORES_NOT_SUPPORTED;
++uint32_t dwNonTemporalMemcpySizeMin = NON_TEMPORAL_STORES_NOT_SUPPORTED;
++#endif
++typedef BOOL (WINAPI *LPFN_GLPI)(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION, PDWORD);
++
++int Initialize_TT()
++{
++#ifdef TT_MEMUTIL
++    int omp_thread_counts = 0;
++    DWORD pam, sam;
++
++    long env_omp_num_threads = 0;
++    wchar_t *lpwz_env = _wgetenv(L"OMP_NUM_THREADS");
++    if (lpwz_env)
++    {
++      env_omp_num_threads = _wtol(lpwz_env);
++    }
++
++    omp_set_dynamic(0);
++    omp_set_num_threads(1);
++
++    if (GetProcessAffinityMask(GetCurrentProcess(), &pam, &sam))
++    {
++        LPFN_GLPI glpi =
++            (LPFN_GLPI)GetProcAddress(GetModuleHandle("kernel32.dll"),
++            "GetLogicalProcessorInformation");
++        DWORD returnLength = 0;
++        int *pThreadBindIndex = NULL;
++
++        if (NULL != glpi &&
++            !glpi(NULL, &returnLength) &&
++            GetLastError() == ERROR_INSUFFICIENT_BUFFER)
++        {
++            PSYSTEM_LOGICAL_PROCESSOR_INFORMATION buffer =
++                (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION)malloc(returnLength);
++
++            if (glpi(buffer, &returnLength))
++            {
++                DWORD byteOffset;
++                PSYSTEM_LOGICAL_PROCESSOR_INFORMATION ptr;
++                int i;
++                size_t threadBindIndexSize;
++
++                byteOffset = 0;
++                ptr = buffer;
++                while (byteOffset < returnLength)
++                {
++                    if (RelationProcessorCore == ptr->Relationship)
++                    {
++                        omp_thread_counts++;
++                    }
++                    byteOffset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
++                    ptr++;
++                }
++
++                threadBindIndexSize = sizeof(int) * omp_thread_counts;
++                pThreadBindIndex = (int *)malloc(threadBindIndexSize);
++                memset(pThreadBindIndex, 0xFF, threadBindIndexSize);
++
++                i = 0;
++                byteOffset = 0;
++                ptr = buffer;
++                while (byteOffset < returnLength)
++                {
++                    if (RelationProcessorCore == ptr->Relationship)
++                    {
++                        if (i < omp_thread_counts)
++                        {
++                            int b;
++
++                            for (b = 0; b <= 31; b++)
++                            {
++                                if ((pam & ptr->ProcessorMask) & (1 << b))
++                                {
++                                    pThreadBindIndex[i++] = b;
++                                    break;
++                                }
++                            }
++                        }
++                        else
++                        {
++                            break;
++                        }
++                    }
++                    byteOffset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
++                    ptr++;
++                }
++            }
++            free(buffer);
++        }
++
++        if (NULL == pThreadBindIndex)
++        {
++            int b;
++            int i;
++            size_t threadBindIndexSize;
++
++            for (b = 0; b <= 31; b++)
++            {
++                if (pam & (1 << b)) omp_thread_counts++;
++            }
++
++            threadBindIndexSize = sizeof(int) * omp_thread_counts;
++            pThreadBindIndex = (int *)malloc(threadBindIndexSize);
++            memset(pThreadBindIndex, 0xFF, threadBindIndexSize);
++
++            for (i = 0; i < omp_thread_counts; i++)
++            {
++                pThreadBindIndex[i] = i;
++            }
++        }
++
++        if (NULL != pThreadBindIndex)
++        {
++            if (omp_thread_counts >= 1)
++            {
++                OSVERSIONINFO osvi = { sizeof(OSVERSIONINFO) };
++                BOOL bIsWindows7orLater = FALSE;
++
++                omp_set_dynamic(0);
++                if (0 != env_omp_num_threads)
++                {
++                    omp_thread_counts = env_omp_num_threads;
++                }
++                omp_set_num_threads(omp_thread_counts);
++                omp_thread_counts = omp_get_max_threads();
++
++                GetVersionEx(&osvi);
++                bIsWindows7orLater =
++                    (VER_PLATFORM_WIN32_NT == osvi.dwPlatformId) &&
++                    ((6 == osvi.dwMajorVersion && osvi.dwMinorVersion >= 1) || (osvi.dwMajorVersion >= 7));
++                if (!bIsWindows7orLater)
++                {
++#pragma omp parallel
++                    {
++                        SetThreadIdealProcessor(GetCurrentThread(),
++                            pThreadBindIndex[omp_get_thread_num()]);
++                    }
++                }
++            }
++            free(pThreadBindIndex);
++        }
++    }
++#endif /* TT_MEMUTIL */
++
++#ifdef TT_MEMUTIL
++    dwNonTemporalMemcpySizeMin = dwNonTemporalDataSizeMin = GetNonTemporalDataSizeMin_tt();
++    if (dwNonTemporalMemcpySizeMin != NON_TEMPORAL_STORES_NOT_SUPPORTED)
++    {
++        dwNonTemporalMemcpySizeMin = dwNonTemporalDataSizeMin / 2;
++    }
++#endif
++
++    return 0;
++}
++
++#endif /* _MSC_VER */
++
+ pixman_implementation_t *
+ _pixman_choose_implementation (void)
+ {
+     pixman_implementation_t *imp;
++
++#ifdef _MSC_VER
++    {
++        static pixman_bool_t initialized = FALSE;
++
++        if (!initialized)
++        {
++            Initialize_TT();
++            initialized = TRUE;
++        }
++    }
++#endif
+ 
+     imp = _pixman_implementation_create_general();
+ 
+diff -ruNa mozilla-release/gfx/cairo/libpixman/src/pixman-private.h mozilla-release-fix/gfx/cairo/libpixman/src/pixman-private.h
+--- mozilla-release/gfx/cairo/libpixman/src/pixman-private.h	Tue Dec  3 13:17:34 2013
++++ mozilla-release-fix/gfx/cairo/libpixman/src/pixman-private.h	Thu Dec  5 18:58:10 2013
+@@ -1184,4 +1184,11 @@
+ 
+ #endif /* __ASSEMBLER__ */
+ 
++#ifdef TT_MEMUTIL
++extern pixman_bool_t nt_initialized;
++extern uint32_t dwNonTemporalDataSizeMin;
++extern uint32_t dwNonTemporalMemcpySizeMin;
++void InitializeNonTemporalData();
++#endif /* TT_MEMUTIL */
++
+ #endif /* PIXMAN_PRIVATE_H */
+diff -ruNa mozilla-release/gfx/cairo/libpixman/src/pixman-sse2.c mozilla-release-fix/gfx/cairo/libpixman/src/pixman-sse2.c
+--- mozilla-release/gfx/cairo/libpixman/src/pixman-sse2.c	Tue Dec  3 13:17:34 2013
++++ mozilla-release-fix/gfx/cairo/libpixman/src/pixman-sse2.c	Thu Dec  5 18:58:10 2013
+@@ -380,6 +380,13 @@
+     _mm_stream_si128 (dst, data);
+ }
+ 
++/* save 1 pixels using Write Combining memory */
++static force_inline void
++save_32_write_combining (int* dst, int data)
++{
++    _mm_stream_si32 (dst, data);
++}
++
+ /* save 4 pixels on a 16-byte boundary aligned address */
+ static force_inline void
+ save_128_aligned (__m128i* dst,
+@@ -4682,6 +4689,10 @@
+     }
+ }
+ 
++#ifdef TT_MEMUTIL
++extern uint32_t dwNonTemporalMemcpySizeMin;
++#endif
++
+ static pixman_bool_t
+ sse2_blt (pixman_implementation_t *imp,
+           uint32_t *               src_bits,
+@@ -4700,6 +4711,9 @@
+     uint8_t *   src_bytes;
+     uint8_t *   dst_bytes;
+     int byte_width;
++#ifdef TT_MEMUTIL
++    pixman_bool_t use_nontemporal_copy;
++#endif
+ 
+     if (src_bpp != dst_bpp)
+ 	return FALSE;
+@@ -4729,6 +4743,10 @@
+ 	return FALSE;
+     }
+ 
++#ifdef TT_MEMUTIL
++    use_nontemporal_copy = ((uint32_t)(byte_width * height) > dwNonTemporalMemcpySizeMin);
++#endif
++
+     while (height--)
+     {
+ 	int w;
+@@ -4746,6 +4764,60 @@
+ 	    d += 2;
+ 	}
+ 
++#ifdef TT_MEMUTIL
++if (use_nontemporal_copy)
++{
++	while (w >= 4 && ((uintptr_t)d & 15))
++	{
++	    save_32_write_combining ((int*)d, *(int*)s);
++
++	    w -= 4;
++	    s += 4;
++	    d += 4;
++	}
++
++	while (w >= 64)
++	{
++	    __m128i xmm0, xmm1, xmm2, xmm3;
++
++	    _mm_prefetch((char const *)s + (200*64/34+192), _MM_HINT_NTA);
++
++	    xmm0 = load_128_unaligned ((__m128i*)(s));
++	    xmm1 = load_128_unaligned ((__m128i*)(s + 16));
++	    xmm2 = load_128_unaligned ((__m128i*)(s + 32));
++	    xmm3 = load_128_unaligned ((__m128i*)(s + 48));
++
++	    save_128_write_combining ((__m128i*)(d),    xmm0);
++	    save_128_write_combining ((__m128i*)(d + 16), xmm1);
++	    save_128_write_combining ((__m128i*)(d + 32), xmm2);
++	    save_128_write_combining ((__m128i*)(d + 48), xmm3);
++
++	    s += 64;
++	    d += 64;
++	    w -= 64;
++	}
++
++	while (w >= 16)
++	{
++	    save_128_write_combining ((__m128i*)d, load_128_unaligned ((__m128i*)s) );
++
++	    w -= 16;
++	    d += 16;
++	    s += 16;
++	}
++
++	while (w >= 4)
++	{
++	    save_32_write_combining ((int*)d, *(int*)s);
++
++	    w -= 4;
++	    s += 4;
++	    d += 4;
++	}
++}
++else
++#endif
++{
+ 	while (w >= 4 && ((uintptr_t)d & 15))
+ 	{
+ 	    *(uint32_t *)d = *(uint32_t *)s;
+@@ -4791,6 +4863,7 @@
+ 	    s += 4;
+ 	    d += 4;
+ 	}
++}
+ 
+ 	if (w >= 2)
+ 	{
+@@ -4800,6 +4873,13 @@
+ 	    d += 2;
+ 	}
+     }
++
++#ifdef TT_MEMUTIL
++    if (use_nontemporal_copy)
++    {
++        _mm_sfence();
++    }
++#endif
+ 
+     return TRUE;
+ }
+diff -ruNa mozilla-release/gfx/cairo/libpixman/src/pixman-trap.c mozilla-release-fix/gfx/cairo/libpixman/src/pixman-trap.c
+--- mozilla-release/gfx/cairo/libpixman/src/pixman-trap.c	Tue Dec  3 13:17:34 2013
++++ mozilla-release-fix/gfx/cairo/libpixman/src/pixman-trap.c	Thu Dec  5 18:58:10 2013
+@@ -25,6 +25,11 @@
+ #include <config.h>
+ #endif
+ 
++#if defined(TT_MEMUTIL) && defined(_MSC_VER)
++#include <omp.h>
++#endif
++#include <limits.h>
++
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include "pixman-private.h"
+@@ -40,6 +45,26 @@
+     pixman_fixed_t f = pixman_fixed_frac (y);
+     pixman_fixed_t i = pixman_fixed_floor (y);
+ 
++if (8 == n)
++{
++    f = DIV (f - Y_FRAC_FIRST (8) + (STEP_Y_SMALL (8) - pixman_fixed_e), STEP_Y_SMALL (8)) * STEP_Y_SMALL (8) +
++	Y_FRAC_FIRST (8);
++    
++    if (f > Y_FRAC_LAST (8))
++    {
++	if (pixman_fixed_to_int (i) == 0x7fff)
++	{
++	    f = 0xffff; /* saturate */
++	}
++	else
++	{
++	    f = Y_FRAC_FIRST (8);
++	    i += pixman_fixed_1;
++	}
++    }
++}
++else
++{
+     f = DIV (f - Y_FRAC_FIRST (n) + (STEP_Y_SMALL (n) - pixman_fixed_e), STEP_Y_SMALL (n)) * STEP_Y_SMALL (n) +
+ 	Y_FRAC_FIRST (n);
+     
+@@ -55,6 +80,7 @@
+ 	    i += pixman_fixed_1;
+ 	}
+     }
++}
+     return (i | f);
+ }
+ 
+@@ -69,6 +95,26 @@
+     pixman_fixed_t f = pixman_fixed_frac (y);
+     pixman_fixed_t i = pixman_fixed_floor (y);
+ 
++if (8 == n)
++{
++    f = DIV (f - pixman_fixed_e - Y_FRAC_FIRST (8), STEP_Y_SMALL (8)) * STEP_Y_SMALL (8) +
++	Y_FRAC_FIRST (8);
++
++    if (f < Y_FRAC_FIRST (8))
++    {
++	if (pixman_fixed_to_int (i) == 0x8000)
++	{
++	    f = 0; /* saturate */
++	}
++	else
++	{
++	    f = Y_FRAC_LAST (8);
++	    i -= pixman_fixed_1;
++	}
++    }
++}
++else
++{
+     f = DIV (f - pixman_fixed_e - Y_FRAC_FIRST (n), STEP_Y_SMALL (n)) * STEP_Y_SMALL (n) +
+ 	Y_FRAC_FIRST (n);
+ 
+@@ -84,6 +130,8 @@
+ 	    i -= pixman_fixed_1;
+ 	}
+     }
++}
++
+     return (i | f);
+ }
+ 
+@@ -186,11 +234,22 @@
+ 	    e->e = 0;
+ 	}
+ 
++if (8 == n)
++{
++	_pixman_edge_multi_init (e, STEP_Y_SMALL (8),
++				 &e->stepx_small, &e->dx_small);
++
++	_pixman_edge_multi_init (e, STEP_Y_BIG (8),
++				 &e->stepx_big, &e->dx_big);
++}
++else
++{
+ 	_pixman_edge_multi_init (e, STEP_Y_SMALL (n),
+ 				 &e->stepx_small, &e->dx_small);
+ 
+ 	_pixman_edge_multi_init (e, STEP_Y_BIG (n),
+ 				 &e->stepx_big, &e->dx_big);
++}
+     }
+     pixman_edge_step (e, y_start - y_top);
+ }
+@@ -327,6 +386,27 @@
+     dump_image (image, "before");
+ #endif
+ 
++#if defined(TT_MEMUTIL) && defined(_MSC_VER)
++int omp_thread_counts = omp_get_max_threads();
++if (omp_thread_counts >= 2 &&
++    ntraps >= omp_thread_counts &&
++    ntraps >= 160)
++{
++#pragma omp parallel for schedule(guided) default(none) \
++shared(ntraps, traps, image, x_off, y_off)
++    for (i = 0; i < ntraps; ++i)
++    {
++	const pixman_trapezoid_t *trap = &(traps[i]);
++
++	if (pixman_trapezoid_valid (trap))
++	{
++		pixman_rasterize_trapezoid (image, trap, x_off, y_off);
++	}
++    }
++}
++else
++#endif
++{
+     for (i = 0; i < ntraps; ++i)
+     {
+ 	const pixman_trapezoid_t *trap = &(traps[i]);
+@@ -336,6 +416,7 @@
+ 
+ 	pixman_rasterize_trapezoid (image, trap, x_off, y_off);
+     }
++}
+ 
+ #if 0
+     dump_image (image, "after");
+diff -ruNa mozilla-release/gfx/src/nsRect.h mozilla-release-fix/gfx/src/nsRect.h
+--- mozilla-release/gfx/src/nsRect.h	Tue Dec  3 13:17:34 2013
++++ mozilla-release-fix/gfx/src/nsRect.h	Thu Dec  5 18:58:10 2013
+@@ -20,6 +20,62 @@
+ #include "nsTraceRefcnt.h"              // for MOZ_COUNT_CTOR, etc
+ #include "nscore.h"                     // for NS_BUILD_REFCNT_LOGGING
+ 
++#include "mozilla/Util.h"
++#include "mozilla/SSE.h"
++
++#if _MSC_VER == 1400
++#include <emmintrin.h>
++#else
++#include <smmintrin.h>
++#endif
++
++#if (_MSC_VER == 1400) && !defined(_M_AMD64)
++__declspec(naked) __declspec(noinline)
++static __m128d mm_floor_pd_BaseRect(__m128d a)
++{
++  __asm {
++    // roundpd  xmm0, xmm0, 1
++    __asm _emit 0x66
++    __asm _emit 0x0F
++    __asm _emit 0x3A
++    __asm _emit 0x09
++    __asm _emit 0xC0
++    __asm _emit 0x01
++    ret
++  }
++}
++#define _mm_floor_pd(a) mm_floor_pd_BaseRect(a)
++
++__declspec(naked) __declspec(noinline)
++static __m128d mm_ceil_pd_BaseRect(__m128d a)
++{
++  __asm {
++    // roundpd  xmm0, xmm0, 2
++    __asm _emit 0x66
++    __asm _emit 0x0F
++    __asm _emit 0x3A
++    __asm _emit 0x09
++    __asm _emit 0xC0
++    __asm _emit 0x02
++    ret
++  }
++}
++#define _mm_ceil_pd(a) mm_ceil_pd_BaseRect(a)
++
++/* VC8 doesn't support some SSE2 built-in functions, so we define them here. */
++static __forceinline __m128
++_mm_castsi128_ps(__m128i a)
++{
++    return *(__m128 *)&a;
++}
++
++static __forceinline __m128i
++_mm_castps_si128(__m128 a)
++{
++    return *(__m128i *)&a;
++}
++#endif
++
+ struct nsIntRect;
+ struct nsMargin;
+ struct nsIntMargin;
+@@ -48,6 +104,10 @@
+   {
+     MOZ_COUNT_CTOR(nsRect);
+   }
++  nsRect(const __m128i& a128i) : Super(a128i)
++  {
++    MOZ_COUNT_CTOR(nsRect);
++  }
+ 
+ #ifdef NS_BUILD_REFCNT_LOGGING
+   ~nsRect() {
+@@ -179,6 +239,9 @@
+       Super(aX, aY, aWidth, aHeight)
+   {
+   }
++  nsIntRect(const __m128i& a128i) : Super(a128i)
++  {
++  }
+ 
+   inline nsRect ToAppUnits(nscoord aAppUnitsPerPixel) const;
+ 
+@@ -236,11 +299,29 @@
+   return rect;
+ }
+ 
++static const MOZ_ALIGNED_DECL(double d_half[2], 16) = { 0.5, 0.5 };
++
+ // scale the rect but round to preserve centers
+ inline nsIntRect
+ nsRect::ScaleToNearestPixels(float aXScale, float aYScale,
+                              nscoord aAppUnitsPerPixel) const
+ {
++#if !defined(NS_COORD_IS_FLOAT) && ((_MSC_VER != 1400) || !defined(_M_AMD64))
++  if (IsInt32x4() && mozilla::supports_sse4_1()) {
++    __m128d appUnitsPerPixel_x2 = _mm_cvtepi32_pd(_mm_set1_epi32(aAppUnitsPerPixel));
++    __m128i src_x4 = _mm_loadu_si128((__m128i *)&x);
++    __m128d xy = _mm_cvtepi32_pd(src_x4);
++    __m128d xyMost = _mm_cvtepi32_pd(_mm_add_epi32(src_x4, _mm_srli_si128(src_x4, 8)));
++    __m128d xyScale = _mm_cvtps_pd(_mm_unpacklo_ps(_mm_load_ss(&aXScale), _mm_load_ss(&aYScale)));
++
++    __m128i rectXY = _mm_cvttpd_epi32(_mm_floor_pd(_mm_add_pd(_mm_mul_pd(_mm_div_pd(xy, appUnitsPerPixel_x2), xyScale), *(__m128d *)&d_half)));
++    __m128i rectWH = _mm_sub_epi32(_mm_cvttpd_epi32(_mm_floor_pd(_mm_add_pd(_mm_mul_pd(_mm_div_pd(xyMost, appUnitsPerPixel_x2), xyScale), *(__m128d *)&d_half))), rectXY);
++    __m128i rect = _mm_unpacklo_epi64(rectXY, rectWH);
++
++    return nsIntRect(rect);
++  }
++#endif
++
+   nsIntRect rect;
+   rect.x = NSToIntRoundUp(NSAppUnitsToDoublePixels(x, aAppUnitsPerPixel) * aXScale);
+   rect.y = NSToIntRoundUp(NSAppUnitsToDoublePixels(y, aAppUnitsPerPixel) * aYScale);
+@@ -256,6 +337,23 @@
+ nsRect::ScaleToOutsidePixels(float aXScale, float aYScale,
+                              nscoord aAppUnitsPerPixel) const
+ {
++#if !defined(NS_COORD_IS_FLOAT) && ((_MSC_VER != 1400) || !defined(_M_AMD64))
++  if (IsInt32x4() && mozilla::supports_sse4_1()) {
++    __m128 appUnitsPerPixel_x4 = _mm_cvtepi32_ps(_mm_set1_epi32(aAppUnitsPerPixel));
++    __m128i src_x4 = _mm_loadu_si128((__m128i *)&x);
++    __m128 xy_xyMost = _mm_cvtepi32_ps(_mm_add_epi32(src_x4, _mm_slli_si128(src_x4, 8)));
++    __m128 xyScale_x2 = _mm_unpacklo_ps(_mm_load_ss(&aXScale), _mm_load_ss(&aYScale));
++    xyScale_x2 = _mm_movelh_ps(xyScale_x2, xyScale_x2);
++
++    __m128 a = _mm_mul_ps(_mm_div_ps(xy_xyMost, appUnitsPerPixel_x4), xyScale_x2);
++    __m128i rectXY = _mm_cvttpd_epi32(_mm_floor_pd(_mm_cvtps_pd(a)));
++    __m128i rectWH = _mm_sub_epi32(_mm_cvttpd_epi32(_mm_ceil_pd(_mm_cvtps_pd(_mm_castsi128_ps(_mm_srli_si128(_mm_castps_si128(a), 8))))), rectXY);
++    __m128i rect = _mm_unpacklo_epi64(rectXY, rectWH);
++
++    return nsIntRect(rect);
++  }
++#endif
++
+   nsIntRect rect;
+   rect.x = NSToIntFloor(NSAppUnitsToFloatPixels(x, float(aAppUnitsPerPixel)) * aXScale);
+   rect.y = NSToIntFloor(NSAppUnitsToFloatPixels(y, float(aAppUnitsPerPixel)) * aYScale);
+@@ -271,6 +369,23 @@
+ nsRect::ScaleToInsidePixels(float aXScale, float aYScale,
+                             nscoord aAppUnitsPerPixel) const
+ {
++#if !defined(NS_COORD_IS_FLOAT) && ((_MSC_VER != 1400) || !defined(_M_AMD64))
++  if (IsInt32x4() && mozilla::supports_sse4_1()) {
++    __m128 appUnitsPerPixel_x4 = _mm_cvtepi32_ps(_mm_set1_epi32(aAppUnitsPerPixel));
++    __m128i src_x4 = _mm_loadu_si128((__m128i *)&x);
++    __m128 xy_xyMost = _mm_cvtepi32_ps(_mm_add_epi32(src_x4, _mm_slli_si128(src_x4, 8)));
++    __m128 xyScale_x2 = _mm_unpacklo_ps(_mm_load_ss(&aXScale), _mm_load_ss(&aYScale));
++    xyScale_x2 = _mm_movelh_ps(xyScale_x2, xyScale_x2);
++
++    __m128 a = _mm_mul_ps(_mm_div_ps(xy_xyMost, appUnitsPerPixel_x4), xyScale_x2);
++    __m128i rectXY = _mm_cvttpd_epi32(_mm_ceil_pd(_mm_cvtps_pd(a)));
++    __m128i rectWH = _mm_sub_epi32(_mm_cvttpd_epi32(_mm_floor_pd(_mm_cvtps_pd(_mm_castsi128_ps(_mm_srli_si128(_mm_castps_si128(a), 8))))), rectXY);
++    __m128i rect = _mm_unpacklo_epi64(rectXY, rectWH);
++
++    return nsIntRect(rect);
++  }
++#endif
++
+   nsIntRect rect;
+   rect.x = NSToIntCeil(NSAppUnitsToFloatPixels(x, float(aAppUnitsPerPixel)) * aXScale);
+   rect.y = NSToIntCeil(NSAppUnitsToFloatPixels(y, float(aAppUnitsPerPixel)) * aYScale);
+@@ -284,18 +399,63 @@
+ inline nsIntRect
+ nsRect::ToNearestPixels(nscoord aAppUnitsPerPixel) const
+ {
++#if !defined(NS_COORD_IS_FLOAT) && ((_MSC_VER != 1400) || !defined(_M_AMD64))
++  if (IsInt32x4() && mozilla::supports_sse4_1()) {
++    __m128d appUnitsPerPixel_x2 = _mm_cvtepi32_pd(_mm_set1_epi32(aAppUnitsPerPixel));
++    __m128i src_x4 = _mm_loadu_si128((__m128i *)&x);
++    __m128d xy = _mm_cvtepi32_pd(src_x4);
++    __m128d xyMost = _mm_cvtepi32_pd(_mm_add_epi32(src_x4, _mm_srli_si128(src_x4, 8)));
++
++    __m128i rectXY = _mm_cvttpd_epi32(_mm_floor_pd(_mm_add_pd(_mm_div_pd(xy, appUnitsPerPixel_x2), *(__m128d *)&d_half)));
++    __m128i rectWH = _mm_sub_epi32(_mm_cvttpd_epi32(_mm_floor_pd(_mm_add_pd(_mm_div_pd(xyMost, appUnitsPerPixel_x2), *(__m128d *)&d_half))), rectXY);
++    __m128i rect = _mm_unpacklo_epi64(rectXY, rectWH);
++
++    return nsIntRect(rect);
++  }
++#endif
++
+   return ScaleToNearestPixels(1.0f, 1.0f, aAppUnitsPerPixel);
+ }
+ 
+ inline nsIntRect
+ nsRect::ToOutsidePixels(nscoord aAppUnitsPerPixel) const
+ {
++#if !defined(NS_COORD_IS_FLOAT) && ((_MSC_VER != 1400) || !defined(_M_AMD64))
++  if (IsInt32x4() && mozilla::supports_sse4_1()) {
++    __m128 appUnitsPerPixel_x4 = _mm_cvtepi32_ps(_mm_set1_epi32(aAppUnitsPerPixel));
++    __m128i src_x4 = _mm_loadu_si128((__m128i *)&x);
++    __m128 xy_xyMost = _mm_cvtepi32_ps(_mm_add_epi32(src_x4, _mm_slli_si128(src_x4, 8)));
++
++    __m128 a = _mm_div_ps(xy_xyMost, appUnitsPerPixel_x4);
++    __m128i rectXY = _mm_cvttpd_epi32(_mm_floor_pd(_mm_cvtps_pd(a)));
++    __m128i rectWH = _mm_sub_epi32(_mm_cvttpd_epi32(_mm_ceil_pd(_mm_cvtps_pd(_mm_castsi128_ps(_mm_srli_si128(_mm_castps_si128(a), 8))))), rectXY);
++    __m128i rect = _mm_unpacklo_epi64(rectXY, rectWH);
++
++    return nsIntRect(rect);
++  }
++#endif
++
+   return ScaleToOutsidePixels(1.0f, 1.0f, aAppUnitsPerPixel);
+ }
+ 
+ inline nsIntRect
+ nsRect::ToInsidePixels(nscoord aAppUnitsPerPixel) const
+ {
++#if !defined(NS_COORD_IS_FLOAT) && ((_MSC_VER != 1400) || !defined(_M_AMD64))
++  if (IsInt32x4() && mozilla::supports_sse4_1()) {
++    __m128 appUnitsPerPixel_x4 = _mm_cvtepi32_ps(_mm_set1_epi32(aAppUnitsPerPixel));
++    __m128i src_x4 = _mm_loadu_si128((__m128i *)&x);
++    __m128 xy_xyMost = _mm_cvtepi32_ps(_mm_add_epi32(src_x4, _mm_slli_si128(src_x4, 8)));
++
++    __m128 a = _mm_div_ps(xy_xyMost, appUnitsPerPixel_x4);
++    __m128i rectXY = _mm_cvttpd_epi32(_mm_ceil_pd(_mm_cvtps_pd(a)));
++    __m128i rectWH = _mm_sub_epi32(_mm_cvttpd_epi32(_mm_floor_pd(_mm_cvtps_pd(_mm_castsi128_ps(_mm_srli_si128(_mm_castps_si128(a), 8))))), rectXY);
++    __m128i rect = _mm_unpacklo_epi64(rectXY, rectWH);
++
++    return nsIntRect(rect);
++  }
++#endif
++
+   return ScaleToInsidePixels(1.0f, 1.0f, aAppUnitsPerPixel);
+ }
+ 
+diff -ruNa mozilla-release/gfx/thebes/gfxContext.h mozilla-release-fix/gfx/thebes/gfxContext.h
+--- mozilla-release/gfx/thebes/gfxContext.h	Tue Dec  3 13:17:34 2013
++++ mozilla-release-fix/gfx/thebes/gfxContext.h	Thu Dec  5 18:58:10 2013
+@@ -676,7 +676,11 @@
+         /**
+          * Disable copying of backgrounds in PushGroupAndCopyBackground.
+          */
+-        FLAG_DISABLE_COPY_BACKGROUND = (1 << 2)
++        FLAG_DISABLE_COPY_BACKGROUND = (1 << 2),
++        /**
++         * tete009 extension
++         */
++        FLAG_DRAW_SINGLE_IMAGE_TT = (1 << 20)
+     };
+ 
+     void SetFlag(int32_t aFlag) { mFlags |= aFlag; }
+diff -ruNa mozilla-release/gfx/thebes/gfxUtils.cpp mozilla-release-fix/gfx/thebes/gfxUtils.cpp
+--- mozilla-release/gfx/thebes/gfxUtils.cpp	Tue Dec  3 13:17:36 2013
++++ mozilla-release-fix/gfx/thebes/gfxUtils.cpp	Thu Dec  5 18:58:10 2013
+@@ -419,8 +419,12 @@
+                            uint32_t         aImageFlags)
+ {
+     PROFILER_LABEL("gfxUtils", "DrawPixelSnapped");
+-    bool doTile = !aImageRect.Contains(aSourceRect) &&
+-                  !(aImageFlags & imgIContainer::FLAG_CLAMP);
++
++    bool drawSingleImage = (aContext->GetFlags() & gfxContext::FLAG_DRAW_SINGLE_IMAGE_TT);
++    aContext->ClearFlag(gfxContext::FLAG_DRAW_SINGLE_IMAGE_TT);
++
++    bool doTile = (drawSingleImage ? false : (!aImageRect.Contains(aSourceRect) &&
++                  !(aImageFlags & imgIContainer::FLAG_CLAMP)));
+ 
+     nsRefPtr<gfxASurface> currentTarget = aContext->CurrentSurface();
+     gfxMatrix deviceSpaceToImageSpace =
+diff -ruNa mozilla-release/image/src/imgFrame.cpp mozilla-release-fix/image/src/imgFrame.cpp
+--- mozilla-release/image/src/imgFrame.cpp	Tue Dec  3 13:17:36 2013
++++ mozilla-release-fix/image/src/imgFrame.cpp	Thu Dec  5 18:58:10 2013
+@@ -458,6 +458,9 @@
+   NS_ASSERTION(!aSubimage.IsEmpty(), "zero source size --- fix caller");
+   NS_ASSERTION(!mPalettedImageData, "Directly drawing a paletted image!");
+ 
++  bool drawSingleImage = (aContext->GetFlags() & gfxContext::FLAG_DRAW_SINGLE_IMAGE_TT);
++  aContext->ClearFlag(gfxContext::FLAG_DRAW_SINGLE_IMAGE_TT);
++
+   bool doPadding = aPadding != nsIntMargin(0,0,0,0);
+   bool doPartialDecode = !ImageComplete();
+ 
+@@ -476,14 +479,17 @@
+   NS_ASSERTION(!sourceRect.Intersect(subimage).IsEmpty(),
+                "We must be allowed to sample *some* source pixels!");
+ 
+-  bool doTile = !imageRect.Contains(sourceRect) &&
+-                !(aImageFlags & imgIContainer::FLAG_CLAMP);
++  bool doTile = (drawSingleImage ? false : (!imageRect.Contains(sourceRect) &&
++                !(aImageFlags & imgIContainer::FLAG_CLAMP)));
+   SurfaceWithFormat surfaceResult =
+     SurfaceForDrawing(doPadding, doPartialDecode, doTile, aPadding,
+                       userSpaceToImageSpace, fill, subimage, sourceRect,
+                       imageRect);
+ 
+   if (surfaceResult.IsValid()) {
++    if (drawSingleImage) {
++      aContext->SetFlag(gfxContext::FLAG_DRAW_SINGLE_IMAGE_TT);
++    }
+     gfxUtils::DrawPixelSnapped(aContext, surfaceResult.mDrawable,
+                                userSpaceToImageSpace,
+                                subimage, sourceRect, imageRect, fill,
+diff -ruNa mozilla-release/image/src/imgLoader.cpp mozilla-release-fix/image/src/imgLoader.cpp
+--- mozilla-release/image/src/imgLoader.cpp	Tue Dec  3 13:17:36 2013
++++ mozilla-release-fix/image/src/imgLoader.cpp	Thu Dec  5 18:58:10 2013
+@@ -723,13 +723,15 @@
+   nsRefPtr<imgCacheEntry> kungFuDeathGrip(entry);
+ 
+ #if defined(PR_LOGGING)
+-  nsRefPtr<imgRequest> req(entry->GetRequest());
+-  if (req) {
+-    nsCOMPtr<nsIURI> uri;
+-    req->GetURI(getter_AddRefs(uri));
+-    nsAutoCString spec;
+-    uri->GetSpec(spec);
+-    LOG_FUNC_WITH_PARAM(GetImgLog(), "imgCacheExpirationTracker::NotifyExpired", "entry", spec.get());
++  if (entry) {
++    nsRefPtr<imgRequest> req(entry->GetRequest());
++    if (req) {
++      nsCOMPtr<nsIURI> uri;
++      req->GetURI(getter_AddRefs(uri));
++      nsAutoCString spec;
++      uri->GetSpec(spec);
++      LOG_FUNC_WITH_PARAM(GetImgLog(), "imgCacheExpirationTracker::NotifyExpired", "entry", spec.get());
++    }
+   }
+ #endif
+ 
+diff -ruNa mozilla-release/js/src/Makefile.in mozilla-release-fix/js/src/Makefile.in
+--- mozilla-release/js/src/Makefile.in	Tue Dec  3 13:17:38 2013
++++ mozilla-release-fix/js/src/Makefile.in	Thu Dec  5 19:00:44 2013
+@@ -716,3 +716,29 @@
+ 	$(srcdir)/make-source-package.sh clean
+ 
+ endif
++
++ifdef _MSC_VER
++ifeq (WINNT_1,$(OS_ARCH)_$(MOZ_PROFILE_GENERATE)$(MOZ_PROFILE_USE))
++# Optimizer bug with MSVC PGO (Bug 595653)
++YarrPattern.$(OBJ_SUFFIX): COMPILE_CXXFLAGS := $(COMPILE_CXXFLAGS:arch:SSE2=arch:SSE)
++
++# -LTCG:PGINSTRUMENT bug of MSVC PGO
++PolyIC.$(OBJ_SUFFIX): COMPILE_CXXFLAGS += -GL-
++
++# -LTCG:PGINSTRUMENT bug of MSVC PGO
++MonoIC.$(OBJ_SUFFIX): COMPILE_CXXFLAGS += -GL-
++
++# Optimizer bug with MSVC PGO
++FrameState.$(OBJ_SUFFIX): COMPILE_CXXFLAGS += -GL-
++
++FastOps.$(OBJ_SUFFIX): COMPILE_CXXFLAGS += -GL-
++
++ifneq (x86_64, $(TARGET_CPU))
++ifdef ENABLE_ION
++# Optimizer bug with MSVC PGO
++Trampoline-x86.$(OBJ_SUFFIX): COMPILE_CXXFLAGS += -GL-
++endif
++endif
++
++endif
++endif # _MSC_VER
+diff -ruNa mozilla-release/js/src/jsmath.cpp mozilla-release-fix/js/src/jsmath.cpp
+--- mozilla-release/js/src/jsmath.cpp	Tue Dec  3 13:17:40 2013
++++ mozilla-release-fix/js/src/jsmath.cpp	Thu Dec  5 19:03:13 2013
+@@ -37,6 +37,16 @@
+ 
+ #include "jsobjinlines.h"
+ 
++#if defined JS_CPU_X86 || defined JS_CPU_X64
++#if _MSC_VER == 1400
++#include <emmintrin.h>
++#else  /* _MSC_VER == 1400 */
++#include <smmintrin.h>
++#endif /* _MSC_VER == 1400 */
++#endif /* defined JS_CPU_X86 || defined JS_CPU_X64 */
++
++#include "assembler/assembler/MacroAssembler.h"
++
+ using namespace js;
+ 
+ using mozilla::Abs;
+@@ -306,13 +316,42 @@
+     return true;
+ }
+ 
+-double
++JS_ALWAYS_INLINE double
+ js_math_ceil_impl(double x)
+ {
+ #ifdef __APPLE__
+     if (x < 0 && x > -1.0)
+         return js_copysign(0, -1);
+ #endif
++#if defined JS_CPU_X86 || defined JS_CPU_X64
++    if (JSC::MacroAssemblerX86Common::getSSEState() >=
++        JSC::MacroAssemblerX86Common::HasSSE4_1) {
++#if _MSC_VER != 1400
++        __m128d xd = _mm_load_sd(&x);
++        double d;
++
++        xd = _mm_ceil_sd(xd, xd);
++        _mm_store_sd(&d, xd);
++        return d;
++#elif defined JS_CPU_X86
++        double d;
++
++        __asm {
++            movsd       xmm0, x
++            /* roundsd  xmm0, xmm0, 2 */
++            __asm _emit 0x66
++            __asm _emit 0x0F
++            __asm _emit 0x3A
++            __asm _emit 0x0B
++            __asm _emit 0xC0
++            __asm _emit 0x02
++            movsd       d, xmm0
++        }
++        return d;
++#endif
++    }
++#endif /* defined JS_CPU_X86 || defined JS_CPU_X64 */
++
+     return ceil(x);
+ }
+ 
+@@ -421,9 +460,37 @@
+     return true;
+ }
+ 
+-double
++JS_ALWAYS_INLINE double
+ js_math_floor_impl(double x)
+ {
++#if defined JS_CPU_X86 || defined JS_CPU_X64
++    if (JSC::MacroAssemblerX86Common::getSSEState() >=
++        JSC::MacroAssemblerX86Common::HasSSE4_1) {
++#if _MSC_VER != 1400
++        __m128d xd = _mm_load_sd(&x);
++        double d;
++
++        xd = _mm_floor_sd(xd, xd);
++        _mm_store_sd(&d, xd);
++        return d;
++#elif defined JS_CPU_X86
++        double d;
++
++        __asm {
++            movsd       xmm0, x
++            /* roundsd  xmm0, xmm0, 1 */
++            __asm _emit 0x66
++            __asm _emit 0x0F
++            __asm _emit 0x3A
++            __asm _emit 0x0B
++            __asm _emit 0xC0
++            __asm _emit 0x01
++            movsd       d, xmm0
++        }
++        return d;
++#endif
++    }
++#endif /* defined JS_CPU_X86 || defined JS_CPU_X64 */
+     return floor(x);
+ }
+ 
+@@ -769,6 +836,61 @@
+     return true;
+ }
+ 
++#if defined _MSC_VER
++static const double  dbhalf =  0.5;
++__declspec(align(16)) static const __int64 mask_sign[2] = { 0x8000000000000000 };
++#endif
++
++JS_ALWAYS_INLINE double
++js_math_round_impl(double x)
++{
++#if defined JS_CPU_X86 || defined JS_CPU_X64
++    if (JSC::MacroAssemblerX86Common::getSSEState() >=
++        JSC::MacroAssemblerX86Common::HasSSE4_1) {
++#if _MSC_VER != 1400
++        __m128d xmm1d = _mm_load_sd(&x);
++        __m128d xmm0d = xmm1d;
++        double d;
++
++        xmm0d = _mm_add_sd(xmm0d, *(__m128d *)&dbhalf);
++        xmm0d = _mm_floor_sd(xmm0d, xmm0d);
++
++        __m128i xmm2i = _mm_load_si128((__m128i *)mask_sign);
++        __m128i xmm1i = _mm_castpd_si128(xmm1d);
++
++        xmm1i = _mm_and_si128(xmm1i, xmm2i);
++        xmm2i = _mm_andnot_si128(xmm2i, _mm_castpd_si128(xmm0d));
++        xmm1i = _mm_or_si128(xmm1i, xmm2i);
++
++        _mm_store_sd(&d, _mm_castsi128_pd(xmm1i));
++        return d;
++#elif defined JS_CPU_X86
++        double d;
++
++        __asm {
++            movsd       xmm1, x
++            movdqa      xmm2, mask_sign
++            movaps      xmm0, xmm1
++            addsd       xmm0, dbhalf
++            pand        xmm1, xmm2
++            /* roundsd  xmm0, xmm0, 1 */
++            __asm _emit 0x66
++            __asm _emit 0x0F
++            __asm _emit 0x3A
++            __asm _emit 0x0B
++            __asm _emit 0xC0
++            __asm _emit 0x01
++            pandn       xmm2, xmm0
++            por         xmm1, xmm2
++            movsd       d, xmm1
++        }
++        return d;
++#endif
++    }
++#endif /* defined JS_CPU_X86 || defined JS_CPU_X64 */
++    return js_copysign(js_math_floor_impl(x + 0.5), x);
++}
++
+ bool /* ES5 15.8.2.15. */
+ js_math_round(JSContext *cx, unsigned argc, Value *vp)
+ {
+@@ -795,7 +917,7 @@
+         return true;
+     }
+ 
+-    args.rval().setNumber(js_copysign(floor(x + 0.5), x));
++    args.rval().setNumber(js_math_round_impl(x));
+     return true;
+ }
+ 
+diff -ruNa mozilla-release/js/src/jsobjinlines.h mozilla-release-fix/js/src/jsobjinlines.h
+--- mozilla-release/js/src/jsobjinlines.h	Tue Dec  3 13:17:40 2013
++++ mozilla-release-fix/js/src/jsobjinlines.h	Thu Dec  5 18:58:10 2013
+@@ -7,6 +7,10 @@
+ #ifndef jsobjinlines_h
+ #define jsobjinlines_h
+ 
++#if (_M_IX86_FP >= 2) || defined(__SSE2__) || defined(_M_AMD64) || defined(__amd64__)
++#include <emmintrin.h>
++#endif
++
+ #include "jsobj.h"
+ 
+ #include "vm/ArrayObject.h"
+@@ -923,7 +927,7 @@
+     global->setSlot(key + JSProto_LIMIT * 2, ObjectValue(*ctor));
+ 
+     types::AddTypePropertyId(cx, global, id, ObjectValue(*ctor));
+-    if (!global->addDataProperty(cx, id, key + JSProto_LIMIT * 2, 0)) {
++    if (!global->addDataProperty(cx, (jsid)id, key + JSProto_LIMIT * 2, 0)) {
+         global->setSlot(key, UndefinedValue());
+         global->setSlot(key + JSProto_LIMIT, UndefinedValue());
+         global->setSlot(key + JSProto_LIMIT * 2, UndefinedValue());
+diff -ruNa mozilla-release/js/src/yarr/YarrInterpreter.cpp mozilla-release-fix/js/src/yarr/YarrInterpreter.cpp
+--- mozilla-release/js/src/yarr/YarrInterpreter.cpp	Tue Dec  3 13:17:42 2013
++++ mozilla-release-fix/js/src/yarr/YarrInterpreter.cpp	Thu Dec  5 18:58:10 2013
+@@ -1943,7 +1943,13 @@
+     unsigned m_currentAlternativeIndex;
+     Vector<ParenthesesStackEntry> m_parenthesesStack;
+     Vector<ByteDisjunction*> m_allParenthesesInfo;
++#ifdef _MSC_VER
++#pragma optimize("g", off)
++#endif
+ };
++#ifdef _MSC_VER
++#pragma optimize("g", on)
++#endif
+ 
+ PassOwnPtr<BytecodePattern> byteCompile(YarrPattern& pattern, BumpPointerAllocator* allocator)
+ {
+diff -ruNa mozilla-release/layout/base/FrameLayerBuilder.cpp mozilla-release-fix/layout/base/FrameLayerBuilder.cpp
+--- mozilla-release/layout/base/FrameLayerBuilder.cpp	Tue Dec  3 13:17:42 2013
++++ mozilla-release-fix/layout/base/FrameLayerBuilder.cpp	Thu Dec  5 18:58:10 2013
+@@ -279,6 +279,10 @@
+     return aRect.ScaleToNearestPixels(mParameters.mXScale, mParameters.mYScale,
+                                       mAppUnitsPerDevPixel);
+   }
++  nsIntRect ToNearestPixels(const nsRect& aRect)
++  {
++    return aRect.ToNearestPixels(mAppUnitsPerDevPixel);
++  }
+   nsIntRegion ScaleRegionToNearestPixels(const nsRegion& aRegion)
+   {
+     return aRegion.ScaleToNearestPixels(mParameters.mXScale, mParameters.mYScale,
+@@ -292,6 +296,13 @@
+     return aRect.ScaleToOutsidePixels(mParameters.mXScale, mParameters.mYScale,
+                                       mAppUnitsPerDevPixel);
+   }
++  nsIntRect ToOutsidePixels(const nsRect& aRect, bool aSnap)
++  {
++    if (aSnap && mSnappingEnabled) {
++      return ToNearestPixels(aRect);
++    }
++    return aRect.ToOutsidePixels(mAppUnitsPerDevPixel);
++  }
+   nsIntRect ScaleToInsidePixels(const nsRect& aRect, bool aSnap)
+   {
+     if (aSnap && mSnappingEnabled) {
+@@ -300,6 +311,13 @@
+     return aRect.ScaleToInsidePixels(mParameters.mXScale, mParameters.mYScale,
+                                      mAppUnitsPerDevPixel);
+   }
++  nsIntRect ToInsidePixels(const nsRect& aRect, bool aSnap)
++  {
++    if (aSnap && mSnappingEnabled) {
++      return ToNearestPixels(aRect);
++    }
++    return aRect.ToInsidePixels(mAppUnitsPerDevPixel);
++  }
+ 
+   nsIntRegion ScaleRegionToInsidePixels(const nsRegion& aRegion, bool aSnap)
+   {
+@@ -2021,6 +2039,7 @@
+ 
+   const nsIFrame* lastActiveScrolledRoot = nullptr;
+   nsPoint topLeft;
++  const bool scaled = mParameters.Scaled();
+ 
+   // When NO_COMPONENT_ALPHA is set, items will be flattened into a single
+   // layer, so we need to choose which active scrolled root to use for all
+@@ -2041,15 +2060,18 @@
+       "items in a container layer should all have the same app units per dev pixel");
+ 
+     nsIntRect itemVisibleRect =
+-      ScaleToOutsidePixels(item->GetVisibleRect(), false);
++      scaled ? ScaleToOutsidePixels(item->GetVisibleRect(), false) :
++               ToOutsidePixels(item->GetVisibleRect(), false);
+     bool snap;
+     nsRect itemContent = item->GetBounds(mBuilder, &snap);
+-    nsIntRect itemDrawRect = ScaleToOutsidePixels(itemContent, snap);
++    nsIntRect itemDrawRect = scaled ? ScaleToOutsidePixels(itemContent, snap) :
++                                      ToOutsidePixels(itemContent, snap);
+     nsIntRect clipRect;
+     const DisplayItemClip& itemClip = item->GetClip();
+     if (itemClip.HasClip()) {
+       itemContent.IntersectRect(itemContent, itemClip.GetClipRect());
+-      clipRect = ScaleToNearestPixels(itemClip.GetClipRect());
++      clipRect = scaled ? ScaleToNearestPixels(itemClip.GetClipRect()) :
++                          ToNearestPixels(itemClip.GetClipRect());
+       itemDrawRect.IntersectRect(itemDrawRect, clipRect);
+       clipRect.MoveBy(mParameters.mOffset);
+     }
+diff -ruNa mozilla-release/layout/base/FrameLayerBuilder.h mozilla-release-fix/layout/base/FrameLayerBuilder.h
+--- mozilla-release/layout/base/FrameLayerBuilder.h	Tue Dec  3 13:17:42 2013
++++ mozilla-release-fix/layout/base/FrameLayerBuilder.h	Thu Dec  5 18:58:10 2013
+@@ -152,6 +152,11 @@
+       mInActiveTransformedSubtree(aParent.mInActiveTransformedSubtree),
+       mDisableSubpixelAntialiasingInDescendants(aParent.mDisableSubpixelAntialiasingInDescendants)
+     {}
++    bool Scaled()
++    {
++      return (0x3f800000 != *(PRUint32 *)&mXScale) ||
++             (0x3f800000 != *(PRUint32 *)&mYScale);
++    }
+     float mXScale, mYScale;
+     /**
+      * An ancestor clip rect that can be applied to restrict the visibility
+diff -ruNa mozilla-release/layout/base/nsDisplayList.cpp mozilla-release-fix/layout/base/nsDisplayList.cpp
+--- mozilla-release/layout/base/nsDisplayList.cpp	Tue Dec  3 13:17:42 2013
++++ mozilla-release-fix/layout/base/nsDisplayList.cpp	Thu Dec  5 19:05:42 2013
+@@ -10,6 +10,11 @@
+  * used during painting and hit testing
+  */
+ 
++#if !defined(NS_COORD_IS_FLOAT) && defined(_M_IX86_FP) && _M_IX86_FP >= 2
++#include <mmintrin.h>
++#include <emmintrin.h>
++#endif
++
+ #include "mozilla/dom/TabChild.h"
+ #include "mozilla/layers/PLayerTransaction.h"
+ 
+@@ -808,6 +813,9 @@
+       tmp.Area() <= aVisibleRegion->Area()/2) {
+     *aVisibleRegion = tmp;
+   }
++#if !defined(NS_COORD_IS_FLOAT) && defined(_M_IX86_FP) && _M_IX86_FP >= 2
++  _m_empty();
++#endif
+ }
+ 
+ nsCaret *
+diff -ruNa mozilla-release/layout/base/nsLayoutUtils.cpp mozilla-release-fix/layout/base/nsLayoutUtils.cpp
+--- mozilla-release/layout/base/nsLayoutUtils.cpp	Tue Dec  3 13:17:44 2013
++++ mozilla-release-fix/layout/base/nsLayoutUtils.cpp	Thu Dec  5 18:58:10 2013
+@@ -4062,7 +4062,8 @@
+                   const nsRect&          aDirty,
+                   const nsIntSize&       aImageSize,
+                   const SVGImageContext* aSVGContext,
+-                  uint32_t               aImageFlags)
++                  uint32_t               aImageFlags,
++                  const bool             aSingleImage = false)
+ {
+   if (aDest.Contains(aFill)) {
+     aImageFlags |= imgIContainer::FLAG_CLAMP;
+@@ -4082,6 +4083,10 @@
+     ctx->IdentityMatrix();
+   }
+ 
++  if (aSingleImage) {
++    ctx->SetFlag(gfxContext::FLAG_DRAW_SINGLE_IMAGE_TT);
++  }
++
+   aImage->Draw(ctx, aGraphicsFilter, drawingParams.mUserSpaceToImageSpace,
+                drawingParams.mFillRect, drawingParams.mSubimage, aImageSize,
+                aSVGContext, imgIContainer::FRAME_CURRENT, aImageFlags);
+@@ -4162,7 +4167,7 @@
+   fill.IntersectRect(fill, dest);
+   return DrawImageInternal(aRenderingContext, aImage, aGraphicsFilter,
+                            dest, fill, aDest, aDirty ? *aDirty : dest,
+-                           imageSize, nullptr, aImageFlags);
++                           imageSize, nullptr, aImageFlags, true);
+ }
+ 
+ /* static */ nsresult
+@@ -4207,7 +4212,7 @@
+   nsRect fill;
+   fill.IntersectRect(aDest, dest);
+   return DrawImageInternal(aRenderingContext, aImage, aGraphicsFilter, dest, fill,
+-                           fill.TopLeft(), aDirty, imageSize, aSVGContext, aImageFlags);
++                           fill.TopLeft(), aDirty, imageSize, aSVGContext, aImageFlags, true);
+ }
+ 
+ /* static */ void
+diff -ruNa mozilla-release/layout/generic/nsContainerFrame.cpp mozilla-release-fix/layout/generic/nsContainerFrame.cpp
+--- mozilla-release/layout/generic/nsContainerFrame.cpp	Tue Dec  3 13:17:44 2013
++++ mozilla-release-fix/layout/generic/nsContainerFrame.cpp	Thu Dec  5 18:58:10 2013
+@@ -263,6 +263,10 @@
+ /////////////////////////////////////////////////////////////////////////////
+ // Child frame enumeration
+ 
++#ifdef _MSC_VER
++#pragma optimize("g", off)
++#endif
++
+ const nsFrameList&
+ nsContainerFrame::GetChildList(ChildListID aListID) const
+ {
+@@ -288,6 +292,10 @@
+       return nsSplittableFrame::GetChildList(aListID);
+   }
+ }
++
++#ifdef _MSC_VER
++#pragma optimize("g", on)
++#endif
+ 
+ static void AppendIfNonempty(const nsIFrame* aFrame,
+                             FramePropertyTable* aPropTable,
+diff -ruNa mozilla-release/layout/generic/nsHTMLReflowState.cpp mozilla-release-fix/layout/generic/nsHTMLReflowState.cpp
+--- mozilla-release/layout/generic/nsHTMLReflowState.cpp	Tue Dec  3 13:17:44 2013
++++ mozilla-release-fix/layout/generic/nsHTMLReflowState.cpp	Thu Dec  5 18:58:10 2013
+@@ -25,6 +25,7 @@
+ #include "nsFontInflationData.h"
+ #include "StickyScrollContainer.h"
+ #include <algorithm>
++#include "mozilla/Attributes.h"
+ 
+ #ifdef DEBUG
+ #undef NOISY_VERTICAL_ALIGN
+@@ -1027,6 +1028,7 @@
+  * Returns true iff a pre-order traversal of the normal child
+  * frames rooted at aFrame finds no non-empty frame before aDescendant.
+  */
++MOZ_ALWAYS_INLINE
+ static bool AreAllEarlierInFlowFramesEmpty(nsIFrame* aFrame,
+   nsIFrame* aDescendant, bool* aFound) {
+   if (aFrame == aDescendant) {
+diff -ruNa mozilla-release/layout/style/nsCSSDataBlock.cpp mozilla-release-fix/layout/style/nsCSSDataBlock.cpp
+--- mozilla-release/layout/style/nsCSSDataBlock.cpp	Tue Dec  3 13:17:48 2013
++++ mozilla-release-fix/layout/style/nsCSSDataBlock.cpp	Thu Dec  5 18:58:10 2013
+@@ -355,6 +355,10 @@
+     }
+ }
+ 
++#ifdef _MSC_VER
++#pragma optimize("g", off)
++#endif
++
+ void
+ nsCSSExpandedDataBlock::Compress(nsCSSCompressedDataBlock **aNormalBlock,
+                                  nsCSSCompressedDataBlock **aImportantBlock)
+@@ -416,6 +420,10 @@
+     *aNormalBlock = result_normal.forget();
+     *aImportantBlock = result_important.forget();
+ }
++
++#ifdef _MSC_VER
++#pragma optimize("g", on)
++#endif
+ 
+ void
+ nsCSSExpandedDataBlock::AddLonghandProperty(nsCSSProperty aProperty,
+diff -ruNa mozilla-release/layout/style/nsCSSRuleProcessor.cpp mozilla-release-fix/layout/style/nsCSSRuleProcessor.cpp
+--- mozilla-release/layout/style/nsCSSRuleProcessor.cpp	Tue Dec  3 13:17:48 2013
++++ mozilla-release-fix/layout/style/nsCSSRuleProcessor.cpp	Thu Dec  5 18:58:10 2013
+@@ -1618,7 +1618,14 @@
+ //    which is done only when SelectorMatches calls itself recursively
+ //  * what it points to should be set to true whenever a test is skipped
+ //    because of aNodeMatchContent.mStateMask
+-static bool SelectorMatches(Element* aElement,
++bool SelectorMatchesComponent(Element* aElement,
++                              nsCSSSelector* aSelector,
++                              NodeMatchContext& aNodeMatchContext,
++                              TreeMatchContext& aTreeMatchContext,
++                              bool* const aDependence);
++
++inline
++bool SelectorMatches(Element* aElement,
+                               nsCSSSelector* aSelector,
+                               NodeMatchContext& aNodeMatchContext,
+                               TreeMatchContext& aTreeMatchContext,
+@@ -1648,6 +1655,19 @@
+     }
+   }
+ 
++  return SelectorMatchesComponent(aElement,
++                                  aSelector,
++                                  aNodeMatchContext,
++                                  aTreeMatchContext,
++                                  aDependence);
++}
++
++static bool SelectorMatchesComponent(Element* aElement,
++                                       nsCSSSelector* aSelector,
++                                       NodeMatchContext& aNodeMatchContext,
++                                       TreeMatchContext& aTreeMatchContext,
++                                       bool* const aDependence)
++{
+   nsAtomList* IDList = aSelector->mIDList;
+   if (IDList) {
+     nsIAtom* id = aElement->GetID();
+diff -ruNa mozilla-release/memory/mozjemalloc/jemalloc.c mozilla-release-fix/memory/mozjemalloc/jemalloc.c
+--- mozilla-release/memory/mozjemalloc/jemalloc.c	Tue Dec  3 13:17:52 2013
++++ mozilla-release-fix/memory/mozjemalloc/jemalloc.c	Thu Dec  5 18:58:10 2013
+@@ -247,6 +247,14 @@
+ #define __crtInitCritSecAndSpinCount InitializeCriticalSectionAndSpinCount
+ #include <io.h>
+ #include <windows.h>
++#include <intrin.h>
++#if defined _M_IX86 || defined _M_AMD64
++#if _MSC_VER == 1400
++#include <emmintrin.h>
++#else  /* _MSC_VER == 1400 */
++#include <smmintrin.h>
++#endif /* _MSC_VER == 1400 */
++#endif /* defined _M_IX86 || defined _M_AMD64 */
+ 
+ #pragma warning( disable: 4267 4996 4146 )
+ 
+@@ -263,6 +271,16 @@
+ static unsigned long tlsIndex = 0xffffffff;
+ #endif 
+ 
++BOOL ReplaceAPICode(FARPROC lpProcAddr, LPBYTE lpCodeData, int nCodeDataSize);
++static BOOL sse4_1_supported = FALSE;
++typedef struct
++{
++  int EAX;
++  int EBX;
++  int ECX;
++  int EDX;
++} CPU_INFO;
++
+ #define	__thread
+ #define	_pthread_self() __threadid()
+ #define	issetugid() 0
+@@ -5644,6 +5662,20 @@
+ #ifdef MOZ_MEMORY_WINDOWS
+ 	/* get a thread local storage index */
+ 	tlsIndex = TlsAlloc();
++
++	{
++		CPU_INFO CPUInfo;
++
++		__cpuid((int*)&CPUInfo, 0);
++		if (CPUInfo.EAX >= 1)
++		{
++			__cpuid((int*)&CPUInfo, 1);
++			if (CPUInfo.ECX & (1 << 19))
++			{
++				sse4_1_supported = TRUE;
++			}
++		}
++	}
+ #endif
+ 
+ 	/* Get page size and number of CPUs */
+@@ -7224,4 +7256,77 @@
+ 
+   return TRUE;
+ }
++#endif
++
++#ifdef MOZ_MEMORY_WINDOWS
++#include <math.h>
++
++double __cdecl floor_tt(double x)
++{
++#if defined _M_IX86 || defined _M_AMD64
++  if (sse4_1_supported)
++  {
++#if _MSC_VER != 1400
++    __m128d xd = _mm_load_sd(&x);
++    double d;
++
++    xd = _mm_floor_sd(xd, xd);
++    _mm_store_sd(&d, xd);
++    return d;
++#elif defined _M_IX86
++    double d;
++
++    __asm
++    {
++      movsd       xmm0, x
++      /* roundsd  xmm0, xmm0, 1 */
++      __asm _emit 0x66
++      __asm _emit 0x0F
++      __asm _emit 0x3A
++      __asm _emit 0x0B
++      __asm _emit 0xC0
++      __asm _emit 0x01
++      movsd       d, xmm0
++    }
++    return d;
++#endif
++  }
++#endif /* defined _M_IX86 || defined _M_AMD64 */
++  return floor(x);
++}
++
++double __cdecl ceil_tt(double x)
++{
++#if defined _M_IX86 || defined _M_AMD64
++  if (sse4_1_supported)
++  {
++#if _MSC_VER != 1400
++    __m128d xd = _mm_load_sd(&x);
++    double d;
++
++    xd = _mm_ceil_sd(xd, xd);
++    _mm_store_sd(&d, xd);
++    return d;
++#elif defined _M_IX86
++    double d;
++
++    __asm
++    {
++      movsd       xmm0, x
++      /* roundsd  xmm0, xmm0, 2 */
++      __asm _emit 0x66
++      __asm _emit 0x0F
++      __asm _emit 0x3A
++      __asm _emit 0x0B
++      __asm _emit 0xC0
++      __asm _emit 0x02
++      movsd       d, xmm0
++    }
++    return d;
++#endif
++  }
++#endif /* defined _M_IX86 || defined _M_AMD64 */
++  return ceil(x);
++}
++
+ #endif
+diff -ruNa mozilla-release/mfbt/Attributes.h mozilla-release-fix/mfbt/Attributes.h
+--- mozilla-release/mfbt/Attributes.h	Tue Dec  3 13:17:52 2013
++++ mozilla-release-fix/mfbt/Attributes.h	Thu Dec  5 18:58:10 2013
+@@ -11,6 +11,12 @@
+ 
+ #include "mozilla/Compiler.h"
+ 
++#if defined(WIN32) || defined(__SYMBIAN32__)
++#  define TT_RESTRICTED_PTR     __restrict
++#else
++#  define TT_RESTRICTED_PTR     __restrict__
++#endif
++
+ /*
+  * MOZ_INLINE is a macro which expands to tell the compiler that the method
+  * decorated with it should be inlined.  This macro is usable from C and C++
+diff -ruNa mozilla-release/mozglue/build/mozglue.def.in mozilla-release-fix/mozglue/build/mozglue.def.in
+--- mozilla-release/mozglue/build/mozglue.def.in	Tue Dec  3 13:17:54 2013
++++ mozilla-release-fix/mozglue/build/mozglue.def.in	Thu Dec  5 18:58:10 2013
+@@ -33,4 +33,6 @@
+   jemalloc_free_dirty_pages
+   ; A hack to work around the CRT (see giant comment in Makefile.in)
+   frex=dumb_free_thunk
++  floor=floor_tt
++  ceil=ceil_tt
+ #endif
+diff -ruNa mozilla-release/netwerk/base/src/Makefile.in mozilla-release-fix/netwerk/base/src/Makefile.in
+--- mozilla-release/netwerk/base/src/Makefile.in	Tue Dec  3 13:17:54 2013
++++ mozilla-release-fix/netwerk/base/src/Makefile.in	Thu Dec  5 18:58:10 2013
+@@ -22,3 +22,4 @@
+ ifdef MOZ_ENABLE_LIBCONIC
+ 	OS_INCLUDES += $(GLIB_CFLAGS) $(LIBCONIC_CFLAGS)
+ endif
++
+diff -ruNa mozilla-release/security/nss/lib/freebl/Makefile mozilla-release-fix/security/nss/lib/freebl/Makefile
+--- mozilla-release/security/nss/lib/freebl/Makefile	Tue Dec  3 13:17:56 2013
++++ mozilla-release-fix/security/nss/lib/freebl/Makefile	Thu Dec  5 18:58:10 2013
+@@ -129,7 +129,6 @@
+     DEFINES += -DMP_NO_MP_WORD -DMP_USE_UINT_DIGIT
+ else
+ # MSVC
+-    MPI_SRCS += mpi_x86_asm.c
+     DEFINES += -DMP_ASSEMBLY_MULTIPLY -DMP_ASSEMBLY_SQUARE 
+     DEFINES += -DMP_ASSEMBLY_DIV_2DX1D -DMP_USE_UINT_DIGIT -DMP_NO_MP_WORD
+     ifdef BUILD_OPT
+diff -ruNa mozilla-release/security/nss/lib/freebl/manifest.mn mozilla-release-fix/security/nss/lib/freebl/manifest.mn
+--- mozilla-release/security/nss/lib/freebl/manifest.mn	Tue Dec  3 13:17:56 2013
++++ mozilla-release-fix/security/nss/lib/freebl/manifest.mn	Thu Dec  5 18:58:10 2013
+@@ -65,7 +65,11 @@
+ 	$(NULL)
+ 
+ MPI_HDRS = mpi-config.h mpi.h mpi-priv.h mplogic.h mpprime.h logtab.h mp_gf2m.h
++ifdef USE_64
+ MPI_SRCS = mpprime.c mpmontg.c mplogic.c mpi.c mp_gf2m.c
++else
++MPI_SRCS = mpprime.c mpmontg.c mplogic.c mpi.c mp_gf2m.c mpi_x86_asm.c
++endif
+ 
+ 
+ ECL_HDRS = ecl-exp.h ecl.h ec2.h ecp.h ecl-priv.h
+diff -ruNa mozilla-release/toolkit/xre/nsWindowsWMain.cpp mozilla-release-fix/toolkit/xre/nsWindowsWMain.cpp
+--- mozilla-release/toolkit/xre/nsWindowsWMain.cpp	Tue Dec  3 13:18:00 2013
++++ mozilla-release-fix/toolkit/xre/nsWindowsWMain.cpp	Thu Dec  5 18:58:10 2013
+@@ -10,6 +10,10 @@
+ #error This file only makes sense on Windows.
+ #endif
+ 
++#if defined(TT_MEMUTIL) && defined(_MSC_VER)
++#include <omp.h>
++#endif
++
+ #include "nsUTF8Utils.h"
+ 
+ #ifndef XRE_DONT_PROTECT_DLL_LOAD
+diff -ruNa mozilla-release/widget/windows/WinUtils.cpp mozilla-release-fix/widget/windows/WinUtils.cpp
+--- mozilla-release/widget/windows/WinUtils.cpp	Tue Dec  3 13:18:00 2013
++++ mozilla-release-fix/widget/windows/WinUtils.cpp	Thu Dec  5 18:58:10 2013
+@@ -251,16 +251,26 @@
+   return topWnd;
+ }
+ 
+-static PRUnichar*
+-GetNSWindowPropName()
+-{
+-  static PRUnichar sPropName[40] = L"";
+-  if (!*sPropName) {
++class CAtom_NSWindowPropName {
++public:
++  CAtom_NSWindowPropName() {
++    PRUnichar sPropName[40] = L"";
+     _snwprintf(sPropName, 39, L"MozillansIWidgetPtr%p",
+                ::GetCurrentProcessId());
+     sPropName[39] = '\0';
++    atom = ::GlobalAddAtomW(sPropName);
++  }
++  ~CAtom_NSWindowPropName() {
++    ::GlobalDeleteAtom(atom);
+   }
+-  return sPropName;
++  ATOM atom;
++};
++
++static PRUnichar*
++GetNSWindowPropName()
++{
++  static CAtom_NSWindowPropName gaNswpn;
++  return (PRUnichar*)(UINT_PTR)gaNswpn.atom;
+ }
+ 
+ /* static */
+diff -ruNa mozilla-release/widget/windows/nsWindow.cpp mozilla-release-fix/widget/windows/nsWindow.cpp
+--- mozilla-release/widget/windows/nsWindow.cpp	Tue Dec  3 13:18:02 2013
++++ mozilla-release-fix/widget/windows/nsWindow.cpp	Thu Dec  5 18:58:10 2013
+@@ -1990,7 +1990,18 @@
+ // Internally track the caption status via a window property. Required
+ // due to our internal handling of WM_NCACTIVATE when custom client
+ // margins are set.
+-static const PRUnichar kManageWindowInfoProperty[] = L"ManageWindowInfoProperty";
++class CAtom_ManageWindowInfoProperty {
++public:
++  CAtom_ManageWindowInfoProperty() {
++    atom = ::GlobalAddAtomW(L"ManageWindowInfoProperty");
++  }
++  ~CAtom_ManageWindowInfoProperty() {
++    ::GlobalDeleteAtom(atom);
++  }
++  ATOM atom;
++};
++static CAtom_ManageWindowInfoProperty gaMwip;
++#define kManageWindowInfoProperty ((LPCWSTR)(UINT_PTR)gaMwip.atom)
+ typedef BOOL (WINAPI *GetWindowInfoPtr)(HWND hwnd, PWINDOWINFO pwi);
+ static GetWindowInfoPtr sGetWindowInfoPtrStub = NULL;
+ 
+diff -ruNa mozilla-release/xpcom/glue/nsDeque.cpp mozilla-release-fix/xpcom/glue/nsDeque.cpp
+--- mozilla-release/xpcom/glue/nsDeque.cpp	Tue Dec  3 13:18:02 2013
++++ mozilla-release-fix/xpcom/glue/nsDeque.cpp	Thu Dec  5 18:58:10 2013
+@@ -107,7 +107,22 @@
+  */
+ void nsDeque::Empty() {
+   if (mSize && mData) {
+-    memset(mData, 0, mCapacity*sizeof(mData));
++#ifdef TT_MEMUTIL
++     static const PRUint32_pcx dwNonTemporalDataSizeMin = GetNonTemporalDataSizeMin_tt();
++     const PRUint32_pcx dwDataSize = mCapacity*sizeof(mData);
++ 
++     if (dwDataSize < dwNonTemporalDataSizeMin ||
++         NON_TEMPORAL_STORES_NOT_SUPPORTED == dwNonTemporalDataSizeMin)
++     {
++         memset(mData, 0, mCapacity*sizeof(mData));
++     }
++     else
++     {
++         memset_nontemporal_tt(mData, 0, mCapacity*sizeof(mData));
++     }
++#else
++     memset(mData, 0, mCapacity*sizeof(mData));
++#endif
+   }
+   mSize=0;
+   mOrigin=0;
+diff -ruNa mozilla-release/xpcom/glue/pldhash.cpp mozilla-release-fix/xpcom/glue/pldhash.cpp
+--- mozilla-release/xpcom/glue/pldhash.cpp	Tue Dec  3 13:18:02 2013
++++ mozilla-release-fix/xpcom/glue/pldhash.cpp	Thu Dec  5 18:58:10 2013
+@@ -6,6 +6,9 @@
+ /*
+  * Double hashing implementation.
+  */
++#if _MSC_VER >= 1400
++#include <intrin.h>
++#endif
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -129,13 +132,29 @@
+                       const PLDHashEntryHdr *from,
+                       PLDHashEntryHdr *to)
+ {
++#if _MSC_VER >= 1400
++    if ((table->entrySize & 3) == 0) {
++        __movsd((unsigned long*)to, (unsigned long*)from, table->entrySize >> 2);
++    } else {
++        memcpy(to, from, table->entrySize);
++    }
++#else
+     memcpy(to, from, table->entrySize);
++#endif
+ }
+ 
+ void
+ PL_DHashClearEntryStub(PLDHashTable *table, PLDHashEntryHdr *entry)
+ {
++#if _MSC_VER >= 1400
++    if ((table->entrySize & 3) == 0) {
++        __stosd((unsigned long*)entry, 0, table->entrySize >> 2);
++    } else {
++        memset(entry, 0, table->entrySize);
++    }
++#else
+     memset(entry, 0, table->entrySize);
++#endif
+ }
+ 
+ void
+@@ -535,7 +554,29 @@
+     table->generation++;
+ 
+     /* Assign the new entry store to table. */
++#ifdef TT_MEMUTIL
++    {
++        static PRBool initialized = PR_FALSE;
++        static PRUint32 dwNonTemporalDataSizeMin = NON_TEMPORAL_STORES_NOT_SUPPORTED;
++
++        if (!initialized) {
++            dwNonTemporalDataSizeMin = GetNonTemporalDataSizeMin_tt();
++            initialized = PR_TRUE;
++        }
++
++        if (nbytes < dwNonTemporalDataSizeMin ||
++            NON_TEMPORAL_STORES_NOT_SUPPORTED == dwNonTemporalDataSizeMin)
++        {
++            memset(newEntryStore, 0, nbytes);
++        }
++        else
++        {
++            memset_nontemporal_tt(newEntryStore, 0, nbytes);
++        }
++    }
++#else
+     memset(newEntryStore, 0, nbytes);
++#endif
+     oldEntryAddr = oldEntryStore = table->entryStore;
+     table->entryStore = newEntryStore;
+     moveEntry = table->ops->moveEntry;
+diff -ruNa mozilla-release/xpcom/string/public/nsCharTraits.h mozilla-release-fix/xpcom/string/public/nsCharTraits.h
+--- mozilla-release/xpcom/string/public/nsCharTraits.h	Tue Dec  3 13:18:02 2013
++++ mozilla-release-fix/xpcom/string/public/nsCharTraits.h	Thu Dec  5 18:58:10 2013
+@@ -165,6 +165,10 @@
+     char_type*
+     copy( char_type* s1, const char_type* s2, size_t n )
+       {
++        if (1 == n) {
++          *s1 = *s2;
++          return s1;
++        }
+         return static_cast<char_type*>(memcpy(s1, s2, n * sizeof(char_type)));
+       }
+ 

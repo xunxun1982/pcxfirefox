@@ -1,0 +1,1811 @@
+diff -r 7712be144d91 security/nss/lib/freebl/Makefile
+--- a/security/nss/lib/freebl/Makefile	Mon Apr 01 12:21:15 2013 -0700
++++ b/security/nss/lib/freebl/Makefile	Tue Apr 02 10:11:05 2013 +0900
+@@ -135,6 +135,9 @@
+     ifdef BUILD_OPT
+ 	OPTIMIZER += -Ox  # maximum optimization for freebl
+     endif
++    # Intel AES-NI support (required VS2008 or later)
++    DEFINES += -DUSE_HW_AES
++    CSRCS += intel-aes.c
+ endif
+ else
+     # -DMP_NO_MP_WORD
+@@ -151,6 +154,9 @@
+     DEFINES += -DNSS_BEVAND_ARCFOUR -DMPI_AMD64 -DMP_ASSEMBLY_MULTIPLY
+     DEFINES += -DNSS_USE_COMBA
+     MPI_SRCS += mpi_amd64.c
++    # Intel AES-NI support (required VS2008 or later)
++    DEFINES += -DUSE_HW_AES
++    CSRCS += intel-aes.c
+ endif
+ endif
+ endif
+diff -r 7712be144d91 security/nss/lib/freebl/intel-aes.c
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/security/nss/lib/freebl/intel-aes.c	Tue Apr 02 10:11:05 2013 +0900
+@@ -0,0 +1,1746 @@
++/* ***** BEGIN LICENSE BLOCK *****
++ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
++ *
++ * The contents of this file are subject to the Mozilla Public License Version
++ * 1.1 (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ * http://www.mozilla.org/MPL/
++ *
++ * Software distributed under the License is distributed on an "AS IS" basis,
++ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
++ * for the specific language governing rights and limitations under the
++ * License.
++ *
++ * The Original Code is Network Security Services.
++ *
++ * The Initial Developer of the Original Code is
++ * Red Hat Inc.
++ * Portions created by the Initial Developer are Copyright (C) 2009
++ * the Initial Developer. All Rights Reserved.
++ *
++ * Contributor(s):
++ *  Ulrich Drepper <drepper@redhat.com>
++ *  Makoto Kato <m_kato@ga2.so-net.ne.jp>
++ *
++ * Alternatively, the contents of this file may be used under the terms of
++ * either the GNU General Public License Version 2 or later (the "GPL"), or
++ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
++ * in which case the provisions of the GPL or the LGPL are applicable instead
++ * of those above. If you wish to allow use of your version of this file only
++ * under the terms of either the GPL or the LGPL, and not to allow others to
++ * use your version of this file under the terms of the MPL, indicate your
++ * decision by deleting the provisions above and replace them with the notice
++ * and other provisions required by the GPL or the LGPL. If you do not delete
++ * the provisions above, a recipient may use your version of this file under
++ * the terms of any one of the MPL, the GPL or the LGPL.
++ *
++ * ***** END LICENSE BLOCK ***** */
++
++#ifdef USE_HW_AES
++
++/* AES Intrinics is supproted from VS2008 or later */
++#if defined(_MSC_VER) && _MSC_VER >= 1500 && \
++      (defined(_M_IX86) || defined(_M_X64))
++
++#include <wmmintrin.h>
++
++#include "prtypes.h"
++#include "blapi.h"
++#include "rijndael.h"
++#include "intel-aes.h"
++
++#if defined(_M_IX86)
++/* xmm registers on 32-bit platform is less than on 64-bit */
++#define AES_COPY_BLOCK 4
++#else
++#define AES_COPY_BLOCK 8
++#endif
++
++
++#define key_expansion128(key1, round) \
++  { \
++    __m128i rounded = _mm_aeskeygenassist_si128(key1, round); \
++    __m128 xmm3 = _mm_shuffle_ps(_mm_castsi128_ps(_mm_setzero_si128()), \
++                                 _mm_castsi128_ps(key1), 0x10); \
++    key1 = _mm_xor_si128(key1, _mm_castps_si128(xmm3)); \
++    xmm3 = _mm_shuffle_ps(xmm3, _mm_castsi128_ps(key1), 0x8c); \
++    key1 = _mm_xor_si128(key1, _mm_shuffle_epi32(rounded, 0xff)); \
++    key1 = _mm_xor_si128(key1, _mm_castps_si128(xmm3)); \
++  }
++
++void intel_aes_encrypt_init_128(const unsigned char *key, PRUint32 *expanded)
++{
++  __m128i xmm1 = _mm_loadu_si128((__m128i*)key);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  ((__m128i*)expanded)++;
++
++  key_expansion128(xmm1, 0x01);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  ((__m128i*)expanded)++;
++
++  key_expansion128(xmm1, 0x02);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  ((__m128i*)expanded)++;
++
++  key_expansion128(xmm1, 0x04);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  ((__m128i*)expanded)++;
++
++  key_expansion128(xmm1, 0x08);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  ((__m128i*)expanded)++;
++
++  key_expansion128(xmm1, 0x10);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  ((__m128i*)expanded)++;
++
++  key_expansion128(xmm1, 0x20);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  ((__m128i*)expanded)++;
++
++  key_expansion128(xmm1, 0x40);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  ((__m128i*)expanded)++;
++
++  key_expansion128(xmm1, 0x80);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  ((__m128i*)expanded)++;
++
++  key_expansion128(xmm1, 0x1b);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  ((__m128i*)expanded)++;
++
++  key_expansion128(xmm1, 0x36);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  ((__m128i*)expanded)++;
++}
++
++void intel_aes_decrypt_init_128(const unsigned char *key, PRUint32 *expanded)
++{
++  __m128i xmm1 = _mm_loadu_si128((__m128i*)key);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  ((__m128i*)expanded)++;
++
++  key_expansion128(xmm1, 0x01);
++  _mm_storeu_si128((__m128i*)expanded, _mm_aesimc_si128(xmm1));
++  ((__m128i*)expanded)++;
++
++  key_expansion128(xmm1, 0x02);
++  _mm_storeu_si128((__m128i*)expanded, _mm_aesimc_si128(xmm1));
++  ((__m128i*)expanded)++;
++
++  key_expansion128(xmm1, 0x04);
++  _mm_storeu_si128((__m128i*)expanded, _mm_aesimc_si128(xmm1));
++  ((__m128i*)expanded)++;
++
++  key_expansion128(xmm1, 0x08);
++  _mm_storeu_si128((__m128i*)expanded, _mm_aesimc_si128(xmm1));
++  ((__m128i*)expanded)++;
++
++  key_expansion128(xmm1, 0x10);
++  _mm_storeu_si128((__m128i*)expanded, _mm_aesimc_si128(xmm1));
++  ((__m128i*)expanded)++;
++
++  key_expansion128(xmm1, 0x20);
++  _mm_storeu_si128((__m128i*)expanded, _mm_aesimc_si128(xmm1));
++  ((__m128i*)expanded)++;
++
++  key_expansion128(xmm1, 0x40);
++  _mm_storeu_si128((__m128i*)expanded, _mm_aesimc_si128(xmm1));
++  ((__m128i*)expanded)++;
++
++  key_expansion128(xmm1, 0x80);
++  _mm_storeu_si128((__m128i*)expanded, _mm_aesimc_si128(xmm1));
++  ((__m128i*)expanded)++;
++
++  key_expansion128(xmm1, 0x1b);
++  _mm_storeu_si128((__m128i*)expanded, _mm_aesimc_si128(xmm1));
++  ((__m128i*)expanded)++;
++
++  key_expansion128(xmm1, 0x36);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++}
++
++SECStatus intel_aes_encrypt_ecb_128(AESContext *cx,
++                                    unsigned char *output,
++                                    unsigned int *outputLen,
++                                    unsigned int maxOutputLen,
++                                    const unsigned char *input,
++                                    unsigned int inputLen,
++                                    unsigned int blocksize)
++{
++  unsigned int i;
++  PRUint32* expandedKey = cx->expandedKey;
++  const __m128i xmmFirstKey = _mm_loadu_si128((__m128i*)expandedKey);
++  const __m128i xmmLastKey = _mm_loadu_si128((__m128i*)expandedKey + 10);
++
++  while (inputLen >= AES_COPY_BLOCK * sizeof(__m128i)) {
++    __m128i xmm0, xmm1, xmm2, xmm3;
++#if AES_COPY_BLOCK == 8
++    __m128i xmm4, xmm5, xmm6, xmm7;
++#endif
++
++    xmm0 = _mm_loadu_si128((__m128i*)input);
++    xmm1 = _mm_loadu_si128((__m128i*)input + 1);
++    xmm2 = _mm_loadu_si128((__m128i*)input + 2);
++    xmm3 = _mm_loadu_si128((__m128i*)input + 3);
++
++    xmm0 = _mm_xor_si128(xmm0, xmmFirstKey);
++    xmm1 = _mm_xor_si128(xmm1, xmmFirstKey);
++    xmm2 = _mm_xor_si128(xmm2, xmmFirstKey);
++    xmm3 = _mm_xor_si128(xmm3, xmmFirstKey);
++
++#if AES_COPY_BLOCK == 8
++    xmm4 = _mm_loadu_si128((__m128i*)input + 4);
++    xmm5 = _mm_loadu_si128((__m128i*)input + 5);
++    xmm6 = _mm_loadu_si128((__m128i*)input + 6);
++    xmm7 = _mm_loadu_si128((__m128i*)input + 7);
++
++    xmm4 = _mm_xor_si128(xmm4, xmmFirstKey);
++    xmm5 = _mm_xor_si128(xmm5, xmmFirstKey);
++    xmm6 = _mm_xor_si128(xmm6, xmmFirstKey);
++    xmm7 = _mm_xor_si128(xmm7, xmmFirstKey);
++#endif
++
++    for (i = 1; i < 10; i++) {
++      __m128i xmmKey = _mm_loadu_si128((__m128i*)expandedKey + i);
++      xmm0 = _mm_aesenc_si128(xmm0, xmmKey);
++      xmm1 = _mm_aesenc_si128(xmm1, xmmKey);
++      xmm2 = _mm_aesenc_si128(xmm2, xmmKey);
++      xmm3 = _mm_aesenc_si128(xmm3, xmmKey);
++#if AES_COPY_BLOCK == 8
++      xmm4 = _mm_aesenc_si128(xmm4, xmmKey);
++      xmm5 = _mm_aesenc_si128(xmm5, xmmKey);
++      xmm6 = _mm_aesenc_si128(xmm6, xmmKey);
++      xmm7 = _mm_aesenc_si128(xmm7, xmmKey);
++#endif
++    }
++
++    xmm0 = _mm_aesenclast_si128(xmm0, xmmLastKey);
++    xmm1 = _mm_aesenclast_si128(xmm1, xmmLastKey);
++    xmm2 = _mm_aesenclast_si128(xmm2, xmmLastKey);
++    xmm3 = _mm_aesenclast_si128(xmm3, xmmLastKey);
++
++    _mm_storeu_si128((__m128i*)output, xmm0);
++    _mm_storeu_si128((__m128i*)output + 1, xmm1);
++    _mm_storeu_si128((__m128i*)output + 2, xmm2);
++    _mm_storeu_si128((__m128i*)output + 3, xmm3);
++
++#if AES_COPY_BLOCK == 8
++    xmm4 = _mm_aesenclast_si128(xmm4, xmmLastKey);
++    xmm5 = _mm_aesenclast_si128(xmm5, xmmLastKey);
++    xmm6 = _mm_aesenclast_si128(xmm6, xmmLastKey);
++    xmm7 = _mm_aesenclast_si128(xmm7, xmmLastKey);
++
++    _mm_storeu_si128((__m128i*)output + 4, xmm4);
++    _mm_storeu_si128((__m128i*)output + 5, xmm5);
++    _mm_storeu_si128((__m128i*)output + 6, xmm6);
++    _mm_storeu_si128((__m128i*)output + 7, xmm7);
++#endif
++
++    inputLen -= AES_COPY_BLOCK * sizeof(__m128i);
++    input += AES_COPY_BLOCK * sizeof(__m128i);
++    output += AES_COPY_BLOCK * sizeof(__m128i);
++  }
++
++  if (inputLen) {
++    __m128i xmm1 = _mm_loadu_si128((__m128i*)expandedKey + 1);
++    __m128i xmm2 = _mm_loadu_si128((__m128i*)expandedKey + 2);
++    __m128i xmm3 = _mm_loadu_si128((__m128i*)expandedKey + 3);
++    __m128i xmm4 = _mm_loadu_si128((__m128i*)expandedKey + 4);
++    __m128i xmm5 = _mm_loadu_si128((__m128i*)expandedKey + 5);
++    __m128i xmm6 = _mm_loadu_si128((__m128i*)expandedKey + 6);
++    __m128i xmm7 = _mm_loadu_si128((__m128i*)expandedKey + 7);
++    __m128i xmm8 = _mm_loadu_si128((__m128i*)expandedKey + 8);
++    __m128i xmm9 = _mm_loadu_si128((__m128i*)expandedKey + 9);
++
++    while (inputLen) {
++      __m128i xmmInput = _mm_loadu_si128((__m128i*)input);
++      xmmInput = _mm_xor_si128(xmmInput, xmmFirstKey);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm1);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm2);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm3);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm4);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm5);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm6);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm7);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm8);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm9);
++      xmmInput = _mm_aesenclast_si128(xmmInput, xmmLastKey);
++      _mm_storeu_si128((__m128i*)output, xmmInput);
++
++      inputLen -= sizeof(__m128i);
++      input += sizeof(__m128i);
++      output += sizeof(__m128i);
++    }
++  }
++  return SECSuccess;
++}
++
++SECStatus intel_aes_decrypt_ecb_128(AESContext *cx,
++                                    unsigned char *output,
++                                    unsigned int *outputLen,
++                                    unsigned int maxOutputLen,
++                                    const unsigned char *input,
++                                    unsigned int inputLen,
++                                    unsigned int blocksize)
++{
++  unsigned int i;
++  PRUint32* expandedKey = cx->expandedKey;
++  const __m128i xmmFirstKey = _mm_loadu_si128((__m128i*)expandedKey);
++  const __m128i xmmLastKey = _mm_loadu_si128((__m128i*)expandedKey + 10);
++
++  while (inputLen >= AES_COPY_BLOCK * sizeof(__m128i)) {
++    __m128i xmm0, xmm1, xmm2, xmm3;
++#if AES_COPY_BLOCK == 8
++    __m128i xmm4, xmm5, xmm6, xmm7;
++#endif
++
++    xmm0 = _mm_loadu_si128((__m128i*)input);
++    xmm1 = _mm_loadu_si128((__m128i*)input + 1);
++    xmm2 = _mm_loadu_si128((__m128i*)input + 2);
++    xmm3 = _mm_loadu_si128((__m128i*)input + 3);
++
++    xmm0 = _mm_xor_si128(xmm0, xmmLastKey);
++    xmm1 = _mm_xor_si128(xmm1, xmmLastKey);
++    xmm2 = _mm_xor_si128(xmm2, xmmLastKey);
++    xmm3 = _mm_xor_si128(xmm3, xmmLastKey);
++
++#if AES_COPY_BLOCK == 8
++    xmm4 = _mm_loadu_si128((__m128i*)input + 4);
++    xmm5 = _mm_loadu_si128((__m128i*)input + 5);
++    xmm6 = _mm_loadu_si128((__m128i*)input + 6);
++    xmm7 = _mm_loadu_si128((__m128i*)input + 7);
++
++    xmm4 = _mm_xor_si128(xmm4, xmmLastKey);
++    xmm5 = _mm_xor_si128(xmm5, xmmLastKey);
++    xmm6 = _mm_xor_si128(xmm6, xmmLastKey);
++    xmm7 = _mm_xor_si128(xmm7, xmmLastKey);
++#endif
++
++    for (i = 9; i > 0; i--) {
++      __m128i xmmKey = _mm_loadu_si128((__m128i*)expandedKey + i);
++      xmm0 = _mm_aesdec_si128(xmm0, xmmKey);
++      xmm1 = _mm_aesdec_si128(xmm1, xmmKey);
++      xmm2 = _mm_aesdec_si128(xmm2, xmmKey);
++      xmm3 = _mm_aesdec_si128(xmm3, xmmKey);
++#if AES_COPY_BLOCK == 8
++      xmm4 = _mm_aesdec_si128(xmm4, xmmKey);
++      xmm5 = _mm_aesdec_si128(xmm5, xmmKey);
++      xmm6 = _mm_aesdec_si128(xmm6, xmmKey);
++      xmm7 = _mm_aesdec_si128(xmm7, xmmKey);
++#endif
++    }
++
++    xmm0 = _mm_aesdeclast_si128(xmm0, xmmFirstKey);
++    xmm1 = _mm_aesdeclast_si128(xmm1, xmmFirstKey);
++    xmm2 = _mm_aesdeclast_si128(xmm2, xmmFirstKey);
++    xmm3 = _mm_aesdeclast_si128(xmm3, xmmFirstKey);
++
++    _mm_storeu_si128((__m128i*)output, xmm0);
++    _mm_storeu_si128((__m128i*)output + 1, xmm1);
++    _mm_storeu_si128((__m128i*)output + 2, xmm2);
++    _mm_storeu_si128((__m128i*)output + 3, xmm3);
++
++#if AES_COPY_BLOCK == 8
++    xmm4 = _mm_aesdeclast_si128(xmm4, xmmFirstKey);
++    xmm5 = _mm_aesdeclast_si128(xmm5, xmmFirstKey);
++    xmm6 = _mm_aesdeclast_si128(xmm6, xmmFirstKey);
++    xmm7 = _mm_aesdeclast_si128(xmm7, xmmFirstKey);
++
++    _mm_storeu_si128((__m128i*)output + 4, xmm4);
++    _mm_storeu_si128((__m128i*)output + 5, xmm5);
++    _mm_storeu_si128((__m128i*)output + 6, xmm6);
++    _mm_storeu_si128((__m128i*)output + 7, xmm7);
++#endif
++
++    inputLen -= AES_COPY_BLOCK * sizeof(__m128i);
++    input += AES_COPY_BLOCK * sizeof(__m128i);
++    output += AES_COPY_BLOCK * sizeof(__m128i);
++  }
++
++  if (inputLen) {
++    __m128i xmm1 = _mm_loadu_si128((__m128i*)expandedKey + 1);
++    __m128i xmm2 = _mm_loadu_si128((__m128i*)expandedKey + 2);
++    __m128i xmm3 = _mm_loadu_si128((__m128i*)expandedKey + 3);
++    __m128i xmm4 = _mm_loadu_si128((__m128i*)expandedKey + 4);
++    __m128i xmm5 = _mm_loadu_si128((__m128i*)expandedKey + 5);
++    __m128i xmm6 = _mm_loadu_si128((__m128i*)expandedKey + 6);
++    __m128i xmm7 = _mm_loadu_si128((__m128i*)expandedKey + 7);
++    __m128i xmm8 = _mm_loadu_si128((__m128i*)expandedKey + 8);
++    __m128i xmm9 = _mm_loadu_si128((__m128i*)expandedKey + 9);
++
++    while (inputLen) {
++      __m128i xmmInput = _mm_loadu_si128((__m128i*)input);
++      xmmInput = _mm_xor_si128(xmmInput, xmmLastKey);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm9);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm8);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm7);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm6);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm5);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm4);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm3);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm2);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm1);
++      xmmInput = _mm_aesdeclast_si128(xmmInput, xmmFirstKey);
++      _mm_storeu_si128((__m128i*)output, xmmInput);
++
++      inputLen -= sizeof(__m128i);
++      input += sizeof(__m128i);
++      output += sizeof(__m128i);
++    }
++  }
++  return SECSuccess;
++}
++
++SECStatus intel_aes_encrypt_cbc_128(AESContext *cx,
++                                    unsigned char *output,
++                                    unsigned int *outputLen,
++                                    unsigned int maxOutputLen,
++                                    const unsigned char *input,
++                                    unsigned int inputLen,
++                                    unsigned int blocksize)
++{
++  unsigned char *iv = cx->iv;
++  PRUint32* expandedKey = cx->expandedKey;
++
++  __m128i xmmIv = _mm_loadu_si128((__m128i*)iv);
++
++  __m128i xmm0 = _mm_loadu_si128((__m128i*)expandedKey);
++  __m128i xmm1 = _mm_loadu_si128((__m128i*)expandedKey + 1);
++  __m128i xmm2 = _mm_loadu_si128((__m128i*)expandedKey + 2);
++  __m128i xmm3 = _mm_loadu_si128((__m128i*)expandedKey + 3);
++  __m128i xmm4 = _mm_loadu_si128((__m128i*)expandedKey + 4);
++  __m128i xmm5 = _mm_loadu_si128((__m128i*)expandedKey + 5);
++  __m128i xmm6 = _mm_loadu_si128((__m128i*)expandedKey + 6);
++  __m128i xmm7 = _mm_loadu_si128((__m128i*)expandedKey + 7);
++  __m128i xmm8 = _mm_loadu_si128((__m128i*)expandedKey + 8);
++  __m128i xmm9 = _mm_loadu_si128((__m128i*)expandedKey + 9);
++  __m128i xmm10 = _mm_loadu_si128((__m128i*)expandedKey + 10);
++
++  while (inputLen) {
++    __m128i xmmInput = _mm_loadu_si128((__m128i*)input);
++
++    xmmInput = _mm_xor_si128(xmmInput, xmmIv);
++    xmmInput = _mm_xor_si128(xmmInput, xmm0);
++
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm1);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm2);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm3);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm4);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm5);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm6);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm7);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm8);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm9);
++    xmmInput = _mm_aesenclast_si128(xmmInput, xmm10);
++
++    _mm_storeu_si128((__m128i*)output, xmmInput);
++    xmmIv = xmmInput;
++
++    inputLen -= sizeof(__m128i);
++    input += sizeof(__m128i);
++    output += sizeof(__m128i);
++  }
++
++  _mm_storeu_si128((__m128i*)iv, xmmIv);
++  return SECSuccess;
++}
++
++SECStatus intel_aes_decrypt_cbc_128(AESContext *cx,
++                                    unsigned char *output,
++                                    unsigned int *outputLen,
++                                    unsigned int maxOutputLen,
++                                    const unsigned char *input,
++                                    unsigned int inputLen,
++                                    unsigned int blocksize)
++{
++  unsigned int i;
++  unsigned char *iv = cx->iv;
++  PRUint32* expandedKey = cx->expandedKey;
++
++  __m128i xmmIv = _mm_loadu_si128((__m128i*)iv);
++  __m128i xmmFirstKey = _mm_loadu_si128((__m128i*)expandedKey);
++  __m128i xmmLastKey = _mm_loadu_si128((__m128i*)expandedKey + 10);
++
++  while (inputLen >= AES_COPY_BLOCK * sizeof(__m128i))
++  {
++    __m128i xmm0, xmm1, xmm2, xmm3;
++#if AES_COPY_BLOCK == 8
++    __m128i xmm4, xmm5, xmm6, xmm7;
++#endif
++
++    xmm0 = _mm_loadu_si128((__m128i*)input);
++    xmm1 = _mm_loadu_si128((__m128i*)input + 1);
++    xmm2 = _mm_loadu_si128((__m128i*)input + 2);
++    xmm3 = _mm_loadu_si128((__m128i*)input + 3);
++
++    xmm0 = _mm_xor_si128(xmm0, xmmLastKey);
++    xmm1 = _mm_xor_si128(xmm1, xmmLastKey);
++    xmm2 = _mm_xor_si128(xmm2, xmmLastKey);
++    xmm3 = _mm_xor_si128(xmm3, xmmLastKey);
++
++#if AES_COPY_BLOCK == 8
++    xmm4 = _mm_loadu_si128((__m128i*)input + 4);
++    xmm5 = _mm_loadu_si128((__m128i*)input + 5);
++    xmm6 = _mm_loadu_si128((__m128i*)input + 6);
++    xmm7 = _mm_loadu_si128((__m128i*)input + 7);
++
++    xmm4 = _mm_xor_si128(xmm4, xmmLastKey);
++    xmm5 = _mm_xor_si128(xmm5, xmmLastKey);
++    xmm6 = _mm_xor_si128(xmm6, xmmLastKey);
++    xmm7 = _mm_xor_si128(xmm7, xmmLastKey);
++#endif
++
++    for (i = 9; i > 0; i--) {
++      __m128i xmmKey = _mm_loadu_si128((__m128i*)expandedKey + i);
++      xmm0 = _mm_aesdec_si128(xmm0, xmmKey);
++      xmm1 = _mm_aesdec_si128(xmm1, xmmKey);
++      xmm2 = _mm_aesdec_si128(xmm2, xmmKey);
++      xmm3 = _mm_aesdec_si128(xmm3, xmmKey);
++#if AES_COPY_BLOCK == 8
++      xmm4 = _mm_aesdec_si128(xmm4, xmmKey);
++      xmm5 = _mm_aesdec_si128(xmm5, xmmKey);
++      xmm6 = _mm_aesdec_si128(xmm6, xmmKey);
++      xmm7 = _mm_aesdec_si128(xmm7, xmmKey);
++#endif
++    }
++
++    xmm0 = _mm_aesdeclast_si128(xmm0, xmmFirstKey);
++    xmm1 = _mm_aesdeclast_si128(xmm1, xmmFirstKey);
++    xmm2 = _mm_aesdeclast_si128(xmm2, xmmFirstKey);
++    xmm3 = _mm_aesdeclast_si128(xmm3, xmmFirstKey);
++
++    xmm0 = _mm_xor_si128(xmm0, xmmIv);
++    xmm1 = _mm_xor_si128(xmm1, _mm_loadu_si128((__m128i*)input));
++    xmm2 = _mm_xor_si128(xmm2, _mm_loadu_si128((__m128i*)input + 1));
++    xmm3 = _mm_xor_si128(xmm3, _mm_loadu_si128((__m128i*)input + 2));
++
++#if AES_COPY_BLOCK == 8
++    xmm4 = _mm_aesdeclast_si128(xmm4, xmmFirstKey);
++    xmm5 = _mm_aesdeclast_si128(xmm5, xmmFirstKey);
++    xmm6 = _mm_aesdeclast_si128(xmm6, xmmFirstKey);
++    xmm7 = _mm_aesdeclast_si128(xmm7, xmmFirstKey);
++
++    xmm4 = _mm_xor_si128(xmm4, _mm_loadu_si128((__m128i*)input + 3));
++    xmm5 = _mm_xor_si128(xmm5, _mm_loadu_si128((__m128i*)input + 4));
++    xmm6 = _mm_xor_si128(xmm6, _mm_loadu_si128((__m128i*)input + 5));
++    xmm7 = _mm_xor_si128(xmm7, _mm_loadu_si128((__m128i*)input + 6));
++#endif
++
++    /* load next iv because input may be overwritten
++       if input and output is same buffer after storing output */
++    xmmIv = _mm_loadu_si128((__m128i*)input + AES_COPY_BLOCK - 1);
++
++    _mm_storeu_si128((__m128i*)output, xmm0);
++    _mm_storeu_si128((__m128i*)output + 1, xmm1);
++    _mm_storeu_si128((__m128i*)output + 2, xmm2);
++    _mm_storeu_si128((__m128i*)output + 3, xmm3);
++
++#if AES_COPY_BLOCK == 8
++    _mm_storeu_si128((__m128i*)output + 4, xmm4);
++    _mm_storeu_si128((__m128i*)output + 5, xmm5);
++    _mm_storeu_si128((__m128i*)output + 6, xmm6);
++    _mm_storeu_si128((__m128i*)output + 7, xmm7);
++#endif
++
++    inputLen -= AES_COPY_BLOCK * sizeof(__m128i);
++    input += AES_COPY_BLOCK * sizeof(__m128i);
++    output += AES_COPY_BLOCK * sizeof(__m128i);
++  }
++
++  if (inputLen) {
++    __m128i xmm1 = _mm_loadu_si128((__m128i*)expandedKey + 1);
++    __m128i xmm2 = _mm_loadu_si128((__m128i*)expandedKey + 2);
++    __m128i xmm3 = _mm_loadu_si128((__m128i*)expandedKey + 3);
++    __m128i xmm4 = _mm_loadu_si128((__m128i*)expandedKey + 4);
++    __m128i xmm5 = _mm_loadu_si128((__m128i*)expandedKey + 5);
++    __m128i xmm6 = _mm_loadu_si128((__m128i*)expandedKey + 6);
++    __m128i xmm7 = _mm_loadu_si128((__m128i*)expandedKey + 7);
++    __m128i xmm8 = _mm_loadu_si128((__m128i*)expandedKey + 8);
++    __m128i xmm9 = _mm_loadu_si128((__m128i*)expandedKey + 9);
++
++    while (inputLen) {
++      __m128i xmmTmp = _mm_loadu_si128((__m128i*)input);
++      __m128i xmmInput = _mm_xor_si128(xmmTmp, xmmLastKey);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm9);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm8);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm7);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm6);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm5);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm4);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm3);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm2);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm1);
++      xmmInput = _mm_aesdeclast_si128(xmmInput, xmmFirstKey);
++      xmmInput = _mm_xor_si128(xmmInput, xmmIv);
++      _mm_storeu_si128((__m128i*)output, xmmInput);
++      xmmIv = xmmTmp;
++      input += sizeof(__m128i);
++      output += sizeof(__m128i);
++      inputLen -= sizeof(__m128i);
++    }
++  }
++
++  _mm_storeu_si128((__m128i*)iv, xmmIv);
++  return SECSuccess;
++}
++
++#define key_expansion192(xmmKeyLo, xmmKeyHi, round) \
++  { \
++    __m128i rounded = _mm_aeskeygenassist_si128(xmmKeyHi, round); \
++    __m128 xmm4 = _mm_shuffle_ps(_mm_castsi128_ps(_mm_setzero_si128()), \
++                                 _mm_castsi128_ps(xmmKeyLo), 0x10); \
++    xmmKeyLo = _mm_xor_si128(xmmKeyLo, _mm_castps_si128(xmm4)); \
++    xmm4 = _mm_shuffle_ps(xmm4, _mm_castsi128_ps(xmm1), 0x8c); \
++    xmmKeyLo = _mm_xor_si128(xmmKeyLo, _mm_shuffle_epi32(rounded, 0x55)); \
++    xmmKeyLo = _mm_xor_si128(xmmKeyLo, _mm_castps_si128(xmm4)); \
++    \
++    xmm4 = _mm_shuffle_ps(_mm_castsi128_ps(_mm_setzero_si128()), \
++                          _mm_castsi128_ps(xmmKeyHi), 0x00); \
++    xmm4 = _mm_shuffle_ps(xmm4, _mm_castsi128_ps(xmmKeyHi), 0x08); \
++    xmmKeyHi = _mm_xor_si128(xmmKeyHi, _mm_shuffle_epi32(xmmKeyLo, 0xff)); \
++    xmmKeyHi = _mm_xor_si128(xmmKeyHi, _mm_castps_si128(xmm4)); \
++  }
++
++void intel_aes_encrypt_init_192(const unsigned char *key, PRUint32 *expanded)
++{
++  __m128i xmm1 = _mm_loadu_si128((__m128i*)key);
++  __m128i xmm3 = _mm_loadl_epi64((__m128i*)key + 1);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storel_epi64((__m128i*)expanded + 1, xmm3);
++  ((unsigned char*)expanded) += 24;
++
++  key_expansion192(xmm1, xmm3, 0x01);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storel_epi64((__m128i*)expanded + 1, xmm3);
++  ((unsigned char*)expanded) += 24;
++
++  key_expansion192(xmm1, xmm3, 0x02);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storel_epi64((__m128i*)expanded + 1, xmm3);
++  ((unsigned char*)expanded) += 24;
++
++  key_expansion192(xmm1, xmm3, 0x04);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storel_epi64((__m128i*)expanded + 1, xmm3);
++  ((unsigned char*)expanded) += 24;
++
++  key_expansion192(xmm1, xmm3, 0x08);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storel_epi64((__m128i*)expanded + 1, xmm3);
++  expanded += 24 / sizeof(*expanded);
++
++  key_expansion192(xmm1, xmm3, 0x10);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storel_epi64((__m128i*)expanded + 1, xmm3);
++  expanded += 24 / sizeof(*expanded);
++
++  key_expansion192(xmm1, xmm3, 0x20);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storel_epi64((__m128i*)expanded + 1, xmm3);
++  expanded += 24 / sizeof(*expanded);
++
++  key_expansion192(xmm1, xmm3, 0x40);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storel_epi64((__m128i*)expanded + 1, xmm3);
++  expanded += 24 / sizeof(*expanded);
++
++  key_expansion192(xmm1, xmm3, 0x80);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storel_epi64((__m128i*)expanded + 1, xmm3);
++}
++
++void intel_aes_decrypt_init_192(const unsigned char *key, PRUint32 *expanded)
++{
++  __m128i xmm2, xmm4;
++  __m128i xmm1 = _mm_loadu_si128((__m128i*)key);
++  __m128i xmm3 = _mm_loadl_epi64((__m128i*)key + 1);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storel_epi64((__m128i*)expanded + 1, xmm3);
++  ((unsigned char*)expanded) += 24;
++
++  key_expansion192(xmm1, xmm3, 0x01);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storel_epi64((__m128i*)expanded + 1, xmm3);
++  ((unsigned char*)expanded) += 24;
++  xmm2 = _mm_loadu_si128((__m128i*)expanded - 2);
++  xmm4 = _mm_loadu_si128((__m128i*)expanded - 1);
++  _mm_storeu_si128((__m128i*)expanded - 2, _mm_aesimc_si128(xmm2));
++  _mm_storeu_si128((__m128i*)expanded - 1, _mm_aesimc_si128(xmm4));
++
++  key_expansion192(xmm1, xmm3, 0x02);
++  _mm_storeu_si128((__m128i*)expanded, _mm_aesimc_si128(xmm1));
++  _mm_storel_epi64((__m128i*)expanded + 1, xmm3);
++  ((unsigned char*)expanded) += 24;
++
++  key_expansion192(xmm1, xmm3, 0x04);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storel_epi64((__m128i*)expanded + 1, xmm3);
++  ((unsigned char*)expanded) += 24;
++  xmm2 = _mm_loadu_si128((__m128i*)expanded - 2);
++  xmm4 = _mm_loadu_si128((__m128i*)expanded - 1);
++  _mm_storeu_si128((__m128i*)expanded - 2, _mm_aesimc_si128(xmm2));
++  _mm_storeu_si128((__m128i*)expanded - 1, _mm_aesimc_si128(xmm4));
++
++  key_expansion192(xmm1, xmm3, 0x08);
++  _mm_storeu_si128((__m128i*)expanded, _mm_aesimc_si128(xmm1));
++  _mm_storel_epi64((__m128i*)expanded + 1, xmm3);
++  ((unsigned char*)expanded) += 24;
++
++  key_expansion192(xmm1, xmm3, 0x10);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storel_epi64((__m128i*)expanded + 1, xmm3);
++  ((unsigned char*)expanded) += 24;
++  xmm2 = _mm_loadu_si128((__m128i*)expanded - 2);
++  xmm4 = _mm_loadu_si128((__m128i*)expanded - 1);
++  _mm_storeu_si128((__m128i*)expanded - 2, _mm_aesimc_si128(xmm2));
++  _mm_storeu_si128((__m128i*)expanded - 1, _mm_aesimc_si128(xmm4));
++
++  key_expansion192(xmm1, xmm3, 0x20);
++  _mm_storeu_si128((__m128i*)expanded, _mm_aesimc_si128(xmm1));
++  _mm_storel_epi64((__m128i*)expanded + 1, xmm3);
++  ((unsigned char*)expanded) += 24;
++
++  key_expansion192(xmm1, xmm3, 0x40);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storel_epi64((__m128i*)expanded + 1, xmm3);
++  ((unsigned char*)expanded) += 24;
++  xmm2 = _mm_loadu_si128((__m128i*)expanded - 2);
++  xmm4 = _mm_loadu_si128((__m128i*)expanded - 1);
++  _mm_storeu_si128((__m128i*)expanded - 2, _mm_aesimc_si128(xmm2));
++  _mm_storeu_si128((__m128i*)expanded - 1, _mm_aesimc_si128(xmm4));
++
++  key_expansion192(xmm1, xmm3, 0x80);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storel_epi64((__m128i*)expanded + 1, xmm3);
++}
++
++SECStatus intel_aes_encrypt_ecb_192(AESContext *cx,
++                                    unsigned char *output,
++                                    unsigned int *outputLen,
++                                    unsigned int maxOutputLen,
++                                    const unsigned char *input,
++                                    unsigned int inputLen,
++                                    unsigned int blocksize)
++{
++  unsigned int i;
++  PRUint32* expandedKey = cx->expandedKey;
++  const __m128i xmmFirstKey = _mm_loadu_si128((__m128i*)expandedKey);
++  const __m128i xmmLastKey = _mm_loadu_si128((__m128i*)expandedKey + 12);
++
++  while (inputLen >= AES_COPY_BLOCK * sizeof(__m128i)) {
++    __m128i xmm0, xmm1, xmm2, xmm3;
++#if AES_COPY_BLOCK == 8
++    __m128i xmm4, xmm5, xmm6, xmm7;
++#endif
++
++    xmm0 = _mm_loadu_si128((__m128i*)input);
++    xmm1 = _mm_loadu_si128((__m128i*)input + 1);
++    xmm2 = _mm_loadu_si128((__m128i*)input + 2);
++    xmm3 = _mm_loadu_si128((__m128i*)input + 3);
++
++    xmm0 = _mm_xor_si128(xmm0, xmmFirstKey);
++    xmm1 = _mm_xor_si128(xmm1, xmmFirstKey);
++    xmm2 = _mm_xor_si128(xmm2, xmmFirstKey);
++    xmm3 = _mm_xor_si128(xmm3, xmmFirstKey);
++
++#if AES_COPY_BLOCK == 8
++    xmm4 = _mm_loadu_si128((__m128i*)input + 4);
++    xmm5 = _mm_loadu_si128((__m128i*)input + 5);
++    xmm6 = _mm_loadu_si128((__m128i*)input + 6);
++    xmm7 = _mm_loadu_si128((__m128i*)input + 7);
++
++    xmm4 = _mm_xor_si128(xmm4, xmmFirstKey);
++    xmm5 = _mm_xor_si128(xmm5, xmmFirstKey);
++    xmm6 = _mm_xor_si128(xmm6, xmmFirstKey);
++    xmm7 = _mm_xor_si128(xmm7, xmmFirstKey);
++#endif
++
++    for (i = 1; i < 12; i++) {
++      __m128i xmmKey = _mm_loadu_si128((__m128i*)expandedKey + i);
++      xmm0 = _mm_aesenc_si128(xmm0, xmmKey);
++      xmm1 = _mm_aesenc_si128(xmm1, xmmKey);
++      xmm2 = _mm_aesenc_si128(xmm2, xmmKey);
++      xmm3 = _mm_aesenc_si128(xmm3, xmmKey);
++#if AES_COPY_BLOCK == 8
++      xmm4 = _mm_aesenc_si128(xmm4, xmmKey);
++      xmm5 = _mm_aesenc_si128(xmm5, xmmKey);
++      xmm6 = _mm_aesenc_si128(xmm6, xmmKey);
++      xmm7 = _mm_aesenc_si128(xmm7, xmmKey);
++#endif
++    }
++
++    xmm0 = _mm_aesenclast_si128(xmm0, xmmLastKey);
++    xmm1 = _mm_aesenclast_si128(xmm1, xmmLastKey);
++    xmm2 = _mm_aesenclast_si128(xmm2, xmmLastKey);
++    xmm3 = _mm_aesenclast_si128(xmm3, xmmLastKey);
++
++    _mm_storeu_si128((__m128i*)output, xmm0);
++    _mm_storeu_si128((__m128i*)output + 1, xmm1);
++    _mm_storeu_si128((__m128i*)output + 2, xmm2);
++    _mm_storeu_si128((__m128i*)output + 3, xmm3);
++
++#if AES_COPY_BLOCK == 8
++    xmm4 = _mm_aesenclast_si128(xmm4, xmmLastKey);
++    xmm5 = _mm_aesenclast_si128(xmm5, xmmLastKey);
++    xmm6 = _mm_aesenclast_si128(xmm6, xmmLastKey);
++    xmm7 = _mm_aesenclast_si128(xmm7, xmmLastKey);
++
++    _mm_storeu_si128((__m128i*)output + 4, xmm4);
++    _mm_storeu_si128((__m128i*)output + 5, xmm5);
++    _mm_storeu_si128((__m128i*)output + 6, xmm6);
++    _mm_storeu_si128((__m128i*)output + 7, xmm7);
++#endif
++
++    inputLen -= AES_COPY_BLOCK * sizeof(__m128i);
++    input += AES_COPY_BLOCK * sizeof(__m128i);
++    output += AES_COPY_BLOCK * sizeof(__m128i);
++  }
++
++  if (inputLen) {
++    __m128i xmm1 = _mm_loadu_si128((__m128i*)expandedKey + 1);
++    __m128i xmm2 = _mm_loadu_si128((__m128i*)expandedKey + 2);
++    __m128i xmm3 = _mm_loadu_si128((__m128i*)expandedKey + 3);
++    __m128i xmm4 = _mm_loadu_si128((__m128i*)expandedKey + 4);
++    __m128i xmm5 = _mm_loadu_si128((__m128i*)expandedKey + 5);
++    __m128i xmm6 = _mm_loadu_si128((__m128i*)expandedKey + 6);
++    __m128i xmm7 = _mm_loadu_si128((__m128i*)expandedKey + 7);
++    __m128i xmm8 = _mm_loadu_si128((__m128i*)expandedKey + 8);
++    __m128i xmm9 = _mm_loadu_si128((__m128i*)expandedKey + 9);
++    __m128i xmm10 = _mm_loadu_si128((__m128i*)expandedKey + 10);
++    __m128i xmm11 = _mm_loadu_si128((__m128i*)expandedKey + 11);
++
++    while (inputLen) {
++      __m128i xmmInput = _mm_loadu_si128((__m128i*)input);
++      xmmInput = _mm_xor_si128(xmmInput, xmmFirstKey);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm1);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm2);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm3);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm4);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm5);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm6);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm7);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm8);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm9);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm10);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm11);
++      xmmInput = _mm_aesenclast_si128(xmmInput, xmmLastKey);
++      _mm_storeu_si128((__m128i*)output, xmmInput);
++
++      inputLen -= sizeof(__m128i);
++      input += sizeof(__m128i);
++      output += sizeof(__m128i);
++    }
++  }
++
++  return SECSuccess;
++}
++
++SECStatus intel_aes_decrypt_ecb_192(AESContext *cx,
++                                    unsigned char *output,
++                                    unsigned int *outputLen,
++                                    unsigned int maxOutputLen,
++                                    const unsigned char *input,
++                                    unsigned int inputLen,
++                                    unsigned int blocksize)
++{
++  unsigned int i;
++  PRUint32* expandedKey = cx->expandedKey;
++  const __m128i xmmFirstKey = _mm_loadu_si128((__m128i*)expandedKey);
++  const __m128i xmmLastKey = _mm_loadu_si128((__m128i*)expandedKey + 12);
++
++  while (inputLen >= AES_COPY_BLOCK * sizeof(__m128i)) {
++    __m128i xmm0, xmm1, xmm2, xmm3;
++#if AES_COPY_BLOCK == 8
++    __m128i xmm4, xmm5, xmm6, xmm7;
++#endif
++
++    xmm0 = _mm_loadu_si128((__m128i*)input);
++    xmm1 = _mm_loadu_si128((__m128i*)input + 1);
++    xmm2 = _mm_loadu_si128((__m128i*)input + 2);
++    xmm3 = _mm_loadu_si128((__m128i*)input + 3);
++
++    xmm0 = _mm_xor_si128(xmm0, xmmLastKey);
++    xmm1 = _mm_xor_si128(xmm1, xmmLastKey);
++    xmm2 = _mm_xor_si128(xmm2, xmmLastKey);
++    xmm3 = _mm_xor_si128(xmm3, xmmLastKey);
++
++#if AES_COPY_BLOCK == 8
++    xmm4 = _mm_loadu_si128((__m128i*)input + 4);
++    xmm5 = _mm_loadu_si128((__m128i*)input + 5);
++    xmm6 = _mm_loadu_si128((__m128i*)input + 6);
++    xmm7 = _mm_loadu_si128((__m128i*)input + 7);
++
++    xmm4 = _mm_xor_si128(xmm4, xmmLastKey);
++    xmm5 = _mm_xor_si128(xmm5, xmmLastKey);
++    xmm6 = _mm_xor_si128(xmm6, xmmLastKey);
++    xmm7 = _mm_xor_si128(xmm7, xmmLastKey);
++#endif
++
++    for (i = 11; i > 0; i--) {
++      __m128i xmmKey = _mm_loadu_si128((__m128i*)expandedKey + i);
++
++      xmm0 = _mm_aesdec_si128(xmm0, xmmKey);
++      xmm1 = _mm_aesdec_si128(xmm1, xmmKey);
++      xmm2 = _mm_aesdec_si128(xmm2, xmmKey);
++      xmm3 = _mm_aesdec_si128(xmm3, xmmKey);
++#if AES_COPY_BLOCK == 8
++      xmm4 = _mm_aesdec_si128(xmm4, xmmKey);
++      xmm5 = _mm_aesdec_si128(xmm5, xmmKey);
++      xmm6 = _mm_aesdec_si128(xmm6, xmmKey);
++      xmm7 = _mm_aesdec_si128(xmm7, xmmKey);
++#endif
++    }
++
++    xmm0 = _mm_aesdeclast_si128(xmm0, xmmFirstKey);
++    xmm1 = _mm_aesdeclast_si128(xmm1, xmmFirstKey);
++    xmm2 = _mm_aesdeclast_si128(xmm2, xmmFirstKey);
++    xmm3 = _mm_aesdeclast_si128(xmm3, xmmFirstKey);
++
++    _mm_storeu_si128((__m128i*)output, xmm0);
++    _mm_storeu_si128((__m128i*)output + 1, xmm1);
++    _mm_storeu_si128((__m128i*)output + 2, xmm2);
++    _mm_storeu_si128((__m128i*)output + 3, xmm3);
++
++#if AES_COPY_BLOCK == 8
++    xmm4 = _mm_aesdeclast_si128(xmm4, xmmFirstKey);
++    xmm5 = _mm_aesdeclast_si128(xmm5, xmmFirstKey);
++    xmm6 = _mm_aesdeclast_si128(xmm6, xmmFirstKey);
++    xmm7 = _mm_aesdeclast_si128(xmm7, xmmFirstKey);
++
++    _mm_storeu_si128((__m128i*)output + 4, xmm4);
++    _mm_storeu_si128((__m128i*)output + 5, xmm5);
++    _mm_storeu_si128((__m128i*)output + 6, xmm6);
++    _mm_storeu_si128((__m128i*)output + 7, xmm7);
++#endif
++
++    inputLen -= AES_COPY_BLOCK * sizeof(__m128i);
++    input += AES_COPY_BLOCK * sizeof(__m128i);
++    output += AES_COPY_BLOCK * sizeof(__m128i);
++  }
++
++  if (inputLen) {
++    __m128i xmm1 = _mm_loadu_si128((__m128i*)expandedKey + 1);
++    __m128i xmm2 = _mm_loadu_si128((__m128i*)expandedKey + 2);
++    __m128i xmm3 = _mm_loadu_si128((__m128i*)expandedKey + 3);
++    __m128i xmm4 = _mm_loadu_si128((__m128i*)expandedKey + 4);
++    __m128i xmm5 = _mm_loadu_si128((__m128i*)expandedKey + 5);
++    __m128i xmm6 = _mm_loadu_si128((__m128i*)expandedKey + 6);
++    __m128i xmm7 = _mm_loadu_si128((__m128i*)expandedKey + 7);
++    __m128i xmm8 = _mm_loadu_si128((__m128i*)expandedKey + 8);
++    __m128i xmm9 = _mm_loadu_si128((__m128i*)expandedKey + 9);
++    __m128i xmm10 = _mm_loadu_si128((__m128i*)expandedKey + 10);
++    __m128i xmm11 = _mm_loadu_si128((__m128i*)expandedKey + 11);
++
++    while (inputLen) {
++      __m128i xmmInput = _mm_loadu_si128((__m128i*)input);
++      xmmInput = _mm_xor_si128(xmmInput, xmmLastKey);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm11);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm10);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm9);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm8);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm7);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm6);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm5);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm4);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm3);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm2);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm1);
++      xmmInput = _mm_aesdeclast_si128(xmmInput, xmmFirstKey);
++      _mm_storeu_si128((__m128i*)output, xmmInput);
++
++      inputLen -= sizeof(__m128i);
++      input += sizeof(__m128i);
++      output += sizeof(__m128i);
++    }
++  }
++
++  return SECSuccess;
++}
++
++SECStatus intel_aes_encrypt_cbc_192(AESContext *cx,
++                                    unsigned char *output,
++                                    unsigned int *outputLen,
++                                    unsigned int maxOutputLen,
++                                    const unsigned char *input,
++                                    unsigned int inputLen,
++                                    unsigned int blocksize)
++{
++  unsigned char *iv = cx->iv;
++  PRUint32* expandedKey = cx->expandedKey;
++  __m128i xmmIv = _mm_loadu_si128((__m128i*)iv);
++
++  __m128i xmm0 = _mm_loadu_si128((__m128i*)expandedKey);
++  __m128i xmm1 = _mm_loadu_si128((__m128i*)expandedKey + 1);
++  __m128i xmm2 = _mm_loadu_si128((__m128i*)expandedKey + 2);
++  __m128i xmm3 = _mm_loadu_si128((__m128i*)expandedKey + 3);
++  __m128i xmm4 = _mm_loadu_si128((__m128i*)expandedKey + 4);
++  __m128i xmm5 = _mm_loadu_si128((__m128i*)expandedKey + 5);
++  __m128i xmm6 = _mm_loadu_si128((__m128i*)expandedKey + 6);
++  __m128i xmm7 = _mm_loadu_si128((__m128i*)expandedKey + 7);
++  __m128i xmm8 = _mm_loadu_si128((__m128i*)expandedKey + 8);
++  __m128i xmm9 = _mm_loadu_si128((__m128i*)expandedKey + 9);
++  __m128i xmm10 = _mm_loadu_si128((__m128i*)expandedKey + 10);
++  __m128i xmm11 = _mm_loadu_si128((__m128i*)expandedKey + 11);
++  __m128i xmm12 = _mm_loadu_si128((__m128i*)expandedKey + 12);
++
++  while (inputLen) {
++    __m128i xmmInput = _mm_loadu_si128((__m128i*)input);
++    xmmInput = _mm_xor_si128(xmmInput, xmmIv);
++
++    xmmInput = _mm_xor_si128(xmmInput, xmm0);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm1);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm2);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm3);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm4);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm5);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm6);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm7);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm8);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm9);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm10);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm11);
++    xmmInput = _mm_aesenclast_si128(xmmInput, xmm12);
++
++    _mm_storeu_si128((__m128i*)output, xmmInput);
++    xmmIv = xmmInput;
++
++    inputLen -= sizeof(__m128i);
++    input += sizeof(__m128i);
++    output += sizeof(__m128i);
++  }
++
++  _mm_storeu_si128((__m128i*)iv, xmmIv);
++  return SECSuccess;
++}
++
++SECStatus intel_aes_decrypt_cbc_192(AESContext *cx,
++                                    unsigned char *output,
++                                    unsigned int *outputLen,
++                                    unsigned int maxOutputLen,
++                                    const unsigned char *input,
++                                    unsigned int inputLen,
++                                    unsigned int blocksize)
++{
++  unsigned int i;
++  unsigned char *iv = cx->iv;
++  PRUint32* expandedKey = cx->expandedKey;
++
++  __m128i xmmIv = _mm_loadu_si128((__m128i*)iv);
++  __m128i xmmFirstKey = _mm_loadu_si128((__m128i*)expandedKey);
++  __m128i xmmLastKey = _mm_loadu_si128((__m128i*)expandedKey + 12);
++
++  while (inputLen >= AES_COPY_BLOCK * sizeof(__m128i)) {
++    __m128i xmm0, xmm1, xmm2, xmm3;
++#if AES_COPY_BLOCK == 8
++    __m128i xmm4, xmm5, xmm6, xmm7;
++#endif
++
++    xmm0 = _mm_loadu_si128((__m128i*)input);
++    xmm1 = _mm_loadu_si128((__m128i*)input + 1);
++    xmm2 = _mm_loadu_si128((__m128i*)input + 2);
++    xmm3 = _mm_loadu_si128((__m128i*)input + 3);
++
++    xmm0 = _mm_xor_si128(xmm0, xmmLastKey);
++    xmm1 = _mm_xor_si128(xmm1, xmmLastKey);
++    xmm2 = _mm_xor_si128(xmm2, xmmLastKey);
++    xmm3 = _mm_xor_si128(xmm3, xmmLastKey);
++
++#if AES_COPY_BLOCK == 8
++    xmm4 = _mm_loadu_si128((__m128i*)input + 4);
++    xmm5 = _mm_loadu_si128((__m128i*)input + 5);
++    xmm6 = _mm_loadu_si128((__m128i*)input + 6);
++    xmm7 = _mm_loadu_si128((__m128i*)input + 7);
++
++    xmm4 = _mm_xor_si128(xmm4, xmmLastKey);
++    xmm5 = _mm_xor_si128(xmm5, xmmLastKey);
++    xmm6 = _mm_xor_si128(xmm6, xmmLastKey);
++    xmm7 = _mm_xor_si128(xmm7, xmmLastKey);
++#endif
++
++    for (i = 11; i > 0; i--) {
++      __m128i xmmKey = _mm_loadu_si128((__m128i*)expandedKey + i);
++      xmm0 = _mm_aesdec_si128(xmm0, xmmKey);
++      xmm1 = _mm_aesdec_si128(xmm1, xmmKey);
++      xmm2 = _mm_aesdec_si128(xmm2, xmmKey);
++      xmm3 = _mm_aesdec_si128(xmm3, xmmKey);
++#if AES_COPY_BLOCK == 8
++      xmm4 = _mm_aesdec_si128(xmm4, xmmKey);
++      xmm5 = _mm_aesdec_si128(xmm5, xmmKey);
++      xmm6 = _mm_aesdec_si128(xmm6, xmmKey);
++      xmm7 = _mm_aesdec_si128(xmm7, xmmKey);
++#endif
++    }
++
++    xmm0 = _mm_aesdeclast_si128(xmm0, xmmFirstKey);
++    xmm1 = _mm_aesdeclast_si128(xmm1, xmmFirstKey);
++    xmm2 = _mm_aesdeclast_si128(xmm2, xmmFirstKey);
++    xmm3 = _mm_aesdeclast_si128(xmm3, xmmFirstKey);
++
++    xmm0 = _mm_xor_si128(xmm0, xmmIv);
++    xmm1 = _mm_xor_si128(xmm1, _mm_loadu_si128((__m128i*)input));
++    xmm2 = _mm_xor_si128(xmm2, _mm_loadu_si128((__m128i*)input + 1));
++    xmm3 = _mm_xor_si128(xmm3, _mm_loadu_si128((__m128i*)input + 2));
++
++#if AES_COPY_BLOCK == 8
++    xmm4 = _mm_aesdeclast_si128(xmm4, xmmFirstKey);
++    xmm5 = _mm_aesdeclast_si128(xmm5, xmmFirstKey);
++    xmm6 = _mm_aesdeclast_si128(xmm6, xmmFirstKey);
++    xmm7 = _mm_aesdeclast_si128(xmm7, xmmFirstKey);
++
++    xmm4 = _mm_xor_si128(xmm4, _mm_loadu_si128((__m128i*)input + 3));
++    xmm5 = _mm_xor_si128(xmm5, _mm_loadu_si128((__m128i*)input + 4));
++    xmm6 = _mm_xor_si128(xmm6, _mm_loadu_si128((__m128i*)input + 5));
++    xmm7 = _mm_xor_si128(xmm7, _mm_loadu_si128((__m128i*)input + 6));
++#endif
++
++    /* load next iv because input may be overwritten
++       if input and output is same buffer after storing output */
++    xmmIv = _mm_loadu_si128((__m128i*)input + AES_COPY_BLOCK - 1);
++
++    _mm_storeu_si128((__m128i*)output, xmm0);
++    _mm_storeu_si128((__m128i*)output + 1, xmm1);
++    _mm_storeu_si128((__m128i*)output + 2, xmm2);
++    _mm_storeu_si128((__m128i*)output + 3, xmm3);
++
++#if AES_COPY_BLOCK == 8
++    _mm_storeu_si128((__m128i*)output + 4, xmm4);
++    _mm_storeu_si128((__m128i*)output + 5, xmm5);
++    _mm_storeu_si128((__m128i*)output + 6, xmm6);
++    _mm_storeu_si128((__m128i*)output + 7, xmm7);
++#endif
++
++    inputLen -= AES_COPY_BLOCK * sizeof(__m128i);
++    input += AES_COPY_BLOCK * sizeof(__m128i);
++    output += AES_COPY_BLOCK * sizeof(__m128i);
++  }
++
++  if (inputLen) {
++    __m128i xmm1 = _mm_loadu_si128((__m128i*)expandedKey + 1);
++    __m128i xmm2 = _mm_loadu_si128((__m128i*)expandedKey + 2);
++    __m128i xmm3 = _mm_loadu_si128((__m128i*)expandedKey + 3);
++    __m128i xmm4 = _mm_loadu_si128((__m128i*)expandedKey + 4);
++    __m128i xmm5 = _mm_loadu_si128((__m128i*)expandedKey + 5);
++    __m128i xmm6 = _mm_loadu_si128((__m128i*)expandedKey + 6);
++    __m128i xmm7 = _mm_loadu_si128((__m128i*)expandedKey + 7);
++    __m128i xmm8 = _mm_loadu_si128((__m128i*)expandedKey + 8);
++    __m128i xmm9 = _mm_loadu_si128((__m128i*)expandedKey + 9);
++    __m128i xmm10 = _mm_loadu_si128((__m128i*)expandedKey + 10);
++    __m128i xmm11 = _mm_loadu_si128((__m128i*)expandedKey + 11);
++
++    while (inputLen) {
++      __m128i xmmTmp = _mm_loadu_si128((__m128i*)input);
++      __m128i xmmInput = _mm_xor_si128(xmmTmp, xmmLastKey);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm11);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm10);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm9);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm8);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm7);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm6);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm5);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm4);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm3);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm2);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm1);
++      xmmInput = _mm_aesdeclast_si128(xmmInput, xmmFirstKey);
++      xmmInput = _mm_xor_si128(xmmInput, xmmIv);
++      _mm_storeu_si128((__m128i*)output, xmmInput);
++      xmmIv = xmmTmp;
++      input += sizeof(__m128i);
++      output += sizeof(__m128i);
++      inputLen -= sizeof(__m128i);
++    }
++  }
++
++  _mm_storeu_si128((__m128i*)iv, xmmIv);
++  return SECSuccess;
++}
++
++#define key_expansion256(xmmKeyLo, xmmKeyHi, round) \
++  { \
++    __m128i rounded = _mm_aeskeygenassist_si128(xmmKeyHi, round); \
++    __m128 xmm6 = _mm_shuffle_ps(_mm_castsi128_ps(_mm_setzero_si128()), \
++                                 _mm_castsi128_ps(xmmKeyLo), 0x10); \
++    xmmKeyLo = _mm_xor_si128(xmmKeyLo, _mm_castps_si128(xmm6)); \
++    xmm6 = _mm_shuffle_ps(xmm6, _mm_castsi128_ps(xmmKeyLo), 0x8c); \
++    xmmKeyLo = _mm_xor_si128(xmmKeyLo, _mm_shuffle_epi32(rounded, 0xff)); \
++    xmmKeyLo = _mm_xor_si128(xmmKeyLo, _mm_castps_si128(xmm6)); \
++    \
++    rounded = _mm_aeskeygenassist_si128(xmmKeyLo, 0); \
++    xmm6 = _mm_shuffle_ps(xmm6, _mm_castsi128_ps(xmmKeyHi), 0x10); \
++    xmmKeyHi = _mm_xor_si128(xmmKeyHi, _mm_castps_si128(xmm6)); \
++    xmm6 = _mm_shuffle_ps(xmm6, _mm_castsi128_ps(xmmKeyHi), 0x8c); \
++    xmmKeyHi = _mm_xor_si128(xmmKeyHi, _mm_shuffle_epi32(rounded, 0xaa)); \
++    xmmKeyHi = _mm_xor_si128(xmmKeyHi, _mm_castps_si128(xmm6)); \
++  }
++
++void intel_aes_encrypt_init_256(const unsigned char *key, PRUint32 *expanded)
++{
++   __m128i xmm2;
++   __m128 xmm6;
++
++  __m128i xmm1 = _mm_loadu_si128((__m128i*)key);
++  __m128i xmm3 = _mm_loadu_si128((__m128i*)key + 1);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storeu_si128((__m128i*)expanded + 1, xmm3);
++  ((__m128i*)expanded) += 2;
++
++  key_expansion256(xmm1, xmm3, 0x01);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storeu_si128((__m128i*)expanded + 1, xmm3);
++  ((__m128i*)expanded) += 2;
++
++  key_expansion256(xmm1, xmm3, 0x02);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storeu_si128((__m128i*)expanded + 1, xmm3);
++  ((__m128i*)expanded) += 2;
++
++  key_expansion256(xmm1, xmm3, 0x04);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storeu_si128((__m128i*)expanded + 1, xmm3);
++  ((__m128i*)expanded) += 2;
++
++  key_expansion256(xmm1, xmm3, 0x08);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storeu_si128((__m128i*)expanded + 1, xmm3);
++  ((__m128i*)expanded) += 2;
++
++  key_expansion256(xmm1, xmm3, 0x10);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storeu_si128((__m128i*)expanded + 1, xmm3);
++  ((__m128i*)expanded) += 2;
++
++  key_expansion256(xmm1, xmm3, 0x20);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storeu_si128((__m128i*)expanded + 1, xmm3);
++  ((__m128i*)expanded) += 2;
++
++  xmm2 = _mm_aeskeygenassist_si128(xmm3, 0x40);
++  xmm2 = _mm_shuffle_epi32(xmm2, 0xff);
++  xmm6 = _mm_shuffle_ps(_mm_castsi128_ps(_mm_setzero_si128()),
++                        _mm_castsi128_ps(xmm1), 0x10);
++  xmm1 = _mm_xor_si128(xmm1, _mm_castps_si128(xmm6));
++  xmm6 = _mm_shuffle_ps(xmm6, _mm_castsi128_ps(xmm1), 0x8c);
++  xmm1 = _mm_xor_si128(xmm1, xmm2);
++  xmm1 = _mm_xor_si128(xmm1, _mm_castps_si128(xmm6));
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++}
++
++void intel_aes_decrypt_init_256(const unsigned char *key, PRUint32 *expanded)
++{
++  __m128i xmm2;
++  __m128 xmm6;
++
++  __m128i xmm1 = _mm_loadu_si128((__m128i*)key);
++  __m128i xmm3 = _mm_loadu_si128((__m128i*)key + 1);
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++  _mm_storeu_si128((__m128i*)expanded + 1, _mm_aesimc_si128(xmm3));
++  ((__m128i*)expanded) += 2;
++
++  key_expansion256(xmm1, xmm3, 0x01);
++  _mm_storeu_si128((__m128i*)expanded, _mm_aesimc_si128(xmm1));
++  _mm_storeu_si128((__m128i*)expanded + 1, _mm_aesimc_si128(xmm3));
++  ((__m128i*)expanded) += 2;
++
++  key_expansion256(xmm1, xmm3, 0x02);
++  _mm_storeu_si128((__m128i*)expanded, _mm_aesimc_si128(xmm1));
++  _mm_storeu_si128((__m128i*)expanded + 1, _mm_aesimc_si128(xmm3));
++  ((__m128i*)expanded) += 2;
++
++  key_expansion256(xmm1, xmm3, 0x04);
++  _mm_storeu_si128((__m128i*)expanded, _mm_aesimc_si128(xmm1));
++  _mm_storeu_si128((__m128i*)expanded + 1, _mm_aesimc_si128(xmm3));
++  ((__m128i*)expanded) += 2;
++
++  key_expansion256(xmm1, xmm3, 0x08);
++  _mm_storeu_si128((__m128i*)expanded, _mm_aesimc_si128(xmm1));
++  _mm_storeu_si128((__m128i*)expanded + 1, _mm_aesimc_si128(xmm3));
++  ((__m128i*)expanded) += 2;
++
++  key_expansion256(xmm1, xmm3, 0x10);
++  _mm_storeu_si128((__m128i*)expanded, _mm_aesimc_si128(xmm1));
++  _mm_storeu_si128((__m128i*)expanded + 1, _mm_aesimc_si128(xmm3));
++  ((__m128i*)expanded) += 2;
++
++  key_expansion256(xmm1, xmm3, 0x20);
++  _mm_storeu_si128((__m128i*)expanded, _mm_aesimc_si128(xmm1));
++  _mm_storeu_si128((__m128i*)expanded + 1, _mm_aesimc_si128(xmm3));
++  ((__m128i*)expanded) += 2;
++
++  xmm2 = _mm_aeskeygenassist_si128(xmm3, 0x40);
++
++  xmm2 = _mm_shuffle_epi32(xmm2, 0xff);
++  xmm6 = _mm_shuffle_ps(_mm_castsi128_ps(_mm_setzero_si128()),
++                        _mm_castsi128_ps(xmm1), 0x10);
++  xmm1 = _mm_xor_si128(xmm1, _mm_castps_si128(xmm6)); \
++  xmm6 = _mm_shuffle_ps(xmm6, _mm_castsi128_ps(xmm1), 0x8c);
++  xmm1 = _mm_xor_si128(xmm1, xmm2);
++  xmm1 = _mm_xor_si128(xmm1, _mm_castps_si128(xmm6));
++  _mm_storeu_si128((__m128i*)expanded, xmm1);
++}
++
++SECStatus intel_aes_encrypt_ecb_256(AESContext *cx,
++                                    unsigned char *output,
++                                    unsigned int *outputLen,
++                                    unsigned int maxOutputLen,
++                                    const unsigned char *input,
++                                    unsigned int inputLen,
++                                    unsigned int blocksize)
++{
++  unsigned int i;
++  PRUint32* expandedKey = cx->expandedKey;
++  const __m128i xmmFirstKey = _mm_loadu_si128((__m128i*)expandedKey);
++  const __m128i xmmLastKey = _mm_loadu_si128((__m128i*)expandedKey + 14);
++
++  while (inputLen >= AES_COPY_BLOCK * sizeof(__m128i)) {
++    __m128i xmm0, xmm1, xmm2, xmm3;
++#if AES_COPY_BLOCK == 8
++    __m128i xmm4, xmm5, xmm6, xmm7;
++#endif
++
++    xmm0 = _mm_loadu_si128((__m128i*)input);
++    xmm1 = _mm_loadu_si128((__m128i*)input + 1);
++    xmm2 = _mm_loadu_si128((__m128i*)input + 2);
++    xmm3 = _mm_loadu_si128((__m128i*)input + 3);
++
++    xmm0 = _mm_xor_si128(xmm0, xmmFirstKey);
++    xmm1 = _mm_xor_si128(xmm1, xmmFirstKey);
++    xmm2 = _mm_xor_si128(xmm2, xmmFirstKey);
++    xmm3 = _mm_xor_si128(xmm3, xmmFirstKey);
++
++#if AES_COPY_BLOCK == 8
++    xmm4 = _mm_loadu_si128((__m128i*)input + 4);
++    xmm5 = _mm_loadu_si128((__m128i*)input + 5);
++    xmm6 = _mm_loadu_si128((__m128i*)input + 6);
++    xmm7 = _mm_loadu_si128((__m128i*)input + 7);
++
++    xmm4 = _mm_xor_si128(xmm4, xmmFirstKey);
++    xmm5 = _mm_xor_si128(xmm5, xmmFirstKey);
++    xmm6 = _mm_xor_si128(xmm6, xmmFirstKey);
++    xmm7 = _mm_xor_si128(xmm7, xmmFirstKey);
++#endif
++
++    for (i = 1; i < 14; i++) {
++      __m128i xmmKey = _mm_loadu_si128((__m128i*)expandedKey + i);
++      xmm0 = _mm_aesenc_si128(xmm0, xmmKey);
++      xmm1 = _mm_aesenc_si128(xmm1, xmmKey);
++      xmm2 = _mm_aesenc_si128(xmm2, xmmKey);
++      xmm3 = _mm_aesenc_si128(xmm3, xmmKey);
++#if AES_COPY_BLOCK == 8
++      xmm4 = _mm_aesenc_si128(xmm4, xmmKey);
++      xmm5 = _mm_aesenc_si128(xmm5, xmmKey);
++      xmm6 = _mm_aesenc_si128(xmm6, xmmKey);
++      xmm7 = _mm_aesenc_si128(xmm7, xmmKey);
++#endif
++    }
++
++    xmm0 = _mm_aesenclast_si128(xmm0, xmmLastKey);
++    xmm1 = _mm_aesenclast_si128(xmm1, xmmLastKey);
++    xmm2 = _mm_aesenclast_si128(xmm2, xmmLastKey);
++    xmm3 = _mm_aesenclast_si128(xmm3, xmmLastKey);
++
++    _mm_storeu_si128((__m128i*)output, xmm0);
++    _mm_storeu_si128((__m128i*)output + 1, xmm1);
++    _mm_storeu_si128((__m128i*)output + 2, xmm2);
++    _mm_storeu_si128((__m128i*)output + 3, xmm3);
++
++#if AES_COPY_BLOCK == 8
++    xmm4 = _mm_aesenclast_si128(xmm4, xmmLastKey);
++    xmm5 = _mm_aesenclast_si128(xmm5, xmmLastKey);
++    xmm6 = _mm_aesenclast_si128(xmm6, xmmLastKey);
++    xmm7 = _mm_aesenclast_si128(xmm7, xmmLastKey);
++
++    _mm_storeu_si128((__m128i*)output + 4, xmm4);
++    _mm_storeu_si128((__m128i*)output + 5, xmm5);
++    _mm_storeu_si128((__m128i*)output + 6, xmm6);
++    _mm_storeu_si128((__m128i*)output + 7, xmm7);
++#endif
++
++    inputLen -= AES_COPY_BLOCK * sizeof(__m128i);
++    input += AES_COPY_BLOCK * sizeof(__m128i);
++    output += AES_COPY_BLOCK * sizeof(__m128i);
++  }
++
++  if (inputLen) {
++    __m128i xmm1 = _mm_loadu_si128((__m128i*)expandedKey + 1);
++    __m128i xmm2 = _mm_loadu_si128((__m128i*)expandedKey + 2);
++    __m128i xmm3 = _mm_loadu_si128((__m128i*)expandedKey + 3);
++    __m128i xmm4 = _mm_loadu_si128((__m128i*)expandedKey + 4);
++    __m128i xmm5 = _mm_loadu_si128((__m128i*)expandedKey + 5);
++    __m128i xmm6 = _mm_loadu_si128((__m128i*)expandedKey + 6);
++    __m128i xmm7 = _mm_loadu_si128((__m128i*)expandedKey + 7);
++    __m128i xmm8 = _mm_loadu_si128((__m128i*)expandedKey + 8);
++    __m128i xmm9 = _mm_loadu_si128((__m128i*)expandedKey + 9);
++    __m128i xmm10 = _mm_loadu_si128((__m128i*)expandedKey + 10);
++    __m128i xmm11 = _mm_loadu_si128((__m128i*)expandedKey + 11);
++    __m128i xmm12 = _mm_loadu_si128((__m128i*)expandedKey + 12);
++    __m128i xmm13 = _mm_loadu_si128((__m128i*)expandedKey + 13);
++
++    while (inputLen) {
++      __m128i xmmInput = _mm_loadu_si128((__m128i*)input);
++      xmmInput = _mm_xor_si128(xmmInput, xmmFirstKey);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm1);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm2);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm3);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm4);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm5);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm6);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm7);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm8);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm9);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm10);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm11);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm12);
++      xmmInput = _mm_aesenc_si128(xmmInput, xmm13);
++      xmmInput = _mm_aesenclast_si128(xmmInput, xmmLastKey);
++      _mm_storeu_si128((__m128i*)output, xmmInput);
++
++      inputLen -= sizeof(__m128i);
++      input += sizeof(__m128i);
++      output += sizeof(__m128i);
++    }
++  }
++
++  return SECSuccess;
++}
++
++SECStatus intel_aes_decrypt_ecb_256(AESContext *cx,
++                                    unsigned char *output,
++                                    unsigned int *outputLen,
++                                    unsigned int maxOutputLen,
++                                    const unsigned char *input,
++                                    unsigned int inputLen,
++                                    unsigned int blocksize)
++{
++  unsigned int i;
++  PRUint32* expandedKey = cx->expandedKey;
++  const __m128i xmmFirstKey = _mm_loadu_si128((__m128i*)expandedKey);
++  const __m128i xmmLastKey = _mm_loadu_si128((__m128i*)expandedKey + 14);
++
++  while (inputLen >= AES_COPY_BLOCK * sizeof(__m128i)) {
++    __m128i xmm0, xmm1, xmm2, xmm3;
++#if AES_COPY_BLOCK == 8
++    __m128i xmm4, xmm5, xmm6, xmm7;
++#endif
++
++    xmm0 = _mm_loadu_si128((__m128i*)input);
++    xmm1 = _mm_loadu_si128((__m128i*)input + 1);
++    xmm2 = _mm_loadu_si128((__m128i*)input + 2);
++    xmm3 = _mm_loadu_si128((__m128i*)input + 3);
++
++    xmm0 = _mm_xor_si128(xmm0, xmmLastKey);
++    xmm1 = _mm_xor_si128(xmm1, xmmLastKey);
++    xmm2 = _mm_xor_si128(xmm2, xmmLastKey);
++    xmm3 = _mm_xor_si128(xmm3, xmmLastKey);
++
++#if AES_COPY_BLOCK == 8
++    xmm4 = _mm_loadu_si128((__m128i*)input + 4);
++    xmm5 = _mm_loadu_si128((__m128i*)input + 5);
++    xmm6 = _mm_loadu_si128((__m128i*)input + 6);
++    xmm7 = _mm_loadu_si128((__m128i*)input + 7);
++
++    xmm4 = _mm_xor_si128(xmm4, xmmLastKey);
++    xmm5 = _mm_xor_si128(xmm5, xmmLastKey);
++    xmm6 = _mm_xor_si128(xmm6, xmmLastKey);
++    xmm7 = _mm_xor_si128(xmm7, xmmLastKey);
++#endif
++
++    for (i = 13; i > 0; i--) {
++      __m128i xmmKey = _mm_loadu_si128((__m128i*)expandedKey + i);
++      xmm0 = _mm_aesdec_si128(xmm0, xmmKey);
++      xmm1 = _mm_aesdec_si128(xmm1, xmmKey);
++      xmm2 = _mm_aesdec_si128(xmm2, xmmKey);
++      xmm3 = _mm_aesdec_si128(xmm3, xmmKey);
++#if AES_COPY_BLOCK == 8
++      xmm4 = _mm_aesdec_si128(xmm4, xmmKey);
++      xmm5 = _mm_aesdec_si128(xmm5, xmmKey);
++      xmm6 = _mm_aesdec_si128(xmm6, xmmKey);
++      xmm7 = _mm_aesdec_si128(xmm7, xmmKey);
++#endif
++    }
++
++    xmm0 = _mm_aesdeclast_si128(xmm0, xmmFirstKey);
++    xmm1 = _mm_aesdeclast_si128(xmm1, xmmFirstKey);
++    xmm2 = _mm_aesdeclast_si128(xmm2, xmmFirstKey);
++    xmm3 = _mm_aesdeclast_si128(xmm3, xmmFirstKey);
++
++#if AES_COPY_BLOCK == 8
++    xmm4 = _mm_aesdeclast_si128(xmm4, xmmFirstKey);
++    xmm5 = _mm_aesdeclast_si128(xmm5, xmmFirstKey);
++    xmm6 = _mm_aesdeclast_si128(xmm6, xmmFirstKey);
++    xmm7 = _mm_aesdeclast_si128(xmm7, xmmFirstKey);
++#endif
++
++    _mm_storeu_si128((__m128i*)output, xmm0);
++    _mm_storeu_si128((__m128i*)output + 1, xmm1);
++    _mm_storeu_si128((__m128i*)output + 2, xmm2);
++    _mm_storeu_si128((__m128i*)output + 3, xmm3);
++
++#if AES_COPY_BLOCK == 8
++    _mm_storeu_si128((__m128i*)output + 4, xmm4);
++    _mm_storeu_si128((__m128i*)output + 5, xmm5);
++    _mm_storeu_si128((__m128i*)output + 6, xmm6);
++    _mm_storeu_si128((__m128i*)output + 7, xmm7);
++#endif
++
++    inputLen -= AES_COPY_BLOCK * sizeof(__m128i);
++    input += AES_COPY_BLOCK * sizeof(__m128i);
++    output += AES_COPY_BLOCK * sizeof(__m128i);
++  }
++
++  if (inputLen) {
++    __m128i xmm1 = _mm_loadu_si128((__m128i*)expandedKey + 1);
++    __m128i xmm2 = _mm_loadu_si128((__m128i*)expandedKey + 2);
++    __m128i xmm3 = _mm_loadu_si128((__m128i*)expandedKey + 3);
++    __m128i xmm4 = _mm_loadu_si128((__m128i*)expandedKey + 4);
++    __m128i xmm5 = _mm_loadu_si128((__m128i*)expandedKey + 5);
++    __m128i xmm6 = _mm_loadu_si128((__m128i*)expandedKey + 6);
++    __m128i xmm7 = _mm_loadu_si128((__m128i*)expandedKey + 7);
++    __m128i xmm8 = _mm_loadu_si128((__m128i*)expandedKey + 8);
++    __m128i xmm9 = _mm_loadu_si128((__m128i*)expandedKey + 9);
++    __m128i xmm10 = _mm_loadu_si128((__m128i*)expandedKey + 10);
++    __m128i xmm11 = _mm_loadu_si128((__m128i*)expandedKey + 11);
++    __m128i xmm12 = _mm_loadu_si128((__m128i*)expandedKey + 12);
++    __m128i xmm13 = _mm_loadu_si128((__m128i*)expandedKey + 13);
++
++    while (inputLen) {
++      __m128i xmmInput = _mm_loadu_si128((__m128i*)input);
++      xmmInput = _mm_xor_si128(xmmInput, xmmLastKey);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm13);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm12);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm11);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm10);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm9);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm8);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm7);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm6);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm5);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm4);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm3);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm2);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm1);
++      xmmInput = _mm_aesdeclast_si128(xmmInput, xmmFirstKey);
++      _mm_storeu_si128((__m128i*)output, xmmInput);
++
++      inputLen -= sizeof(__m128i);
++      input += sizeof(__m128i);
++      output += sizeof(__m128i);
++    }
++  }
++
++  return SECSuccess;
++}
++
++SECStatus intel_aes_encrypt_cbc_256(AESContext *cx,
++                                    unsigned char *output,
++                                    unsigned int *outputLen,
++                                    unsigned int maxOutputLen,
++                                    const unsigned char *input,
++                                    unsigned int inputLen,
++                                    unsigned int blocksize)
++{
++  unsigned char *iv = cx->iv;
++  PRUint32* expandedKey = cx->expandedKey;
++
++  __m128i xmmIv = _mm_loadu_si128((__m128i*)iv);
++
++  __m128i xmm0 = _mm_loadu_si128((__m128i*)expandedKey);
++  __m128i xmm1 = _mm_loadu_si128((__m128i*)expandedKey + 1);
++  __m128i xmm2 = _mm_loadu_si128((__m128i*)expandedKey + 2);
++  __m128i xmm3 = _mm_loadu_si128((__m128i*)expandedKey + 3);
++  __m128i xmm4 = _mm_loadu_si128((__m128i*)expandedKey + 4);
++  __m128i xmm5 = _mm_loadu_si128((__m128i*)expandedKey + 5);
++  __m128i xmm6 = _mm_loadu_si128((__m128i*)expandedKey + 6);
++  __m128i xmm7 = _mm_loadu_si128((__m128i*)expandedKey + 7);
++  __m128i xmm8 = _mm_loadu_si128((__m128i*)expandedKey + 8);
++  __m128i xmm9 = _mm_loadu_si128((__m128i*)expandedKey + 9);
++  __m128i xmm10 = _mm_loadu_si128((__m128i*)expandedKey + 10);
++  __m128i xmm11 = _mm_loadu_si128((__m128i*)expandedKey + 11);
++  __m128i xmm12 = _mm_loadu_si128((__m128i*)expandedKey + 12);
++  __m128i xmm13 = _mm_loadu_si128((__m128i*)expandedKey + 13);
++  __m128i xmm14 = _mm_loadu_si128((__m128i*)expandedKey + 14);
++
++  while (inputLen) {
++    __m128i xmmInput = _mm_loadu_si128((__m128i*)input);
++
++    xmmInput = _mm_xor_si128(xmmInput, xmmIv);
++    xmmInput = _mm_xor_si128(xmmInput, xmm0);
++
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm1);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm2);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm3);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm4);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm5);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm6);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm7);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm8);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm9);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm10);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm11);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm12);
++    xmmInput = _mm_aesenc_si128(xmmInput, xmm13);
++    xmmInput = _mm_aesenclast_si128(xmmInput, xmm14);
++
++    _mm_storeu_si128((__m128i*)output, xmmInput);
++    xmmIv = xmmInput;
++
++    inputLen -= sizeof(__m128i);
++    input += sizeof(__m128i);
++    output += sizeof(__m128i);
++  }
++
++  _mm_storeu_si128((__m128i*)iv, xmmIv);
++  return SECSuccess;
++}
++
++SECStatus intel_aes_decrypt_cbc_256(AESContext *cx,
++                                    unsigned char *output,
++                                    unsigned int *outputLen,
++                                    unsigned int maxOutputLen,
++                                    const unsigned char *input,
++                                    unsigned int inputLen,
++                                    unsigned int blocksize)
++{
++  unsigned int i;
++  unsigned char *iv = cx->iv;
++  PRUint32* expandedKey = cx->expandedKey;
++
++  __m128i xmmIv = _mm_loadu_si128((__m128i*)iv);
++  __m128i xmmFirstKey = _mm_loadu_si128((__m128i*)expandedKey);
++  __m128i xmmLastKey = _mm_loadu_si128((__m128i*)expandedKey + 14);
++
++  while (inputLen >= AES_COPY_BLOCK * sizeof(__m128i)) {
++    __m128i xmm0, xmm1, xmm2, xmm3;
++#if AES_COPY_BLOCK == 8
++    __m128i xmm4, xmm5, xmm6, xmm7;
++#endif
++
++    xmm0 = _mm_loadu_si128((__m128i*)input);
++    xmm1 = _mm_loadu_si128((__m128i*)input + 1);
++    xmm2 = _mm_loadu_si128((__m128i*)input + 2);
++    xmm3 = _mm_loadu_si128((__m128i*)input + 3);
++
++    xmm0 = _mm_xor_si128(xmm0, xmmLastKey);
++    xmm1 = _mm_xor_si128(xmm1, xmmLastKey);
++    xmm2 = _mm_xor_si128(xmm2, xmmLastKey);
++    xmm3 = _mm_xor_si128(xmm3, xmmLastKey);
++
++#if AES_COPY_BLOCK == 8
++    xmm4 = _mm_loadu_si128((__m128i*)input + 4);
++    xmm5 = _mm_loadu_si128((__m128i*)input + 5);
++    xmm6 = _mm_loadu_si128((__m128i*)input + 6);
++    xmm7 = _mm_loadu_si128((__m128i*)input + 7);
++
++    xmm4 = _mm_xor_si128(xmm4, xmmLastKey);
++    xmm5 = _mm_xor_si128(xmm5, xmmLastKey);
++    xmm6 = _mm_xor_si128(xmm6, xmmLastKey);
++    xmm7 = _mm_xor_si128(xmm7, xmmLastKey);
++#endif
++
++    for (i = 13; i > 0; i--) {
++      __m128i xmmKey = _mm_loadu_si128((__m128i*)expandedKey + i);
++      xmm0 = _mm_aesdec_si128(xmm0, xmmKey);
++      xmm1 = _mm_aesdec_si128(xmm1, xmmKey);
++      xmm2 = _mm_aesdec_si128(xmm2, xmmKey);
++      xmm3 = _mm_aesdec_si128(xmm3, xmmKey);
++#if AES_COPY_BLOCK == 8
++      xmm4 = _mm_aesdec_si128(xmm4, xmmKey);
++      xmm5 = _mm_aesdec_si128(xmm5, xmmKey);
++      xmm6 = _mm_aesdec_si128(xmm6, xmmKey);
++      xmm7 = _mm_aesdec_si128(xmm7, xmmKey);
++#endif
++    }
++
++    xmm0 = _mm_aesdeclast_si128(xmm0, xmmFirstKey);
++    xmm1 = _mm_aesdeclast_si128(xmm1, xmmFirstKey);
++    xmm2 = _mm_aesdeclast_si128(xmm2, xmmFirstKey);
++    xmm3 = _mm_aesdeclast_si128(xmm3, xmmFirstKey);
++
++    xmm0 = _mm_xor_si128(xmm0, xmmIv);
++    xmm1 = _mm_xor_si128(xmm1, _mm_loadu_si128((__m128i*)input));
++    xmm2 = _mm_xor_si128(xmm2, _mm_loadu_si128((__m128i*)input + 1));
++    xmm3 = _mm_xor_si128(xmm3, _mm_loadu_si128((__m128i*)input + 2));
++
++#if AES_COPY_BLOCK == 8
++    xmm4 = _mm_aesdeclast_si128(xmm4, xmmFirstKey);
++    xmm5 = _mm_aesdeclast_si128(xmm5, xmmFirstKey);
++    xmm6 = _mm_aesdeclast_si128(xmm6, xmmFirstKey);
++    xmm7 = _mm_aesdeclast_si128(xmm7, xmmFirstKey);
++
++    xmm4 = _mm_xor_si128(xmm4, _mm_loadu_si128((__m128i*)input + 3));
++    xmm5 = _mm_xor_si128(xmm5, _mm_loadu_si128((__m128i*)input + 4));
++    xmm6 = _mm_xor_si128(xmm6, _mm_loadu_si128((__m128i*)input + 5));
++    xmm7 = _mm_xor_si128(xmm7, _mm_loadu_si128((__m128i*)input + 6));
++#endif
++
++    /* load next iv because input may be overwritten
++       if input and output is same buffer after storing output */
++    xmmIv = _mm_loadu_si128((__m128i*)input + AES_COPY_BLOCK - 1);
++
++    _mm_storeu_si128((__m128i*)output, xmm0);
++    _mm_storeu_si128((__m128i*)output + 1, xmm1);
++    _mm_storeu_si128((__m128i*)output + 2, xmm2);
++    _mm_storeu_si128((__m128i*)output + 3, xmm3);
++
++#if AES_COPY_BLOCK == 8
++    _mm_storeu_si128((__m128i*)output + 4, xmm4);
++    _mm_storeu_si128((__m128i*)output + 5, xmm5);
++    _mm_storeu_si128((__m128i*)output + 6, xmm6);
++    _mm_storeu_si128((__m128i*)output + 7, xmm7);
++#endif
++
++    inputLen -= AES_COPY_BLOCK * sizeof(__m128i);
++    input += AES_COPY_BLOCK * sizeof(__m128i);
++    output += AES_COPY_BLOCK * sizeof(__m128i);
++  }
++
++  if (inputLen) {
++    __m128i xmm1 = _mm_loadu_si128((__m128i*)expandedKey + 1);
++    __m128i xmm2 = _mm_loadu_si128((__m128i*)expandedKey + 2);
++    __m128i xmm3 = _mm_loadu_si128((__m128i*)expandedKey + 3);
++    __m128i xmm4 = _mm_loadu_si128((__m128i*)expandedKey + 4);
++    __m128i xmm5 = _mm_loadu_si128((__m128i*)expandedKey + 5);
++    __m128i xmm6 = _mm_loadu_si128((__m128i*)expandedKey + 6);
++    __m128i xmm7 = _mm_loadu_si128((__m128i*)expandedKey + 7);
++    __m128i xmm8 = _mm_loadu_si128((__m128i*)expandedKey + 8);
++    __m128i xmm9 = _mm_loadu_si128((__m128i*)expandedKey + 9);
++    __m128i xmm10 = _mm_loadu_si128((__m128i*)expandedKey + 10);
++    __m128i xmm11 = _mm_loadu_si128((__m128i*)expandedKey + 11);
++    __m128i xmm12 = _mm_loadu_si128((__m128i*)expandedKey + 12);
++    __m128i xmm13 = _mm_loadu_si128((__m128i*)expandedKey + 13);
++
++    while (inputLen) {
++      __m128i xmmTmp = _mm_loadu_si128((__m128i*)input);
++      __m128i xmmInput = _mm_xor_si128(xmmTmp, xmmLastKey);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm13);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm12);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm11);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm10);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm9);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm8);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm7);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm6);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm5);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm4);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm3);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm2);
++      xmmInput = _mm_aesdec_si128(xmmInput, xmm1);
++      xmmInput = _mm_aesdeclast_si128(xmmInput, xmmFirstKey);
++      xmmInput = _mm_xor_si128(xmmInput, xmmIv);
++
++      _mm_storeu_si128((__m128i*)output, xmmInput);
++      xmmIv = xmmTmp;
++
++      input += sizeof(__m128i);
++      output += sizeof(__m128i);
++      inputLen -= sizeof(__m128i);
++    }
++  }
++
++  _mm_storeu_si128((__m128i*)iv, xmmIv);
++  return SECSuccess;
++}
++#endif
++
++#endif /* USE_HW_AES */
+diff -r 7712be144d91 security/nss/lib/freebl/intel-gcm-wrap.c
+--- a/security/nss/lib/freebl/intel-gcm-wrap.c	Mon Apr 01 12:21:15 2013 -0700
++++ b/security/nss/lib/freebl/intel-gcm-wrap.c	Tue Apr 02 10:11:05 2013 +0900
+@@ -29,6 +29,10 @@
+ #elif defined(__GNUC__)
+ #include <emmintrin.h>
+ #include <tmmintrin.h>
++/* AES Intrinics is supproted from VS2008 or later */
++#elif defined(_MSC_VER) && _MSC_VER >= 1500 && \
++      (defined(_M_IX86) || defined(_M_X64))
++#include <wmmintrin.h>
+ #endif
+ 
+ 
+diff -r 7712be144d91 security/nss/lib/freebl/rijndael.c
+--- a/security/nss/lib/freebl/rijndael.c	Mon Apr 01 12:21:15 2013 -0700
++++ b/security/nss/lib/freebl/rijndael.c	Tue Apr 02 10:11:05 2013 +0900
+@@ -19,6 +19,11 @@
+ #include "ctr.h"
+ #include "gcm.h"
+ 
++#if defined(_MSC_VER) && _MSC_VER <= 1400
++/* VS2005 or early doesn't support Intel AES-NI */
++#undef USE_HW_AES
++#endif
++
+ #if USE_HW_AES
+ #include "intel-gcm.h"
+ #include "intel-aes.h"
+@@ -1130,7 +1135,7 @@
+ 	cx->isBlock = PR_FALSE;
+ 	break;
+     case NSS_AES_GCM:
+-#if USE_HW_AES
++#if USE_HW_AES && !defined(WIN32)
+ 	if(use_hw_gcm) {
+         	cx->worker_cx = intel_AES_GCM_CreateContext(cx, cx->worker, iv, blocksize);
+ 		cx->worker = (freeblCipherFunc)
