@@ -66,7 +66,7 @@ int read_appint(LPCWSTR cat,LPCWSTR name)
 	return res;
 }
 
-BOOL for_eachSection(LPCWSTR cat,						/* ini 区段 */
+BOOL foreach_section(LPCWSTR cat,						/* ini 区段 */
 					 wchar_t (*lpdata)[VALUE_LEN+1],	/* 二维数组首地址,保存多个段值 */
 					 int line							/* 二维数组行数 */
 					 )
@@ -272,7 +272,7 @@ BOOL WINAPI IsGUI(LPCWSTR lpFileName)
 
 BOOL WINAPI GetCurrentProcessName(LPWSTR lpstrName, DWORD wlen)
 {
-	int i=0;
+	size_t i = 0;
 	WCHAR lpFullPath[MAX_PATH+1]={0};
 	if ( GetModuleFileNameW(NULL,lpFullPath,MAX_PATH)>0 )
 	{
@@ -308,7 +308,9 @@ BOOL is_browser(void)
 {
 	WCHAR	process_name[VALUE_LEN+1];
 	GetCurrentProcessName(process_name,VALUE_LEN);
-	return ( !(_wcsicmp(process_name, L"firefox.exe") ) );
+	return ( !(_wcsicmp(process_name, L"Iceweasel.exe") &&
+				_wcsicmp(process_name, L"firefox.exe")	&&
+				_wcsicmp(process_name, L"lawlietfox.exe") ) );
 }
 
 DWORD WINAPI GetOsVersion(void)

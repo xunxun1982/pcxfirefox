@@ -1,24 +1,10 @@
-CC       = gcc -c 
-CFLAGS   = -O3
-LD       = gcc -o
+CC       = $(CROSS_COMPILING)gcc -c 
+CFLAGS   = -O2
+LD       = $(CROSS_COMPILING)gcc -o
 BITS	 := 32
-CRT_LINK := 1600
-MSCRT    =
+DFLAGS :=
+MSCRT    := -lmsvcrt
 DLL_MAIN_STDCALL_NAME =
-
-ifeq ($(CRT_LINK),1400)
-    MSCRT = -lmsvcr80
-else ifeq ($(CRT_LINK),1500)
-    MSCRT = -lmsvcr90
-else ifeq ($(CRT_LINK),1600)
-    MSCRT = -lmsvcr100
-else ifeq ($(CRT_LINK),1700)
-    MSCRT = -lmsvcr110
-else ifeq ($(CRT_LINK),1800)
-    MSCRT = -lmsvcr120
-else
-    MSCRT = -lmsvcrt
-endif
 
 ifeq ($(BITS),64)
 DLL_MAIN_STDCALL_NAME = DllMain
@@ -26,11 +12,12 @@ else
 DLL_MAIN_STDCALL_NAME = _DllMain@12
 endif
 
-LDFLAGS  = -nodefaultlibs -Wl,-static -lmingw32 -lmingwex -lkernel32 -luser32 -Wl,-s
-CFLAGS   += -DCRT_LINK=$(CRT_LINK) -Wall -Wno-unused -Wno-format -msse2 \
+LDFLAGS  = -nodefaultlibs -Wl,-static -lmingw32 -lmingwex -lgcc -lkernel32 -luser32 -Wl,-s
+CFLAGS   += $(DFLAGS)  -Wall -Wno-unused -Wno-format -Wno-int-to-pointer-cast -msse2 \
 	    -fomit-frame-pointer -finline-functions -fno-stack-protector
-LDLIBS   = -lshlwapi -lshell32 -lgdi32 -lgcc $(MSCRT)
+LDLIBS   = -lshlwapi -lshell32 -lgdi32 $(MSCRT)
 MD       = mkdir -p
+CP        = cp
 SRC      = src
 SUB_DIR  = $(SRC)/mhook-lib
 SUBMK    = $(MAKE) -C $(SUB_DIR)
@@ -42,10 +29,10 @@ OBJECTS  = $(DEP)/portable.o $(DEP)/inipara.o $(DEP)/ice_error.o \
 DISTDIR  = Release
 OUT1     = $(DISTDIR)/libmhook$(BITS).a
 OUT2     = $(DISTDIR)/tmemutil$(BITS).dll
-RC       = windres
+RC       = $(CROSS_COMPILING)windres
 RCFLAGS  = -l "LANGUAGE 4,2" -J rc -O coff
-DLLFLAGS += -shared -Wl,--out-implib,$(DISTDIR)/tmemutil$(BITS).lib --entry=$(DLL_MAIN_STDCALL_NAME)
-MKDLL	 += $(LD) $(DLLFLAGS) -shared -L$(DISTDIR) -lmhook
+DLLFLAGS += -shared -Wl,--out-implib,$(DISTDIR)/libtmemutil$(BITS).dll.a --entry=$(DLL_MAIN_STDCALL_NAME)
+MKDLL	 += $(LD) $(DLLFLAGS) -shared -L$(DISTDIR) -lmhook(BITS)
 
 EXEC     = \
     @echo Starting Compile... \
@@ -68,7 +55,8 @@ $(OUT1)		      : $(SUB_DIR)/Makefile
 	$(call SUBMK)
 $(OUT2)		      : $(OBJECTS)
 	$(LD) $@ $(OBJECTS) $(DLLFLAGS) $(OUT1) $(LDFLAGS) $(LDLIBS)
-$(DEP)/portable.o     : $(SRC)/portable.c $(SRC)/portable.h 
+	-$(CP) $(DISTDIR)/libportable$(BITS).dll.a $(DISTDIR)/portable$(BITS).lib 2>/dev/null
+$(DEP)/portable.o     : $(SRC)/portable.c $(SRC)/portable.h
 	$(call EXEC)
 	$(CC) $< $(CFLAGS) -o $@
 $(DEP)/inipara.o      : $(SRC)/inipara.c $(SRC)/inipara.h

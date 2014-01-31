@@ -1,11 +1,13 @@
-CC       = gcc
-CFLAGS   = -O3
+CC       = $(CROSS_COMPILING)gcc
+CFLAGS   = -O2
 BITS	 := 32
-LD       = gcc
+DFLAGS :=
+LD       = $(CROSS_COMPILING)gcc
 LDFLAGS  = -Wl,-s
-CFLAGS   += -Wall -Wno-unused -Wno-format -DNDEBUG -msse2 -finline-functions -fomit-frame-pointer
+AR       =$(CROSS_COMPILING)ar
+CFLAGS   += $(DFLAGS) -Wall -Wno-unused -Wno-format -DNDEBUG -msse2 -finline-functions -fomit-frame-pointer
 CFLAGSEX =
-LDLIBS   = -lmhook -municode
+LDLIBS   = -lmhook$(BITS) -municode
 MD       = mkdir -p
 SRC      = src
 DEP      = ../../.dep
@@ -34,7 +36,7 @@ else
 endif
 
 $(DISTDIR)/$(OUT)    : $(OBJECTS) 
-	ar rcs $@ $^
+	$(AR) rcs $@ $^
 $(DEP)/cpu.o         : cpu.c cpu.h
 	$(call EXEC)
 	$(CC) -c $< $(CFLAGS) -o $@

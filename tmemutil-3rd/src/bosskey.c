@@ -139,7 +139,7 @@ unsigned WINAPI bosskey_thread(void * lparam)
 	MSG msg;
 	LPWNDINFO lpInfo = (LPWNDINFO)lparam;
 	set_hotkey(lpInfo);
-    if ( is_browser()  || is_thunderbird() )
+	if ( is_browser()  || is_thunderbird() )
 	{
 		if ( init_bosskey(lpInfo) )
 		{

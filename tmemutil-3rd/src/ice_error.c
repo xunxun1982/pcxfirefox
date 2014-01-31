@@ -35,16 +35,16 @@ BOOL WINAPI MiniDumpWriteDump_func( HANDLE hProcess,DWORD ProcessId,HANDLE hFile
 
 LONG WINAPI ProcessException_ice(PEXCEPTION_POINTERS pExceptionInfo)
 {
-    /* 异常信息结构体 */
+     /* 异常信息结构体 */
     MINIDUMP_EXCEPTION_INFORMATION  ExInfo;
     /* dump生成目录 */
-    wchar_t appdir[MAX_PATH] = {0};
+    wchar_t appdir[MAX_PATH+1] = {0};
 	HANDLE hFile = NULL;
-    if ( !(GetEnvironmentVariableW(L"APPDATA",appdir,sizeof(appdir)) > 0) )
+    if ( !(GetEnvironmentVariableW(L"APPDATA",appdir,MAX_PATH) > 0) )
 	{
 		return EXCEPTION_CONTINUE_SEARCH;
 	}
-    PathAppendW(appdir,L"pcxfirefox.dmp");
+    PathAppendW(appdir,L"pcxFirefox.dmp");
     /* 创建文件句柄 */
     hFile = CreateFileW(appdir,
         GENERIC_WRITE,
@@ -65,7 +65,6 @@ LONG WINAPI ProcessException_ice(PEXCEPTION_POINTERS pExceptionInfo)
 	}
 	if (INVALID_HANDLE_VALUE == hFile)
 		return EXCEPTION_CONTINUE_SEARCH;
-    MINIDUMP_EXCEPTION_INFORMATION  ExInfo;
     ExInfo.ThreadId = GetCurrentThreadId();
     ExInfo.ExceptionPointers = pExceptionInfo;
     ExInfo.ClientPointers = TRUE;

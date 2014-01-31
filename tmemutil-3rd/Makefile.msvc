@@ -4,8 +4,9 @@ ASMLIB = E:\Mozilla\3rdlib\asmlib
 
 CC       = cl.exe
 CPP	 = cl.exe
-CFLAGS   = /EHs-c- /nologo /W3 /WX- /wd4819 /O2 /Ot /Oi /Ob2 /Oy /GT /Gy /GF /GS- /GR- /Gd /GL /MD /I$(ASMLIB) /D "NDEBUG" /D "_UNICODE" /D "UNICODE" \
-                  /D "_CRT_SECURE_NO_WARNINGS" /D "_USRDLL" /D "LIBPORTABLE_EXPORTS"
+DFLAGS   =
+CFLAGS   = $(DFLAGS) /nologo /W3 /WX- /wd4996 /wd4819 /O2 /Ot /Oi /Ob2 /Oy /GT /Gy /GF /GS- /GR- /Gd /GL /MD /I$(ASMLIB) /D "NDEBUG" /D "_UNICODE" /D "UNICODE" \
+                  /D "_CRT_SECURE_NO_WARNINGS" /D "_DLL" /D "_USRDLL" /D "LIBPORTABLE_EXPORTS"
 LD       = link.exe /DLL
 MAKE	 = nmake
 
@@ -13,13 +14,16 @@ MAKE	 = nmake
 PLATFORM = X64
 BITS	 = 64
 CFLAGS = $(CFLAGS) /D "WIN64" /D "_WIN64" /favor:blend /fp:fast
+DEPLIBS  = /LIBPATH:msrt msvcrt-light-x64.lib
 !else
 PLATFORM = X86
 BITS	 = 32
 CFLAGS = $(CFLAGS) /D "WIN32" /D "_WIN32" /arch:SSE2 /fp:fast
+DEPLIBS  = /LIBPATH:msrt msvcrt-light-x86.lib
 !endif
 
-LDFLAGS   =  /NOLOGO /LTCG /opt:ref /opt:icf /MACHINE:$(PLATFORM) /LARGEADDRESSAWARE /LIBPATH:$(ASMLIB) libacof$(BITS).lib
+LDFLAGS   =  /NOLOGO /LTCG /opt:ref /opt:icf /MACHINE:$(PLATFORM) /NODEFAULTLIB /DEFAULTLIB:OLDNAMES /LARGEADDRESSAWARE /LIBPATH:"$(ASMLIB)" libacof$(BITS).lib
+DEPLIBS   = $(OUT1) kernel32.lib shell32.lib shlwapi.lib gdi32.lib user32.lib $(DEPLIBS)
 LIBFLAGS   =  /LTCG /NOLOGO /OUT:"$(DISTDIR)\$(OUT)" 
 
 CPPFLAGS = $(CFLAGS) /TP
@@ -52,8 +56,8 @@ all				: $(OUT1) $(OUT2)
 $(OUT1)			: $(SUB_DIR)/Makefile.msvc
 	$(SUBMK)
 $(OUT2)			: $(OBJDLL)
-	$(LD) /OUT:"$@" $(OBJDLL) $(LDFLAGS) $(OUT1) 
-$(DEP)\portable.obj     : $(SRC)\portable.c $(SRC)\portable.h 
+	$(LD) /OUT:"$@" $(OBJDLL) $(LDFLAGS) $(DEPLIBS)
+$(DEP)\portable.obj     : $(SRC)\portable.c $(SRC)\portable.h
 	$(EXEC)
 	$(CC) $(CFLAGS) /c $(SRC)\portable.c /Fo$@
 $(DEP)\inipara.obj      : $(SRC)\inipara.c $(SRC)\inipara.h
@@ -61,7 +65,7 @@ $(DEP)\inipara.obj      : $(SRC)\inipara.c $(SRC)\inipara.h
 $(DEP)\safe_ex.obj      : $(SRC)\safe_ex.c $(SRC)\safe_ex.h $(SRC)\header.h
 	$(CC) $(CFLAGS) /c $(SRC)\safe_ex.c /Fo$@
 $(DEP)\ice_error.obj    : $(SRC)\ice_error.c $(SRC)\ice_error.h
-	$(CC) $(CFLAGS) /TP /c $(SRC)\ice_error.c /Fo$@
+	$(CC) $(CFLAGS) /c $(SRC)\ice_error.c /Fo$@
 $(DEP)\bosskey.obj    : $(SRC)\bosskey.c $(SRC)\bosskey.h
 	$(CC) $(CFLAGS) /c $(SRC)\bosskey.c /Fo$@
 $(DEP)\resource.res     : $(SRC)\resource.rc

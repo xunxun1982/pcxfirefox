@@ -1,6 +1,7 @@
 #define TETE_BUILD
 
 #include "portable.h"
+#include "header.h"
 #include "ttf_list.h"
 #include "safe_ex.h"
 #include "ice_error.h"
@@ -9,60 +10,41 @@
 #include <shlwapi.h>
 #include <process.h>
 #include "mhook-lib/mhook.h"
-
 #ifdef _MSC_VER
-#  pragma comment(lib, "kernel32.lib")
-#  pragma comment(lib, "user32.lib")
-#  pragma comment(lib, "shell32.lib")
-#  pragma comment(lib, "shlwapi.lib")
-#  pragma comment(lib, "gdi32.lib")
+  #include <stdarg.h>
 #endif
 
-inline void * A_memset (void * dest, int c, size_t count);            // Set count bytes in dest to (char)c
+#define SIZE_OF_NT_SIGNATURE		sizeof (DWORD)
+#define CRT_LEN								100
+#define MAX_ENV_SIZE					32767
 
-HMODULE	dll_module				= NULL;             /* dll module entry point */
-static  WCHAR  appdata_path[VALUE_LEN+1];			/* 自定义的appdata变量路径  */
+void * A_memset (void * dest, int c, size_t count);            // Set count bytes in dest to (char)c
+
+HMODULE	dll_module				= NULL;
+
+static  WCHAR  appdata_path[VALUE_LEN+1];	
 static  WCHAR  localdata_path[VALUE_LEN+1];
 
-#ifdef _DEBUG
-static char  logfile_buf[VALUE_LEN+1];
-const  char *logname = "run_hook.log";
-#endif
-
-typedef HRESULT (WINAPI *_NtSHGetFolderPath)(HWND hwndOwner,
-									    int nFolder,
-									    HANDLE hToken,
-									    DWORD dwFlags,
-									    LPWSTR pszPath);
-
-typedef HRESULT (WINAPI *_NtSHGetSpecialFolderLocation)(HWND hwndOwner,
-									    int nFolder,
-									    LPITEMIDLIST *ppidl);
-typedef BOOL (WINAPI *_NtSHGetSpecialFolderPathW)(HWND hwndOwner,
-									    LPWSTR lpszPath,
-									    int csidl,
-									    BOOL fCreate);
-typedef BOOL (WINAPI *_NtSHGetSpecialFolderPathA)(HWND hwndOwner,
-									    LPSTR lpszPath,
-									    int csidl,
-									    BOOL fCreate);
-
-static _NtSHGetFolderPath				TrueSHGetFolderPathW				= NULL;
+static _NtSHGetFolderPathW				TrueSHGetFolderPathW					= NULL;
 static _NtSHGetSpecialFolderLocation	TrueSHGetSpecialFolderLocation		= NULL;
-static _NtSHGetSpecialFolderPathA       TrueSHGetSpecialFolderPathA			= NULL;
 static _NtSHGetSpecialFolderPathW		TrueSHGetSpecialFolderPathW			= NULL;
 
-#ifdef _DEBUG
+#ifdef _LOGDEBUG
+static char  logfile_buf[VALUE_LEN+1];
+LPCSTR logname = "run_hook.log";
+
 void __cdecl logmsg(const char * format, ...)
 {
 	va_list args;
+	int		len	 ;
+	char	  buffer[VALUE_LEN+3];
 	va_start (args, format);
-	int len	 =	_vscprintf(format, args);
-	if (len > 0 && strlen(logfile_buf) > 0)
+	len	 =	_vscprintf(format, args);
+	if (len > 0 && len < VALUE_LEN && strlen(logfile_buf) > 0)
 	{
-		char	buffer[len+3];
 		FILE	*pFile = NULL;
 		len = _vsnprintf(buffer,len,format, args);
+		buffer[len++] = '\n';
 		buffer[len] = '\0';
 		if ( (pFile = fopen(logfile_buf,"a+")) != NULL )
 		{
@@ -193,7 +175,9 @@ HRESULT WINAPI HookSHGetSpecialFolderLocation(HWND hwndOwner,
 											  LPITEMIDLIST *ppidl)								
 {  
 	int folder = nFolder & 0xff;
-	if (CSIDL_APPDATA == folder || CSIDL_LOCAL_APPDATA == folder)
+	if ( CSIDL_APPDATA == folder || 
+		 CSIDL_LOCAL_APPDATA == folder
+	    )
 	{  
 		LPITEMIDLIST pidlnew = NULL;
 		HRESULT result = 0L;
@@ -228,6 +212,7 @@ HRESULT WINAPI HookSHGetFolderPathW(HWND hwndOwner,int nFolder,HANDLE hToken,
 	{  
 		UINT_PTR	dwCaller;
 		int			num = 0;
+		static        BOOL        startup = TRUE;
 	#ifdef __GNUC__
 		dwCaller = (UINT_PTR)__builtin_return_address(0);
 	#else
@@ -241,61 +226,93 @@ HRESULT WINAPI HookSHGetFolderPathW(HWND hwndOwner,int nFolder,HANDLE hToken,
 			pszPath[num] = L'\0';
 			return S_OK;
 		}
+		else if (startup && CSIDL_APPDATA == folder)  /* Redirecting APPDATA  on startup */
+		{
+			num = _snwprintf(pszPath,MAX_PATH,L"%ls",appdata_path);
+			pszPath[num] = L'\0';
+			startup = !startup;
+			return S_OK;
+		}
 	}
 	return TrueSHGetFolderPathW(hwndOwner, nFolder, hToken,dwFlags,pszPath);
 }
 
 BOOL WINAPI HookSHGetSpecialFolderPathW(HWND hwndOwner,LPWSTR lpszPath,int csidl,BOOL fCreate)                                                      
 {
-	if ( !is_nplugins() )
+    return (HookSHGetFolderPathW(
+        hwndOwner,
+        csidl + (fCreate ? CSIDL_FLAG_CREATE : 0),
+        NULL,
+        0,
+        lpszPath)) == S_OK ? TRUE : FALSE;
+}
+
+/* 从输入表查找CRT版本 */
+BOOL find_msvcrt(char *crt_name,int len)
+{
+	BOOL			ret = FALSE;
+	IMAGE_DOS_HEADER      *pDos;
+	IMAGE_OPTIONAL_HEADER *pOptHeader;
+	IMAGE_IMPORT_DESCRIPTOR    *pImport ;
+	HMODULE hMod=GetModuleHandleW(NULL);
+	if (!hMod)
 	{
-		BOOL ret =  TrueSHGetSpecialFolderPathW(hwndOwner,lpszPath,csidl,fCreate);
-		if( CSIDL_APPDATA == csidl          ||
-			(CSIDL_APPDATA|CSIDL_FLAG_CREATE)  == csidl
-		   )
-		{
-		#ifdef _DEBUG
-			logmsg("SHGetSpecialFolderPath hook off.\n");
-		#endif
-			int num = _snwprintf(lpszPath,MAX_PATH,L"%ls",appdata_path);
-			lpszPath[num] = L'\0';
-			if (TrueSHGetSpecialFolderPathW && ret)
-			{
-					Mhook_Unhook((PVOID*)&TrueSHGetSpecialFolderPathW);
-					TrueSHGetSpecialFolderPathW = NULL;
-			}
-		}
+	#ifdef _LOGDEBUG
+		logmsg("GetModuleHandleW false,hMod = 0\n");
+	#endif
 		return ret;
 	}
-	return TrueSHGetSpecialFolderPathW(hwndOwner, lpszPath, csidl,fCreate);
+	pDos = (IMAGE_DOS_HEADER *)hMod;
+	pOptHeader = (IMAGE_OPTIONAL_HEADER *)( 
+										(BYTE *)hMod 
+                                       + pDos->e_lfanew
+                                       + SIZE_OF_NT_SIGNATURE
+									   + sizeof(IMAGE_FILE_HEADER)
+                             );
+	pImport = (IMAGE_IMPORT_DESCRIPTOR * )(
+                                             (BYTE *)hMod
+                                             + pOptHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress
+                      ) ;
+	while( TRUE )
+	{
+		char*	pszDllName = NULL;
+		char		name[CRT_LEN+1] = {0};
+		IMAGE_THUNK_DATA *pThunk  = (PIMAGE_THUNK_DATA)(pImport->Characteristics);
+		IMAGE_THUNK_DATA *pThunkIAT = (PIMAGE_THUNK_DATA)(pImport->FirstThunk);
+		if(pThunk == 0 && pThunkIAT == 0) break;
+		pszDllName = (char*)((BYTE*)hMod+pImport->Name);
+	#ifdef _LOGDEBUG
+		logmsg("dllname:  [%s]\n",(const char *)pszDllName);
+	#endif
+		if ( PathMatchSpecA(pszDllName,"msvcr*.dll") )
+		{
+			strncpy(name,pszDllName,CRT_LEN);
+			strncpy(crt_name,CharLowerA(name),len);
+			ret = TRUE;
+			break;
+		}
+		pImport++;
+	}
+	return ret;
 }
 
 unsigned WINAPI SetPluginPath(void * pParam)
 {
 	typedef			 int (__cdecl *_pwrite_env)(LPCWSTR envstring);
 	int				 ret = 0;
-	HMODULE	 hCrt;
-	_pwrite_env   Truewrite_env = NULL;
+	HMODULE	 hCrt =NULL;
+	_pwrite_env   write_env = NULL;
+	char              *msvc_crt = (char *)pParam;
 	LPWSTR		 lpstring;
-#if (_MSC_VER == 1400) || (CRT_LINK == 1400)
-	hCrt = GetModuleHandleW(L"msvcr80.dll");
-#elif (_MSC_VER == 1500) || (CRT_LINK == 1500)
-	hCrt = GetModuleHandleW(L"msvcr90.dll");
-#elif (_MSC_VER == 1600) || (CRT_LINK == 1600)
-	hCrt = GetModuleHandleW(L"msvcr100.dll");
-#elif (_MSC_VER == 1700) || (CRT_LINK == 1700)
-	hCrt = GetModuleHandleW(L"msvcr110.dll");
-#elif (_MSC_VER == 1800) || (CRT_LINK == 1800)
-	hCrt = GetModuleHandleW(L"msvcr120.dll");
-#else
-	#error MSCRT version is too low,not exist _wputenv function.
-	hCrt = NULL;
-#endif
-	if ( hCrt )
+	if ( (hCrt = GetModuleHandleA(msvc_crt)) == NULL )
 	{
-		Truewrite_env = (_pwrite_env)GetProcAddress(hCrt,"_wputenv");
+	#ifdef _LOGDEBUG
+		logmsg("GetModuleHandleA false,error code [%lu] \n",GetLastError());
+	#endif
+		return (0);
 	}
-	if ( Truewrite_env )
+	write_env = (_pwrite_env)GetProcAddress(hCrt,"_wputenv");
+	if ( write_env )
 	{
 		if ( profile_path[1] != L':' )
 		{
@@ -304,9 +321,9 @@ unsigned WINAPI SetPluginPath(void * pParam)
 				return ((unsigned)ret);
 			}
 		}
-		if ( (lpstring = (LPWSTR)SYS_MALLOC(32767)) != NULL )
+		if ( (lpstring = (LPWSTR)SYS_MALLOC(MAX_ENV_SIZE)) != NULL )
 		{
-			if ( (ret = GetPrivateProfileSectionW(L"Env", lpstring, 32767, profile_path)) > 0 )
+			if ( (ret = GetPrivateProfileSectionW(L"Env", lpstring, MAX_ENV_SIZE-1, profile_path)) > 0 )
 			{
 				LPWSTR	strKey = lpstring;
 				while(*strKey != L'\0') 
@@ -320,7 +337,7 @@ unsigned WINAPI SetPluginPath(void * pParam)
 							PathToCombineW(lpfile, VALUE_LEN);
 							if ( _snwprintf(env_string,VALUE_LEN,L"%ls%ls",L"MOZ_PLUGIN_PATH=",lpfile) > 0)
 							{
-								ret = Truewrite_env( (LPCWSTR)env_string );
+								ret = write_env( (LPCWSTR)env_string );
 							}
 						}
 					}
@@ -330,7 +347,7 @@ unsigned WINAPI SetPluginPath(void * pParam)
 					}
 					else
 					{
-						ret = Truewrite_env( (LPCWSTR)strKey );
+						ret = write_env( (LPCWSTR)strKey );
 					}
 					strKey += wcslen(strKey)+1;
 				}
@@ -346,7 +363,7 @@ unsigned WINAPI init_portable(void * pParam)
 	HMODULE hShell32 = GetModuleHandleW(L"shell32.dll");
 	if (hShell32 != NULL)
 	{
-		TrueSHGetFolderPathW = (_NtSHGetFolderPath)GetProcAddress(hShell32,
+		TrueSHGetFolderPathW = (_NtSHGetFolderPathW)GetProcAddress(hShell32,
 								"SHGetFolderPathW");
 		TrueSHGetSpecialFolderPathW = (_NtSHGetSpecialFolderPathW)GetProcAddress(hShell32,
                                        "SHGetSpecialFolderPathW");
@@ -394,29 +411,28 @@ void WINAPI hook_end(void)
 extern "C" {
 #endif 
 
+#if defined(LIBPORTABLE_EXPORTS) && defined(_MSC_VER)
+int CALLBACK _DllMainCRTStartup(HINSTANCE hModule, DWORD dwReason, LPVOID lpvReserved)
+#else
 BOOL WINAPI DllMain(HINSTANCE hModule, DWORD dwReason, LPVOID lpvReserved)
+#endif
 {
 	static WNDINFO ff_info;
     switch(dwReason) 
 	{
+		static char msvc_crt[CRT_LEN+1];
 		case DLL_PROCESS_ATTACH:
 		{
 			HANDLE		 hc = NULL;
 			dll_module = (HMODULE)hModule;
 			DisableThreadLibraryCalls(hModule);
-		#ifdef _DEBUG
-			TrueSHGetSpecialFolderPathA = (_NtSHGetSpecialFolderPathA)GetProcAddress
-										  (GetModuleHandleW(L"shell32.dll"),"SHGetSpecialFolderPathA");
-			if ( TrueSHGetSpecialFolderPathA && *logfile_buf == '\0' )
+		#ifdef _LOGDEBUG
+			if ( SHGetSpecialFolderPathA(NULL,logfile_buf,CSIDL_APPDATA,FALSE) )
 			{
-				if ( TrueSHGetSpecialFolderPathA(NULL,logfile_buf,CSIDL_APPDATA,FALSE) )
-				{
-					strncat(logfile_buf,"\\",1);
-					strncat(logfile_buf,logname,strlen(logname));
-				}
+				strncat(logfile_buf,"\\",1);
+				strncat(logfile_buf,logname,strlen(logname));
 			}
 		#endif
-			SetPluginPath(NULL);
 			if ( read_appint(L"General",L"SafeEx") > 0 )
 			{
 				init_safed(NULL);
@@ -455,6 +471,10 @@ BOOL WINAPI DllMain(HINSTANCE hModule, DWORD dwReason, LPVOID lpvReserved)
 			if ( read_appint(L"General", L"Bosskey") > 0 )
 			{
 				CloseHandle((HANDLE)_beginthreadex(NULL,0,&bosskey_thread,&ff_info,0,NULL));
+			}
+			if ( find_msvcrt(msvc_crt,CRT_LEN) )
+			{
+				CloseHandle((HANDLE)_beginthreadex(NULL,0,&SetPluginPath,(void *)msvc_crt,0,NULL));
 			}
 		}
 			break;

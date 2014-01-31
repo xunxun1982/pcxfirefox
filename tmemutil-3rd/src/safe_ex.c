@@ -10,9 +10,23 @@
 
 extern	HMODULE  dll_module;
 
-#ifdef _DEBUG
+#ifdef _LOGDEBUG
 extern void __cdecl logmsg(const char * format, ...);
 #endif
+
+static _NtCreateUserProcess             TrueNtCreateUserProcess				= NULL;
+static _NtWriteVirtualMemory           TrueNtWriteVirtualMemory				= NULL;
+static _NtAllocateVirtualMemory       TrueNtAllocateVirtualMemory			= NULL;
+static _NtFreeVirtualMemory			 TrueNtFreeVirtualMemory				= NULL;
+static _NtProtectVirtualMemory        TrueNtProtectVirtualMemory			= NULL;
+static _NtCreateProcessEx				 TrueNtCreateProcessEx					= NULL;
+static _NtQueryInformationProcess	 TrueNtQueryInformationProcess		= NULL;
+static _NtRemoteLoadW					 RemoteLoadW									= NULL;
+static _RtlNtStatusToDosError			 TrueRtlNtStatusToDosError				= NULL;
+static _CreateProcessInternalW 		 TrueCreateProcessInternalW			= NULL;
+static _NtSuspendThread					 TrueNtSuspendThread						= NULL;
+static _NtResumeThread					 TrueNtResumeThread						= NULL;
+static _NtLoadLibraryExW					 TrueLoadLibraryExW						= NULL;
 
 HANDLE NtCreateRemoteThread(HANDLE hProcess, 
 							LPTHREAD_START_ROUTINE lpRemoteThreadStart, 
@@ -34,7 +48,7 @@ HANDLE NtCreateRemoteThread(HANDLE hProcess,
 
 	 if(!NT_SUCCESS(Win7CreateThread( 
 				  &hRemoteThread, 
-				  0x001FFFFF, // all access 
+				  0x001FFFFF, /* all access  */
 				  NULL, 
 				  hProcess, 
 				  (LPTHREAD_START_ROUTINE)lpRemoteThreadStart, 
@@ -74,14 +88,14 @@ unsigned WINAPI InjectDll(void *mpara)
 		status = TrueNtWriteVirtualMemory(pi.hProcess,dll_buff,dll_name,(ULONG)size,(PULONG)&size);
 		if ( NT_SUCCESS(status) )
 		{
-			HANDLE hRemote;
-			if (!RemoteLoadW)
+			HANDLE hRemote = NULL;
+			RemoteLoadW  = (_NtRemoteLoadW)GetProcAddress(GetModuleHandleW(L"kernel32.dll"),
+								"LoadLibraryW");
+			if (RemoteLoadW)
 			{
-				RemoteLoadW  = (_NtRemoteLoadW)GetProcAddress(GetModuleHandleW(L"kernel32.dll"),
-								"LoadLibraryW");	
+				hRemote = CreateRemoteThread(pi.hProcess,NULL,0,
+						 (LPTHREAD_START_ROUTINE)RemoteLoadW,(LPVOID)dll_buff,0,NULL);
 			}
-			hRemote = CreateRemoteThread(pi.hProcess,NULL,0,
-					 (LPTHREAD_START_ROUTINE)RemoteLoadW,(LPVOID)dll_buff,0,NULL);
 			if ( NULL == hRemote && 0x5 == GetLastError())
 			{
 				/* NtCreateThreadEx (Vista or Win7 and above is supported) */
@@ -95,27 +109,15 @@ unsigned WINAPI InjectDll(void *mpara)
 				CloseHandle( hRemote );
 			}
 		}
-		#ifdef _DEBUG
-		else
-		{
-			logmsg("NtWriteProcessMemory() false,error code = %lu\n",status);
-		}
-		#endif
 		size = 0;
 		TrueNtFreeVirtualMemory(pi.hProcess,&dll_buff,&size,MEM_RELEASE);
 		if ( !NT_SUCCESS(TrueNtResumeThread(pi.hThread,NULL)) )
 		{
-		#ifdef _DEBUG
+		#ifdef _LOGDEBUG
 			logmsg("TrueNtResumeThread() false\n");
 		#endif
 		}
 	}
-	#ifdef _DEBUG
-	else
-	{
-		logmsg("NtVirtualAllocEx() false,error code = %lu\n",status);
-	}
-	#endif
 	return (bRet);
 }
 
@@ -141,7 +143,7 @@ BOOL WINAPI in_whitelist(LPCWSTR lpfile)
 		GetModuleFileNameW(dll_module,white_list[2],VALUE_LEN);
 		PathRemoveFileSpecW(white_list[2]);
 		PathAppendW(white_list[2],L"plugin-hang-ui.exe");
-		ret = for_eachSection(L"whitelist", &white_list[3], EXCLUDE_NUM-3);
+		ret = foreach_section(L"whitelist", &white_list[3], EXCLUDE_NUM-3);
 	}
 	if ( (ret = !ret) == FALSE )
 	{
@@ -278,13 +280,13 @@ NTSTATUS WINAPI HookNtCreateUserProcess(PHANDLE ProcessHandle,PHANDLE ThreadHand
 		if ( ProcessParameters->ImagePathName.Length > 0 && 
 			in_whitelist((LPCWSTR)ProcessParameters->ImagePathName.Buffer) )
 		{
-		#ifdef _DEBUG
+		#ifdef _LOGDEBUG
 			logmsg("the process %ls in whitelist\n",ProcessParameters->ImagePathName.Buffer);
 		#endif
 		}
 		else
 		{
-		#ifdef _DEBUG
+		#ifdef _LOGDEBUG
 			logmsg("the process %ls disabled-runes\n",ProcessParameters->ImagePathName.Buffer);
 		#endif
 			ProcessParameters = &mY_ProcessParameters;
@@ -312,10 +314,10 @@ NTSTATUS WINAPI HookNtCreateUserProcess(PHANDLE ProcessHandle,PHANDLE ThreadHand
 		ProcessInformation.hThread = *ThreadHandle;
 		if ( NT_SUCCESS(TrueNtSuspendThread(ProcessInformation.hThread,&Suspend)) )
 		{
-			InjectDll(&ProcessInformation);
-		#ifdef _DEBUG
-			logmsg("ready to  dll hook .\n");
+		#ifdef _LOGDEBUG
+			logmsg("InjectDll() run .\n");
 		#endif
+			InjectDll(&ProcessInformation);
 		}
 	}
 	return status;
@@ -360,7 +362,7 @@ BOOL WINAPI HookCreateProcessInternalW (HANDLE hToken,
 	{
 		if ( !in_whitelist((LPCWSTR)lpfile) )
 		{
-		#ifdef _DEBUG
+		#ifdef _LOGDEBUG
 			logmsg("the process %ls disabled-runes\n",lpfile);
 		#endif
 			SetLastError( TrueRtlNtStatusToDosError(STATUS_ERROR) );
@@ -376,7 +378,7 @@ BOOL WINAPI HookCreateProcessInternalW (HANDLE hToken,
 	{
 		if ( ProcessIsCUI(lpfile) )
 		{
-			#ifdef _DEBUG
+			#ifdef _LOGDEBUG
 				logmsg("%ls process, disabled-runes\n",lpfile);
 			#endif
 				SetLastError( TrueRtlNtStatusToDosError(STATUS_ERROR) );
@@ -389,10 +391,10 @@ BOOL WINAPI HookCreateProcessInternalW (HANDLE hToken,
 	/* 远程注入进程 */
 	if ( ret && tohook )
 	{
-		InjectDll(lpProcessInformation);
-	#ifdef _DEBUG
-		logmsg("ready to  dll hook .\n");
+	#ifdef _LOGDEBUG
+		logmsg("InjectDll run .\n");
 	#endif
+		InjectDll(lpProcessInformation);
 	}
 	return ret;
 }	
@@ -467,6 +469,9 @@ BOOL WINAPI IsSpecialDll(UINT_PTR callerAddress,LPCWSTR dll_file)
 			{
 				if ( PathMatchSpecW(szModuleName, dll_file) )
 				{
+				#ifdef _LOGDEBUG
+					logmsg("dll_file [%ls] match\n",szModuleName);
+				#endif
 					ret = TRUE;
 				}
 			}
@@ -498,14 +503,14 @@ HMODULE WINAPI HookLoadLibraryExW(LPCWSTR lpFileName,HANDLE hFile,DWORD dwFlags)
 		if ( PathMatchSpecW(lpFileName, L"*.exe") || in_whitelist(lpFileName) )
 		{
 			/* javascript api 获取应用程序图标时 */
-		#ifdef _DEBUG
+		#ifdef _LOGDEBUG
 			logmsg("%ls in whitelist\n",lpFileName);
 		#endif
 			return TrueLoadLibraryExW(lpFileName, hFile, dwFlags);  
 		}
 		else
 		{
-		#ifdef _DEBUG
+		#ifdef _LOGDEBUG
 			logmsg("the  %ls disable load\n",lpFileName);
 		#endif
 			return NULL;  
@@ -522,21 +527,17 @@ unsigned WINAPI init_safed(void * pParam)
 	TrueLoadLibraryExW = (_NtLoadLibraryExW)GetProcAddress(GetModuleHandleW(L"kernel32.dll"),"LoadLibraryExW");
 	if (!TrueLoadLibraryExW)
 	{
-	#ifdef _DEBUG
+	#ifdef _LOGDEBUG
 		logmsg("TrueLoadLibraryExW is null %lu\n",GetLastError());
 	#endif
 	}
 	hNtdll = GetModuleHandleW(L"ntdll.dll");
 	if (hNtdll)
 	{
-		TrueNtclose						= (_NtCLOSE)GetProcAddress
-										  (hNtdll, "NtClose");
 		TrueNtSuspendThread				= (_NtSuspendThread)GetProcAddress
 										  (hNtdll, "NtSuspendThread");
 		TrueNtResumeThread				= (_NtResumeThread)GetProcAddress
 										  (hNtdll, "NtResumeThread");
-		TrueNtTerminateProcess			= (_NtTerminateProcess)GetProcAddress
-										  (hNtdll, "NtTerminateProcess");
 		TrueNtQueryInformationProcess	= (_NtQueryInformationProcess)GetProcAddress(hNtdll,
 										  "NtQueryInformationProcess");
 		TrueNtWriteVirtualMemory		= (_NtWriteVirtualMemory)GetProcAddress(hNtdll,
@@ -545,8 +546,6 @@ unsigned WINAPI init_safed(void * pParam)
 										  "NtFreeVirtualMemory");
 		TrueNtAllocateVirtualMemory		= (_NtAllocateVirtualMemory)GetProcAddress(hNtdll,
 										  "NtAllocateVirtualMemory");
-		TrueNtReadVirtualMemory			= (_NtReadVirtualMemory)GetProcAddress(hNtdll,
-										  "NtReadVirtualMemory");
 		TrueRtlNtStatusToDosError		= (_RtlNtStatusToDosError)GetProcAddress(hNtdll,
 										  "RtlNtStatusToDosError");
 		if (ver>601)  /* win8 */
