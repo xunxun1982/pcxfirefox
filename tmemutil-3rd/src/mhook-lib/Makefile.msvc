@@ -2,19 +2,19 @@
 CC       = cl.exe
 CPP     = cl.exe
 DFLAGS   =
-CFLAGS   = $(DFLAGS) /nologo /W3 /WX- /O2 /Ot /Oi /Ob2 /Oy /GT /Gy /GF /GS- /GR- /Gd /GL /MD /D "NDEBUG" /D "_UNICODE" /D "UNICODE" /D "LIBPORTABLE_EXPORTS"
+CFLAGS   = $(DFLAGS) /nologo /W3 /WX- /O2 /Ot /Oi /Ob2 /Oy /GT /Gy /GF /GS- /GR- /GL /MD /fp:fast /D "NDEBUG" /D "_UNICODE" /D "UNICODE" /D "LIBPORTABLE_EXPORTS"
 LD       = link.exe
-!if "$(PLATFORM)"=="X64"
+!if "$(PLATFORM)"=="X64" || "$(TARGET_CPU)"=="x64"
 PLATFORM = X64
 BITS	 = 64
-CFLAGS = $(CFLAGS) /D "WIN64" /D "_WIN64" /favor:blend /fp:fast
+CFLAGS = $(CFLAGS) /D "WIN64" /D "_WIN64" /favor:blend
 !else
 PLATFORM = X86
 BITS	 = 32
-CFLAGS = $(CFLAGS) /D "WIN32" /D "_WIN32" /arch:SSE2 /fp:fast
+CFLAGS = $(CFLAGS) /D "WIN32" /D "_WIN32" /arch:SSE2
 !endif
 
-LDFLAGS   =  /NOLOGO /LTCG /opt:ref /opt:icf /MACHINE:$(PLATFORM) /LARGEADDRESSAWARE
+LDFLAGS   =  /NOLOGO /LTCG /opt:ref /opt:icf /MACHINE:$(PLATFORM)
 LIBFLAGS   =  /LTCG /NOLOGO /OUT:"$(DISTDIR)\$(OUT)" 
 
 CPPFLAGS = $(CFLAGS) /TP
