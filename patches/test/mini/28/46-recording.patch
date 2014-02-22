@@ -1,0 +1,71 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392971309 -28800
+#      Fri Feb 21 16:28:29 2014 +0800
+# Node ID cb7ca3934c043eb889c5988b766f71ca09e7f0c1
+# Parent  34839fb4f26a25d8bf0bdc57a28129c034e4c3f1
+Disable recording
+
+diff -r 34839fb4f26a -r cb7ca3934c04 browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Fri Feb 21 16:26:17 2014 +0800
++++ b/browser/installer/package-manifest.in	Fri Feb 21 16:28:29 2014 +0800
+@@ -555,8 +555,10 @@
+ @BINPATH@/components/nsIDService.js
+ @BINPATH@/components/Identity.manifest
+ #endif
++#ifdef MOZ_RECORDING
+ @BINPATH@/components/recording-cmdline.js
+ @BINPATH@/components/recording-cmdline.manifest
++#endif
+ 
+ @BINPATH@/components/PermissionSettings.js
+ @BINPATH@/components/PermissionSettings.manifest
+@@ -665,8 +667,10 @@
+ @BINPATH@/browser/extensions/{972ce4c6-7e08-4474-a285-3208198ce6fd}/icon.png
+ @BINPATH@/chrome/toolkit@JAREXT@
+ @BINPATH@/chrome/toolkit.manifest
++#ifdef MOZ_RECORDING
+ @BINPATH@/chrome/recording.manifest
+ @BINPATH@/chrome/recording/*
++#endif
+ #ifdef MOZ_GTK
+ @BINPATH@/browser/chrome/icons/default/default16.png
+ @BINPATH@/browser/chrome/icons/default/default32.png
+diff -r 34839fb4f26a -r cb7ca3934c04 configure.in
+--- a/configure.in	Fri Feb 21 16:26:17 2014 +0800
++++ b/configure.in	Fri Feb 21 16:28:29 2014 +0800
+@@ -7603,6 +7603,15 @@
+ fi
+ AC_SUBST(MOZ_FINALIZATIONWITNESS)
+ 
++MOZ_ARG_DISABLE_BOOL(recording,
++[  --disable-recording          Disable recording],
++    MOZ_RECORDING=,
++    MOZ_RECORDING=1)
++if test -n "$MOZ_RECORDING"; then
++    AC_DEFINE(MOZ_RECORDING)
++fi
++AC_SUBST(MOZ_RECORDING)
++
+ dnl ========================================================
+ dnl = Support for gcc stack unwinding (from gcc 3.3)
+ dnl ========================================================
+diff -r 34839fb4f26a -r cb7ca3934c04 layout/moz.build
+--- a/layout/moz.build	Fri Feb 21 16:26:17 2014 +0800
++++ b/layout/moz.build	Fri Feb 21 16:28:29 2014 +0800
+@@ -15,12 +15,14 @@
+     'ipc',
+     'mathml',
+     'inspector',
+-    'tools/recording',
+ ]
+ 
+ if CONFIG['NS_PRINTING']:
+     PARALLEL_DIRS += ['printing']
+ 
++if CONFIG['MOZ_RECORDING']:
++    PARALLEL_DIRS += ['tools/recording']
++
+ TEST_TOOL_DIRS += [
+     'tools/reftest',
+     'reftests/fonts',

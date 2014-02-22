@@ -1,0 +1,71 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392962503 -28800
+#      Fri Feb 21 14:01:43 2014 +0800
+# Node ID ac33fd1f983b4233c09fa631d88dfb8c9c5813d2
+# Parent  54ffb92f0e4e010b097f92bdcb2611ef1b1a7093
+Disable Eventloop
+
+diff -r 54ffb92f0e4e -r ac33fd1f983b configure.in
+--- a/configure.in	Fri Feb 21 13:59:42 2014 +0800
++++ b/configure.in	Fri Feb 21 14:01:43 2014 +0800
+@@ -4287,7 +4287,7 @@
+     MOZ_WIDGET_TOOLKIT=windows
+     MOZ_WEBGL=1
+     MOZ_PDF_PRINTING=1
+-    MOZ_INSTRUMENT_EVENT_LOOP=1
++    MOZ_INSTRUMENT_EVENT_LOOP=
+     if test -n "$GNU_CC"; then
+         MOZ_FOLD_LIBS=
+     fi
+diff -r 54ffb92f0e4e -r ac33fd1f983b widget/windows/moz.build
+--- a/widget/windows/moz.build	Fri Feb 21 13:59:42 2014 +0800
++++ b/widget/windows/moz.build	Fri Feb 21 14:01:43 2014 +0800
+@@ -56,7 +56,6 @@
+     'TaskbarPreviewButton.cpp',
+     'TaskbarTabPreview.cpp',
+     'TaskbarWindowPreview.cpp',
+-    'WidgetTraceEvent.cpp',
+     'WindowHook.cpp',
+     'WinIMEHandler.cpp',
+     'WinMouseScrollHandler.cpp',
+@@ -76,6 +75,11 @@
+         'nsPrintSettingsWin.cpp',
+     ]
+ 
++if CONFIG['MOZ_INSTRUMENT_EVENT_LOOP']:
++    UNIFIED_SOURCES += [
++        'WidgetTraceEvent.cpp',
++    ]
++
+ if CONFIG['NS_ENABLE_TSF']:
+     SOURCES += [
+         'nsTextStore.cpp',
+diff -r 54ffb92f0e4e -r ac33fd1f983b widget/windows/nsWindow.cpp
+--- a/widget/windows/nsWindow.cpp	Fri Feb 21 13:59:42 2014 +0800
++++ b/widget/windows/nsWindow.cpp	Fri Feb 21 14:01:43 2014 +0800
+@@ -77,7 +77,9 @@
+ #include "prmem.h"
+ #include "prenv.h"
+ 
++#ifdef MOZ_INSTRUMENT_EVENT_LOOP
+ #include "mozilla/WidgetTraceEvent.h"
++#endif
+ #include "nsIAppShell.h"
+ #include "nsISupportsPrimitives.h"
+ #include "nsIDOMMouseEvent.h"
+@@ -4370,12 +4372,14 @@
+     }
+   }
+ 
++#ifdef MOZ_INSTRUMENT_EVENT_LOOP
+   if (msg == MOZ_WM_TRACE) {
+     // This is a tracer event for measuring event loop latency.
+     // See WidgetTraceEvent.cpp for more details.
+     mozilla::SignalTracerThread();
+     return 0;
+   }
++#endif
+ 
+   // Get the window which caused the event and ask it to process the message
+   nsWindow *targetWindow = WinUtils::GetNSWindowPtr(hWnd);

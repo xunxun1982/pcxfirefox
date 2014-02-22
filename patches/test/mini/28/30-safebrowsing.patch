@@ -1,0 +1,74 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392965234 -28800
+#      Fri Feb 21 14:47:14 2014 +0800
+# Node ID f53a7ac063ea26702fe9f51c8e2a8f1a35dc2c3e
+# Parent  a8feac344c18d0a1b8712e65c4fac105c45703dd
+Disable safebrowsing
+
+diff -r a8feac344c18 -r f53a7ac063ea browser/components/preferences/in-content/security.xul
+--- a/browser/components/preferences/in-content/security.xul	Fri Feb 21 14:45:38 2014 +0800
++++ b/browser/components/preferences/in-content/security.xul	Fri Feb 21 14:47:14 2014 +0800
+@@ -18,13 +18,7 @@
+   <preference id="xpinstall.whitelist.required"
+               name="xpinstall.whitelist.required"
+               type="bool"/>
+-  <preference id="browser.safebrowsing.malware.enabled"
+-              name="browser.safebrowsing.malware.enabled"
+-              type="bool"/>
+-  <preference id="browser.safebrowsing.enabled"
+-              name="browser.safebrowsing.enabled"
+-              type="bool"/>
+-
++              
+   <!-- Passwords -->
+   <preference id="signon.rememberSignons" name="signon.rememberSignons" type="bool"/>
+ 
+@@ -46,15 +40,6 @@
+             oncommand="gSecurityPane.showAddonExceptions();"/>
+   </hbox>
+ 
+-  <separator class="thin"/>
+-  <checkbox id="blockAttackSites"
+-            label="&blockAttackSites.label;"
+-            accesskey="&blockAttackSites.accesskey;"
+-            preference="browser.safebrowsing.malware.enabled" />
+-  <checkbox id="blockWebForgeries"
+-            label="&blockWebForgeries.label;"
+-            accesskey="&blockWebForgeries.accesskey;"
+-            preference="browser.safebrowsing.enabled" />
+ </groupbox>
+ 
+ <!-- Passwords -->
+diff -r a8feac344c18 -r f53a7ac063ea browser/components/preferences/security.xul
+--- a/browser/components/preferences/security.xul	Fri Feb 21 14:45:38 2014 +0800
++++ b/browser/components/preferences/security.xul	Fri Feb 21 14:47:14 2014 +0800
+@@ -32,12 +32,6 @@
+       <preference id="xpinstall.whitelist.required"
+                   name="xpinstall.whitelist.required"
+                   type="bool"/>
+-      <preference id="browser.safebrowsing.malware.enabled"
+-                  name="browser.safebrowsing.malware.enabled"
+-                  type="bool"/>
+-      <preference id="browser.safebrowsing.enabled"
+-                  name="browser.safebrowsing.enabled"
+-                  type="bool"/>
+ 
+       <!-- Passwords -->
+       <preference id="signon.rememberSignons" name="signon.rememberSignons" type="bool"/>
+@@ -62,15 +56,6 @@
+                 oncommand="gSecurityPane.showAddonExceptions();"/>
+       </hbox>
+ 
+-      <separator class="thin"/>
+-      <checkbox id="blockAttackSites"
+-                label="&blockAttackSites.label;"
+-                accesskey="&blockAttackSites.accesskey;"
+-                preference="browser.safebrowsing.malware.enabled" />
+-      <checkbox id="blockWebForgeries"
+-                label="&blockWebForgeries.label;"
+-                accesskey="&blockWebForgeries.accesskey;"
+-                preference="browser.safebrowsing.enabled" />
+     </groupbox>
+ 
+     <!-- Passwords -->

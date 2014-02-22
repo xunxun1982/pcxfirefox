@@ -1,0 +1,127 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392959617 -28800
+#      Fri Feb 21 13:13:37 2014 +0800
+# Node ID 0e666d11c93db0512f79b00edf4417cbad242e9f
+# Parent  c7c65ae7b4cf61f5970ffe7347dd2a025ac2f5f6
+DISABLE_PARENTAL_CONTROLS
+
+diff -r c7c65ae7b4cf -r 0e666d11c93d browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Fri Feb 21 13:11:11 2014 +0800
++++ b/browser/installer/package-manifest.in	Fri Feb 21 13:13:37 2014 +0800
+@@ -292,7 +292,9 @@
+ @BINPATH@/components/necko_wyciwyg.xpt
+ @BINPATH@/components/necko.xpt
+ @BINPATH@/components/loginmgr.xpt
++#ifndef MOZ_DISABLE_PARENTAL_CONTROLS
+ @BINPATH@/components/parentalcontrols.xpt
++#endif
+ #ifdef MOZ_WEBRTC
+ @BINPATH@/components/peerconnection.xpt
+ #endif
+diff -r c7c65ae7b4cf -r 0e666d11c93d toolkit/components/downloads/nsDownloadManager.cpp
+--- a/toolkit/components/downloads/nsDownloadManager.cpp	Fri Feb 21 13:11:11 2014 +0800
++++ b/toolkit/components/downloads/nsDownloadManager.cpp	Fri Feb 21 13:13:37 2014 +0800
+@@ -12,7 +12,9 @@
+ #include "nsIDownloadHistory.h"
+ #include "nsIDownloadManagerUI.h"
+ #include "nsIMIMEService.h"
++#ifndef MOZ_DISABLE_PARENTAL_CONTROLS
+ #include "nsIParentalControlsService.h"
++#endif
+ #include "nsIPrefService.h"
+ #include "nsIPromptService.h"
+ #include "nsIResumableChannel.h"
+@@ -1655,6 +1657,7 @@
+   }
+ #endif
+ 
++#ifndef MOZ_DISABLE_PARENTAL_CONTROLS
+   // Check with parental controls to see if file downloads
+   // are allowed for this user. If not allowed, cancel the
+   // download and mark its state as being blocked.
+@@ -1678,6 +1681,7 @@
+                     nullptr);
+     }
+   }
++#endif
+ 
+   NS_ADDREF(*aDownload = dl);
+ 
+@@ -1828,7 +1832,6 @@
+ {
+   // if our download is not canceled or failed, we should fail
+   if (dl->mDownloadState != nsIDownloadManager::DOWNLOAD_FAILED &&
+-      dl->mDownloadState != nsIDownloadManager::DOWNLOAD_BLOCKED_PARENTAL &&
+       dl->mDownloadState != nsIDownloadManager::DOWNLOAD_BLOCKED_POLICY &&
+       dl->mDownloadState != nsIDownloadManager::DOWNLOAD_DIRTY &&
+       dl->mDownloadState != nsIDownloadManager::DOWNLOAD_CANCELED)
+@@ -2057,7 +2060,6 @@
+   DownloadState states[] = { nsIDownloadManager::DOWNLOAD_FINISHED,
+                              nsIDownloadManager::DOWNLOAD_FAILED,
+                              nsIDownloadManager::DOWNLOAD_CANCELED,
+-                             nsIDownloadManager::DOWNLOAD_BLOCKED_PARENTAL,
+                              nsIDownloadManager::DOWNLOAD_BLOCKED_POLICY,
+                              nsIDownloadManager::DOWNLOAD_DIRTY };
+ 
+@@ -2094,7 +2096,6 @@
+   DownloadState states[] = { nsIDownloadManager::DOWNLOAD_FINISHED,
+                              nsIDownloadManager::DOWNLOAD_FAILED,
+                              nsIDownloadManager::DOWNLOAD_CANCELED,
+-                             nsIDownloadManager::DOWNLOAD_BLOCKED_PARENTAL,
+                              nsIDownloadManager::DOWNLOAD_BLOCKED_POLICY,
+                              nsIDownloadManager::DOWNLOAD_DIRTY };
+ 
+@@ -2642,7 +2643,6 @@
+   // the database *before* notifying listeners.  At this point, you can safely
+   // dispatch to the observers as well.
+   switch (aState) {
+-    case nsIDownloadManager::DOWNLOAD_BLOCKED_PARENTAL:
+     case nsIDownloadManager::DOWNLOAD_BLOCKED_POLICY:
+     case nsIDownloadManager::DOWNLOAD_DIRTY:
+     case nsIDownloadManager::DOWNLOAD_CANCELED:
+@@ -2857,7 +2857,6 @@
+       if (!mPrivate)
+         mDownloadManager->SendEvent(this, "dl-done");
+       break;
+-    case nsIDownloadManager::DOWNLOAD_BLOCKED_PARENTAL:
+     case nsIDownloadManager::DOWNLOAD_BLOCKED_POLICY:
+       if (!mPrivate)
+         mDownloadManager->SendEvent(this, "dl-blocked");
+@@ -3026,6 +3025,7 @@
+     if (NS_SUCCEEDED(rv)) {
+       uint32_t status;
+       rv = channel->GetResponseStatus(&status);
++#ifndef MOZ_DISABLE_PARENTAL_CONTROLS
+       // HTTP 450 - Blocked by parental control proxies
+       if (NS_SUCCEEDED(rv) && status == 450) {
+         // Cancel using the provided object
+@@ -3034,6 +3034,7 @@
+         // Fail the download
+         (void)SetState(nsIDownloadManager::DOWNLOAD_BLOCKED_PARENTAL);
+       }
++#endif
+     }
+   } else if ((aStateFlags & STATE_STOP) && (aStateFlags & STATE_IS_NETWORK) &&
+              IsFinishable()) {
+diff -r c7c65ae7b4cf -r 0e666d11c93d toolkit/components/moz.build
+--- a/toolkit/components/moz.build	Fri Feb 21 13:11:11 2014 +0800
++++ b/toolkit/components/moz.build	Fri Feb 21 13:13:37 2014 +0800
+@@ -27,7 +27,6 @@
+     'mediasniffer',
+     'microformats',
+     'osfile',
+-    'parentalcontrols',
+     'passwordmgr',
+     'perf',
+     'places',
+@@ -48,6 +47,9 @@
+ if CONFIG['MOZ_SOCIAL']:
+     PARALLEL_DIRS += ['social']
+ 
++if not CONFIG['MOZ_DISABLE_PARENTAL_CONTROLS']:
++    PARALLEL_DIRS += ['parentalcontrols']
++
+ if CONFIG['BUILD_CTYPES']:
+     PARALLEL_DIRS += ['ctypes']
+ 

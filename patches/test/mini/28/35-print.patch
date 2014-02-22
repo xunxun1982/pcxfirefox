@@ -1,0 +1,189 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392967482 -28800
+#      Fri Feb 21 15:24:42 2014 +0800
+# Node ID 5a66f7f3bcaa0c455dc8440f762d3c30801f51ed
+# Parent  616ccc782658b68a2d26bab917470fd2e4244389
+Disable print
+
+diff -r 616ccc782658 -r 5a66f7f3bcaa browser/base/content/browser-appmenu.inc
+--- a/browser/base/content/browser-appmenu.inc	Fri Feb 21 15:22:04 2014 +0800
++++ b/browser/base/content/browser-appmenu.inc	Fri Feb 21 15:24:42 2014 +0800
+@@ -120,6 +120,7 @@
+       <menuitem id="appmenu_sendLink"
+                 label="&emailPageCmd.label;"
+                 command="Browser:SendLink"/>
++#ifdef NS_PRINTING
+       <splitmenu id="appmenu_print"
+                  iconic="true"
+                  label="&printCmd.label;"
+@@ -138,6 +139,7 @@
+                       command="cmd_pageSetup"/>
+           </menupopup>
+       </splitmenu>
++#endif
+       <menuseparator class="appmenu-menuseparator"/>
+       <splitmenu id="appmenu_webDeveloper"
+                  command="Tools:DevToolbox"
+diff -r 616ccc782658 -r 5a66f7f3bcaa browser/base/content/browser-menubar.inc
+--- a/browser/base/content/browser-menubar.inc	Fri Feb 21 15:22:04 2014 +0800
++++ b/browser/base/content/browser-menubar.inc	Fri Feb 21 15:24:42 2014 +0800
+@@ -62,6 +62,7 @@
+                           accesskey="&emailPageCmd.accesskey;"
+                           command="Browser:SendLink"/>
+                 <menuseparator/>
++#ifdef NS_PRINTING
+                 <menuitem id="menu_printSetup"
+                           label="&printSetupCmd.label;"
+                           accesskey="&printSetupCmd.accesskey;"
+@@ -78,6 +79,7 @@
+                           key="printKb"
+                           command="cmd_print"/>
+                 <menuseparator/>
++#endif
+                 <menuitem id="goOfflineMenuitem"
+                           label="&goOfflineCmd.label;"
+                           accesskey="&goOfflineCmd.accesskey;"
+diff -r 616ccc782658 -r 5a66f7f3bcaa browser/base/content/browser.xul
+--- a/browser/base/content/browser.xul	Fri Feb 21 15:22:04 2014 +0800
++++ b/browser/base/content/browser.xul	Fri Feb 21 15:24:42 2014 +0800
+@@ -927,9 +927,11 @@
+ # Update primaryToolbarButtons in browser/themes/shared/browser.inc when adding
+ # or removing default items with the toolbarbutton-1 class.
+ 
++#ifdef NS_PRINTING
+       <toolbarbutton id="print-button" class="toolbarbutton-1 chromeclass-toolbar-additional"
+                      label="&printButton.label;" command="cmd_print"
+                      tooltiptext="&printButton.tooltip;"/>
++#endif
+ 
+       <!-- This is a placeholder for the Downloads Indicator.  It is visible
+            during the customization of the toolbar, in the palette, and before
+diff -r 616ccc782658 -r 5a66f7f3bcaa browser/modules/BrowserUITelemetry.jsm
+--- a/browser/modules/BrowserUITelemetry.jsm	Fri Feb 21 15:22:04 2014 +0800
++++ b/browser/modules/BrowserUITelemetry.jsm	Fri Feb 21 15:24:42 2014 +0800
+@@ -51,11 +51,6 @@
+   "appmenu_savePage",
+   "appmenu_sendLink",
+ 
+-  "appmenu_print:child",
+-    "appmenu_print_popup",
+-    "appmenu_printPreview",
+-    "appmenu_printSetup",
+-
+   "appmenu_webDeveloper:child",
+     "appmenu_devToolbox",
+     "appmenuitem_webconsole",
+@@ -175,7 +170,6 @@
+ };
+ 
+ const PALETTE_ITEMS = [
+-  "print-button",
+   "history-button",
+   "bookmarks-button",
+   "new-window-button",
+diff -r 616ccc782658 -r 5a66f7f3bcaa browser/themes/shared/browser.inc
+--- a/browser/themes/shared/browser.inc	Fri Feb 21 15:22:04 2014 +0800
++++ b/browser/themes/shared/browser.inc	Fri Feb 21 15:24:42 2014 +0800
+@@ -1,3 +1,3 @@
+ %filter substitution
+ 
+-%define primaryToolbarButtons #back-button, #forward-button, #reload-button, #stop-button, #home-button, #print-button, #downloads-button, #history-button, #bookmarks-button, #bookmarks-menu-button, #new-tab-button, #new-window-button, #cut-button, #copy-button, #paste-button, #fullscreen-button, #zoom-out-button, #zoom-in-button, #sync-button, #feed-button, #alltabs-button, #tabview-button
++%define primaryToolbarButtons #back-button, #forward-button, #reload-button, #stop-button, #home-button, #downloads-button, #history-button, #bookmarks-button, #bookmarks-menu-button, #new-tab-button, #new-window-button, #cut-button, #copy-button, #paste-button, #fullscreen-button, #zoom-out-button, #zoom-in-button, #sync-button, #feed-button, #alltabs-button, #tabview-button
+diff -r 616ccc782658 -r 5a66f7f3bcaa browser/themes/windows/browser.css
+--- a/browser/themes/windows/browser.css	Fri Feb 21 15:22:04 2014 +0800
++++ b/browser/themes/windows/browser.css	Fri Feb 21 15:24:42 2014 +0800
+@@ -98,9 +98,11 @@
+   min-height: 24px;
+ }
+ 
++%ifdef NS_PRINTING
+ #print-preview-toolbar:not(:-moz-lwtheme) {
+   -moz-appearance: toolbox;
+ }
++%endif
+ 
+ #browser-bottombox:not(:-moz-lwtheme) {
+   background-color: -moz-dialog;
+@@ -459,8 +461,10 @@
+   -moz-box-pack: end;
+ }
+ 
++%ifdef NS_PRINTING
+ #appmenu_print,
+ #appmenu_print_popup,
++%endif
+ .appmenu-edit-button,
+ #appmenu-editmenu-cut,
+ #appmenu-editmenu-copy,
+@@ -484,10 +488,12 @@
+   -moz-image-region: rect(0 48px 16px 32px);
+ }
+ 
++%ifdef NS_PRINTING
+ #appmenu_print,
+ #appmenu_print_popup {
+   -moz-image-region: rect(0 64px 16px 48px);
+ }
++%endif
+ 
+ #appmenu-quit {
+   -moz-image-region: rect(0 80px 16px 64px);
+@@ -1098,9 +1104,11 @@
+   list-style-image: url("chrome://browser/skin/Toolbar-inverted.png");
+ }
+ 
++%ifdef NS_PRINTING
+ #print-button {
+   -moz-image-region: rect(0, 162px, 18px, 144px);
+ }
++%endif
+ 
+ #new-tab-button {
+   -moz-image-region: rect(0, 180px, 18px, 162px);
+diff -r 616ccc782658 -r 5a66f7f3bcaa toolkit/components/help/content/help.xul
+--- a/toolkit/components/help/content/help.xul	Fri Feb 21 15:22:04 2014 +0800
++++ b/toolkit/components/help/content/help.xul	Fri Feb 21 15:24:42 2014 +0800
+@@ -80,8 +80,10 @@
+     <key keycode="VK_BACK" command="Help:Back"/>
+     <key keycode="VK_BACK" command="Help:Forward" modifiers="shift"/>
+ #endif
++#ifdef NS_PRINTING
+     <key id="printKb" key="&printCmd.commandkey;" oncommand="print();"
+          modifiers="accel"/>  
++#endif 
+     <key id="key_find" key="&findOnCmd.commandkey;" command="cmd_find" modifiers="accel"/>
+     <key id="key_findAgain" key="&findAgainCmd.commandkey;" command="cmd_findAgain" modifiers="accel"/>
+     <key id="key_findPrevious" key="&findAgainCmd.commandkey;" command="cmd_findPrevious" modifiers="accel,shift"/>
+@@ -134,10 +136,12 @@
+                        tooltiptext="&homeButton.tooltip;"
+                        command="Help:Home"/>
+         <toolbarseparator/>
++#ifdef NS_PRINTING
+         <toolbarbutton id="help-print-button"
+                        label="&printButton.label;"
+                        oncommand="print();"
+                        tooltiptext="&printButton.tooltip;"/>
++#endif           
+         <toolbarspring flex="1"/>
+         <toolbaritem id="search-box"
+                      align="center" pack="center">
+diff -r 616ccc782658 -r 5a66f7f3bcaa toolkit/themes/windows/help/help.css
+--- a/toolkit/themes/windows/help/help.css	Fri Feb 21 15:22:04 2014 +0800
++++ b/toolkit/themes/windows/help/help.css	Fri Feb 21 15:24:42 2014 +0800
+@@ -90,6 +90,7 @@
+   -moz-image-region: rect(72px 72px 96px 48px); 
+ }
+ 
++%ifdef NS_PRINTING
+ /* ----- PRINT BUTTON ----- */
+ 
+ #help-print-button { 
+@@ -107,6 +108,7 @@
+ #help-print-button:not([disabled="true"]):hover:active { 
+   -moz-image-region: rect(72px 96px 96px 72px); 
+ }
++%endif
+ 
+ /* ----- OTHER ----- */
+ 

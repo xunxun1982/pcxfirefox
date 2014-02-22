@@ -1,0 +1,40 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392970552 -28800
+#      Fri Feb 21 16:15:52 2014 +0800
+# Node ID 4b54d51fa3491ba3301462b375967f51b52377c1
+# Parent  056b1b90b9eb179843cf1753a42140f62139df52
+Disable ship spellcheck
+
+diff -r 056b1b90b9eb -r 4b54d51fa349 browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Fri Feb 21 16:11:39 2014 +0800
++++ b/browser/installer/package-manifest.in	Fri Feb 21 16:15:52 2014 +0800
+@@ -38,7 +38,9 @@
+ @BINPATH@/browser/defaults/profile/chrome/*
+ @BINPATH@/browser/defaults/profile/localstore.rdf
+ @BINPATH@/browser/defaults/profile/mimeTypes.rdf
++#ifdef MOZ_SHIP_SPELLCHECK
+ @BINPATH@/dictionaries/*
++#endif
+ #ifdef MOZ_HYPHENATION
+ @BINPATH@/hyphenation/*
+ #endif
+diff -r 056b1b90b9eb -r 4b54d51fa349 configure.in
+--- a/configure.in	Fri Feb 21 16:11:39 2014 +0800
++++ b/configure.in	Fri Feb 21 16:15:52 2014 +0800
+@@ -7585,6 +7585,15 @@
+ fi
+ AC_SUBST(MOZ_JUMPLIST)
+ 
++MOZ_ARG_DISABLE_BOOL(ship-spellcheck,
++[  --disable-ship-spellcheck          Disable ship spellcheck],
++    MOZ_SHIP_SPELLCHECK=,
++    MOZ_SHIP_SPELLCHECK=1)
++if test -n "$MOZ_SHIP_SPELLCHECK"; then
++    AC_DEFINE(MOZ_SHIP_SPELLCHECK)
++fi
++AC_SUBST(MOZ_SHIP_SPELLCHECK)
++
+ dnl ========================================================
+ dnl = Support for gcc stack unwinding (from gcc 3.3)
+ dnl ========================================================

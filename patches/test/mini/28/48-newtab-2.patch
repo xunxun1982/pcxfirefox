@@ -1,0 +1,79 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392971650 -28800
+#      Fri Feb 21 16:34:10 2014 +0800
+# Node ID 2bb2ff631f188718f6aea685a4f5816dc210903f
+# Parent  c1a9b8313983098dd60c440b7e05437c62b7e7c9
+Disable newtab 2
+
+diff -r c1a9b8313983 -r 2bb2ff631f18 browser/base/content/browser.js
+--- a/browser/base/content/browser.js	Fri Feb 21 16:32:27 2014 +0800
++++ b/browser/base/content/browser.js	Fri Feb 21 16:34:10 2014 +0800
+@@ -132,8 +132,10 @@
+   "resource://gre/modules/SafeBrowsing.jsm");
+ #endif
+ 
++#ifdef MOZ_NEWTAB
+ XPCOMUtils.defineLazyModuleGetter(this, "gBrowserNewTabPreloader",
+   "resource:///modules/BrowserNewTabPreloader.jsm", "BrowserNewTabPreloader");
++#endif
+ 
+ XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
+   "resource://gre/modules/PrivateBrowsingUtils.jsm");
+diff -r c1a9b8313983 -r 2bb2ff631f18 browser/components/nsBrowserGlue.js
+--- a/browser/components/nsBrowserGlue.js	Fri Feb 21 16:32:27 2014 +0800
++++ b/browser/components/nsBrowserGlue.js	Fri Feb 21 16:34:10 2014 +0800
+@@ -49,8 +49,10 @@
+ XPCOMUtils.defineLazyModuleGetter(this, "NewTabUtils",
+                                   "resource://gre/modules/NewTabUtils.jsm");
+ 
++#ifdef MOZ_NEWTAB
+ XPCOMUtils.defineLazyModuleGetter(this, "BrowserNewTabPreloader",
+                                   "resource:///modules/BrowserNewTabPreloader.jsm");
++#endif
+ 
+ #ifdef MOZ_PDFJS
+ XPCOMUtils.defineLazyModuleGetter(this, "PdfJs",
+@@ -478,7 +480,9 @@
+     PageThumbs.init();
+ #endif
+     NewTabUtils.init();
++#ifdef MOZ_NEWTAB
+     BrowserNewTabPreloader.init();
++#endif
+     SignInToWebsiteUX.init();
+ #ifdef MOZ_PDFJS
+     PdfJs.init();
+@@ -651,7 +655,9 @@
+    * _onPlacesShutdown() and not here.
+    */
+   _onProfileShutdown: function BG__onProfileShutdown() {
++#ifdef MOZ_NEWTAB
+     BrowserNewTabPreloader.uninit();
++#endif
+     webappsUI.uninit();
+     SignInToWebsiteUX.uninit();
+ #ifdef MOZ_WEBRTC
+diff -r c1a9b8313983 -r 2bb2ff631f18 browser/modules/moz.build
+--- a/browser/modules/moz.build	Fri Feb 21 16:32:27 2014 +0800
++++ b/browser/modules/moz.build	Fri Feb 21 16:34:10 2014 +0800
+@@ -7,7 +7,6 @@
+ TEST_DIRS += ['test']
+ 
+ EXTRA_JS_MODULES += [
+-    'BrowserNewTabPreloader.jsm',
+     'ContentClick.jsm',
+     'NetworkPrioritizer.jsm',
+     'offlineAppCache.jsm',
+@@ -35,6 +34,11 @@
+         'WindowsJumpLists.jsm',
+     ]
+ 
++if CONFIG['MOZ_NEWTAB'] :
++    EXTRA_JS_MODULES += [
++        'BrowserNewTabPreloader.jsm',
++    ]
++
+ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
+     EXTRA_JS_MODULES += [
+         'WindowsPreviewPerTab.jsm',

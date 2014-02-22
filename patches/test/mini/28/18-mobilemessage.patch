@@ -1,0 +1,629 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392961547 -28800
+#      Fri Feb 21 13:45:47 2014 +0800
+# Node ID 3ed1063f85ae35557d459346b81e483cd07cbcca
+# Parent  8a1ec2da7fb4bf1f192fa8eaa94640b59cfa5494
+Disable mobilemessage
+
+diff -r 8a1ec2da7fb4 -r 3ed1063f85ae browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Fri Feb 21 13:39:05 2014 +0800
++++ b/browser/installer/package-manifest.in	Fri Feb 21 13:45:47 2014 +0800
+@@ -220,7 +220,9 @@
+ @BINPATH@/components/dom_settings.xpt
+ @BINPATH@/components/dom_permissionsettings.xpt
+ @BINPATH@/components/dom_sidebar.xpt
++#ifdef MOZ_MOBILEMESSAGE
+ @BINPATH@/components/dom_mobilemessage.xpt
++#endif
+ @BINPATH@/components/dom_storage.xpt
+ @BINPATH@/components/dom_stylesheets.xpt
+ @BINPATH@/components/dom_telephony.xpt
+diff -r 8a1ec2da7fb4 -r 3ed1063f85ae configure.in
+--- a/configure.in	Fri Feb 21 13:39:05 2014 +0800
++++ b/configure.in	Fri Feb 21 13:45:47 2014 +0800
+@@ -7443,6 +7443,15 @@
+ fi
+ AC_SUBST(MOZ_FMRADIO)
+ 
++MOZ_ARG_DISABLE_BOOL(mobilemessage,
++[  --disable-mobilemessage           Disable mobilemessage],
++    MOZ_MOBILEMESSAGE=,
++    MOZ_MOBILEMESSAGE=1)
++if test -n "$MOZ_MOBILEMESSAGE"; then
++    AC_DEFINE(MOZ_MOBILEMESSAGE)
++fi
++AC_SUBST(MOZ_MOBILEMESSAGE)
++
+ dnl ========================================================
+ dnl = Enable Support for AudioChannelManager API
+ dnl ========================================================
+diff -r 8a1ec2da7fb4 -r 3ed1063f85ae content/events/src/nsEventDispatcher.cpp
+--- a/content/events/src/nsEventDispatcher.cpp	Fri Feb 21 13:39:05 2014 +0800
++++ b/content/events/src/nsEventDispatcher.cpp	Fri Feb 21 13:45:47 2014 +0800
+@@ -838,10 +838,12 @@
+     return NS_NewDOMHashChangeEvent(aDOMEvent, aOwner, aPresContext, nullptr);
+   if (aEventType.LowerCaseEqualsLiteral("customevent"))
+     return NS_NewDOMCustomEvent(aDOMEvent, aOwner, aPresContext, nullptr);
++#ifdef MOZ_MOBILEMESSAGE
+   if (aEventType.LowerCaseEqualsLiteral("mozsmsevent"))
+     return NS_NewDOMMozSmsEvent(aDOMEvent, aOwner, aPresContext, nullptr);
+   if (aEventType.LowerCaseEqualsLiteral("mozmmsevent"))
+     return NS_NewDOMMozMmsEvent(aDOMEvent, aOwner, aPresContext, nullptr);
++#endif
+   if (aEventType.LowerCaseEqualsLiteral("storageevent")) {
+     return NS_NewDOMStorageEvent(aDOMEvent, aOwner, aPresContext, nullptr);
+   }
+diff -r 8a1ec2da7fb4 -r 3ed1063f85ae dom/base/Navigator.cpp
+--- a/dom/base/Navigator.cpp	Fri Feb 21 13:39:05 2014 +0800
++++ b/dom/base/Navigator.cpp	Fri Feb 21 13:45:47 2014 +0800
+@@ -30,7 +30,9 @@
+ #include "mozilla/dom/PowerManager.h"
+ #include "nsIDOMWakeLock.h"
+ #include "nsIPowerManagerService.h"
++#ifdef MOZ_MOBILEMESSAGE
+ #include "mozilla/dom/MobileMessageManager.h"
++#endif
+ #include "mozilla/dom/Telephony.h"
+ #include "mozilla/Hal.h"
+ #include "nsISiteSpecificUserAgent.h"
+@@ -142,7 +144,9 @@
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mBatteryManager)
+ #endif
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mPowerManager)
++#ifdef MOZ_MOBILEMESSAGE
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mMobileMessageManager)
++#endif
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mTelephony)
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mConnection)
+ #ifdef MOZ_B2G_RIL
+@@ -211,11 +215,13 @@
+     mPowerManager = nullptr;
+   }
+ 
++#ifdef MOZ_MOBILEMESSAGE
+   if (mMobileMessageManager) {
+     mMobileMessageManager->Shutdown();
+     mMobileMessageManager = nullptr;
+   }
+-
++#endif
++  
+   if (mTelephony) {
+     mTelephony = nullptr;
+   }
+@@ -1158,6 +1164,7 @@
+   return wakelock.forget();
+ }
+ 
++#ifdef MOZ_MOBILEMESSAGE
+ nsIDOMMozMobileMessageManager*
+ Navigator::GetMozMobileMessage()
+ {
+@@ -1172,6 +1179,7 @@
+ 
+   return mMobileMessageManager;
+ }
++#endif
+ 
+ Telephony*
+ Navigator::GetMozTelephony(ErrorResult& aRv)
+@@ -1679,6 +1687,7 @@
+   return !!pmService;
+ }
+ 
++#ifdef MOZ_MOBILEMESSAGE
+ /* static */
+ bool
+ Navigator::HasMobileMessageSupport(JSContext* /* unused */, JSObject* aGlobal)
+@@ -1703,6 +1712,7 @@
+ 
+   return true;
+ }
++#endif
+ 
+ /* static */
+ bool
+diff -r 8a1ec2da7fb4 -r 3ed1063f85ae dom/base/Navigator.h
+--- a/dom/base/Navigator.h	Fri Feb 21 13:39:05 2014 +0800
++++ b/dom/base/Navigator.h	Fri Feb 21 13:45:47 2014 +0800
+@@ -20,7 +20,9 @@
+ class nsMimeTypeArray;
+ class nsPIDOMWindow;
+ class nsIDOMMozConnection;
++#ifdef MOZ_MOBILEMESSAGE
+ class nsIDOMMozMobileMessageManager;
++#endif
+ class nsIDOMNavigatorSystemMessages;
+ class nsDOMCameraManager;
+ class nsDOMDeviceStorage;
+@@ -60,7 +62,9 @@
+ class Promise;
+ 
+ class DesktopNotificationCenter;
++#ifdef MOZ_MOBILEMESSAGE
+ class MobileMessageManager;
++#endif
+ class MozIdleObserver;
+ #ifdef MOZ_GAMEPAD
+ class Gamepad;
+@@ -196,7 +200,9 @@
+   DesktopNotificationCenter* GetMozNotification(ErrorResult& aRv);
+   bool MozIsLocallyAvailable(const nsAString& aURI, bool aWhenOffline,
+                              ErrorResult& aRv);
++#ifdef MOZ_MOBILEMESSAGE
+   nsIDOMMozMobileMessageManager* GetMozMobileMessage();
++#endif
+   Telephony* GetMozTelephony(ErrorResult& aRv);
+   nsIDOMMozConnection* GetMozConnection();
+   nsDOMCameraManager* GetMozCameras(ErrorResult& aRv);
+@@ -254,8 +260,10 @@
+   {
+     return HasDesktopNotificationSupport();
+   }
++#ifdef MOZ_MOBILEMESSAGE
+   static bool HasMobileMessageSupport(JSContext* /* unused */,
+                                       JSObject* aGlobal);
++#endif
+   static bool HasTelephonySupport(JSContext* /* unused */,
+                                   JSObject* aGlobal);
+   static bool HasCameraSupport(JSContext* /* unused */,
+@@ -320,7 +328,9 @@
+   nsRefPtr<FMRadio> mFMRadio;
+ #endif
+   nsRefPtr<PowerManager> mPowerManager;
++#ifdef MOZ_MOBILEMESSAGE
+   nsRefPtr<MobileMessageManager> mMobileMessageManager;
++#endif
+   nsRefPtr<Telephony> mTelephony;
+   nsRefPtr<network::Connection> mConnection;
+ #ifdef MOZ_B2G_RIL
+diff -r 8a1ec2da7fb4 -r 3ed1063f85ae dom/base/nsDOMClassInfo.cpp
+--- a/dom/base/nsDOMClassInfo.cpp	Fri Feb 21 13:39:05 2014 +0800
++++ b/dom/base/nsDOMClassInfo.cpp	Fri Feb 21 13:45:47 2014 +0800
+@@ -6,7 +6,9 @@
+ 
+ #include "mozilla/ArrayUtils.h"
+ // On top because they include basictypes.h:
++#ifdef MOZ_MOBILEMESSAGE
+ #include "mozilla/dom/SmsFilter.h"
++#endif
+ 
+ #ifdef XP_WIN
+ #undef GetClassName
+@@ -153,12 +155,14 @@
+ #include "mozilla/dom/HTMLCollectionBinding.h"
+ 
+ #include "nsIDOMWakeLock.h"
++#ifdef MOZ_MOBILEMESSAGE
+ #include "nsIDOMMobileMessageManager.h"
+ #include "nsIDOMMozSmsMessage.h"
+ #include "nsIDOMMozMmsMessage.h"
+ #include "nsIDOMSmsFilter.h"
+ #include "nsIDOMSmsSegmentInfo.h"
+ #include "nsIDOMMozMobileMessageThread.h"
++#endif
+ #include "nsIDOMConnection.h"
+ 
+ #ifdef MOZ_B2G_RIL
+@@ -452,6 +456,7 @@
+   NS_DEFINE_CLASSINFO_DATA(MozWakeLock, nsDOMGenericSH,
+                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
+ 
++#ifdef MOZ_MOBILEMESSAGE
+   NS_DEFINE_CLASSINFO_DATA(MozMobileMessageManager, nsDOMGenericSH,
+                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
+ 
+@@ -469,7 +474,8 @@
+ 
+   NS_DEFINE_CLASSINFO_DATA(MozMobileMessageThread, nsDOMGenericSH,
+                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
+-
++#endif
++  
+   NS_DEFINE_CLASSINFO_DATA(MozConnection, nsDOMGenericSH,
+                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
+ 
+@@ -571,7 +577,9 @@
+ {
+   NS_DEFINE_CONSTRUCTOR_FUNC_DATA(Blob, nsDOMMultipartFile::NewBlob)
+   NS_DEFINE_CONSTRUCTOR_FUNC_DATA(File, nsDOMMultipartFile::NewFile)
++#ifdef MOZ_MOBILEMESSAGE
+   NS_DEFINE_CONSTRUCTOR_FUNC_DATA(MozSmsFilter, SmsFilter::NewSmsFilter)
++#endif
+   NS_DEFINE_CONSTRUCTOR_FUNC_DATA(XSLTProcessor, XSLTProcessorCtor)
+ };
+ #undef NS_DEFINE_CONSTRUCTOR_FUNC_DATA
+@@ -1180,6 +1188,7 @@
+      DOM_CLASSINFO_MAP_ENTRY(nsIDOMMozWakeLock)
+   DOM_CLASSINFO_MAP_END
+ 
++#ifdef MOZ_MOBILEMESSAGE
+   DOM_CLASSINFO_MAP_BEGIN(MozMobileMessageManager, nsIDOMMozMobileMessageManager)
+      DOM_CLASSINFO_MAP_ENTRY(nsIDOMMozMobileMessageManager)
+   DOM_CLASSINFO_MAP_END
+@@ -1203,7 +1212,8 @@
+   DOM_CLASSINFO_MAP_BEGIN(MozMobileMessageThread, nsIDOMMozMobileMessageThread)
+      DOM_CLASSINFO_MAP_ENTRY(nsIDOMMozMobileMessageThread)
+   DOM_CLASSINFO_MAP_END
+-
++#endif
++  
+   DOM_CLASSINFO_MAP_BEGIN(MozConnection, nsIDOMMozConnection)
+      DOM_CLASSINFO_MAP_ENTRY(nsIDOMMozConnection)
+      DOM_CLASSINFO_MAP_ENTRY(nsIDOMEventTarget)
+diff -r 8a1ec2da7fb4 -r 3ed1063f85ae dom/base/nsDOMClassInfoClasses.h
+--- a/dom/base/nsDOMClassInfoClasses.h	Fri Feb 21 13:39:05 2014 +0800
++++ b/dom/base/nsDOMClassInfoClasses.h	Fri Feb 21 13:45:47 2014 +0800
+@@ -85,13 +85,15 @@
+ 
+ DOMCI_CLASS(MozWakeLock)
+ 
++#ifdef MOZ_MOBILEMESSAGE
+ DOMCI_CLASS(MozMobileMessageManager)
+ DOMCI_CLASS(MozSmsMessage)
+ DOMCI_CLASS(MozMmsMessage)
+ DOMCI_CLASS(MozSmsFilter)
+ DOMCI_CLASS(MozSmsSegmentInfo)
+ DOMCI_CLASS(MozMobileMessageThread)
+-
++#endif
++    
+ DOMCI_CLASS(MozConnection)
+ #ifdef MOZ_B2G_RIL
+ DOMCI_CLASS(MozMobileConnection)
+diff -r 8a1ec2da7fb4 -r 3ed1063f85ae dom/ipc/ContentChild.cpp
+--- a/dom/ipc/ContentChild.cpp	Fri Feb 21 13:39:05 2014 +0800
++++ b/dom/ipc/ContentChild.cpp	Fri Feb 21 13:45:47 2014 +0800
+@@ -101,7 +101,9 @@
+ #endif
+ 
+ #include "mozilla/dom/indexedDB/PIndexedDBChild.h"
++#ifdef MOZ_MOBILEMESSAGE
+ #include "mozilla/dom/mobilemessage/SmsChild.h"
++#endif
+ #include "mozilla/dom/devicestorage/DeviceStorageRequestChild.h"
+ #ifdef MOZ_BLUETOOTH
+ #include "mozilla/dom/bluetooth/PBluetoothChild.h"
+@@ -136,7 +138,9 @@
+ #endif
+ using namespace mozilla::dom::devicestorage;
+ using namespace mozilla::dom::ipc;
++#ifdef MOZ_MOBILEMESSAGE
+ using namespace mozilla::dom::mobilemessage;
++#endif
+ using namespace mozilla::dom::indexedDB;
+ using namespace mozilla::dom::telephony;
+ using namespace mozilla::hal_sandbox;
+@@ -968,6 +972,7 @@
+     return true;
+ }
+ 
++#ifdef MOZ_MOBILEMESSAGE
+ PSmsChild*
+ ContentChild::AllocPSmsChild()
+ {
+@@ -980,6 +985,7 @@
+     delete aSms;
+     return true;
+ }
++#endif
+ 
+ PTelephonyChild*
+ ContentChild::AllocPTelephonyChild()
+diff -r 8a1ec2da7fb4 -r 3ed1063f85ae dom/ipc/ContentChild.h
+--- a/dom/ipc/ContentChild.h	Fri Feb 21 13:39:05 2014 +0800
++++ b/dom/ipc/ContentChild.h	Fri Feb 21 13:45:47 2014 +0800
+@@ -150,8 +150,10 @@
+             PBrowserChild* aBrowser);
+     virtual bool DeallocPExternalHelperAppChild(PExternalHelperAppChild *aService);
+ 
++#ifdef MOZ_MOBILEMESSAGE
+     virtual PSmsChild* AllocPSmsChild();
+     virtual bool DeallocPSmsChild(PSmsChild*);
++#endif
+ 
+     virtual PTelephonyChild* AllocPTelephonyChild();
+     virtual bool DeallocPTelephonyChild(PTelephonyChild*);
+diff -r 8a1ec2da7fb4 -r 3ed1063f85ae dom/ipc/ContentParent.cpp
+--- a/dom/ipc/ContentParent.cpp	Fri Feb 21 13:39:05 2014 +0800
++++ b/dom/ipc/ContentParent.cpp	Fri Feb 21 13:45:47 2014 +0800
+@@ -41,7 +41,9 @@
+ #include "mozilla/dom/devicestorage/DeviceStorageRequestParent.h"
+ #include "mozilla/dom/GeolocationBinding.h"
+ #include "mozilla/dom/telephony/TelephonyParent.h"
++#ifdef MOZ_MOBILEMESSAGE
+ #include "SmsParent.h"
++#endif
+ #include "mozilla/hal_sandbox/PHalParent.h"
+ #include "mozilla/ipc/TestShellParent.h"
+ #include "mozilla/ipc/InputStreamUtils.h"
+@@ -151,7 +153,9 @@
+ using namespace mozilla::dom::devicestorage;
+ using namespace mozilla::dom::indexedDB;
+ using namespace mozilla::dom::power;
++#ifdef MOZ_MOBILEMESSAGE
+ using namespace mozilla::dom::mobilemessage;
++#endif
+ using namespace mozilla::dom::telephony;
+ using namespace mozilla::hal;
+ using namespace mozilla::ipc;
+@@ -2406,6 +2410,7 @@
+     return true;
+ }
+ 
++#ifdef MOZ_MOBILEMESSAGE
+ PSmsParent*
+ ContentParent::AllocPSmsParent()
+ {
+@@ -2424,6 +2429,7 @@
+     static_cast<SmsParent*>(aSms)->Release();
+     return true;
+ }
++#endif
+ 
+ PTelephonyParent*
+ ContentParent::AllocPTelephonyParent()
+diff -r 8a1ec2da7fb4 -r 3ed1063f85ae dom/ipc/ContentParent.h
+--- a/dom/ipc/ContentParent.h	Fri Feb 21 13:39:05 2014 +0800
++++ b/dom/ipc/ContentParent.h	Fri Feb 21 13:45:47 2014 +0800
+@@ -368,8 +368,10 @@
+             PBrowserParent* aBrowser);
+     virtual bool DeallocPExternalHelperAppParent(PExternalHelperAppParent* aService);
+ 
++#ifdef MOZ_MOBILEMESSAGE
+     virtual PSmsParent* AllocPSmsParent();
+     virtual bool DeallocPSmsParent(PSmsParent*);
++#endif
+ 
+     virtual PTelephonyParent* AllocPTelephonyParent();
+     virtual bool DeallocPTelephonyParent(PTelephonyParent*);
+diff -r 8a1ec2da7fb4 -r 3ed1063f85ae dom/ipc/PContent.ipdl
+--- a/dom/ipc/PContent.ipdl	Fri Feb 21 13:39:05 2014 +0800
++++ b/dom/ipc/PContent.ipdl	Fri Feb 21 13:45:47 2014 +0800
+@@ -16,7 +16,6 @@
+ include protocol PIndexedDB;
+ include protocol PMemoryReportRequest;
+ include protocol PNecko;
+-include protocol PSms;
+ include protocol PSpeechSynthesis;
+ include protocol PStorage;
+ include protocol PTelephony;
+@@ -158,7 +157,6 @@
+     manages PIndexedDB;
+     manages PMemoryReportRequest;
+     manages PNecko;
+-    manages PSms;
+     manages PSpeechSynthesis;
+     manages PStorage;
+     manages PTelephony;
+@@ -317,8 +315,6 @@
+ 
+     PNecko();
+ 
+-    PSms();
+-
+     PSpeechSynthesis();
+ 
+     PStorage();
+diff -r 8a1ec2da7fb4 -r 3ed1063f85ae dom/moz.build
+--- a/dom/moz.build	Fri Feb 21 13:39:05 2014 +0800
++++ b/dom/moz.build	Fri Feb 21 13:45:47 2014 +0800
+@@ -55,7 +55,6 @@
+     'push',
+     'quota',
+     'settings',
+-    'mobilemessage',
+     'src',
+     'time',
+     'locales',
+@@ -88,6 +87,9 @@
+ if CONFIG['MOZ_FMRADIO']:
+     PARALLEL_DIRS += ['fmradio']
+ 
++if CONFIG['MOZ_MOBILEMESSAGE']:
++    PARALLEL_DIRS += ['mobilemessage']
++
+ if CONFIG['OS_ARCH'] == 'WINNT':
+     PARALLEL_DIRS += ['plugins/ipc/hangui']
+ 
+diff -r 8a1ec2da7fb4 -r 3ed1063f85ae dom/webidl/DummyBinding.webidl
+--- a/dom/webidl/DummyBinding.webidl	Fri Feb 21 13:39:05 2014 +0800
++++ b/dom/webidl/DummyBinding.webidl	Fri Feb 21 13:45:47 2014 +0800
+@@ -19,10 +19,6 @@
+   void funcDNSLookupDict(optional DNSLookupDict arg);
+   void funcConnStatusDict(optional ConnStatusDict arg);
+   void frameRequestCallback(FrameRequestCallback arg);
+-  void SmsSendParameters(optional SmsSendParameters arg);
+-  void MmsSendParameters(optional MmsSendParameters arg);
+-  void MmsParameters(optional MmsParameters arg);
+-  void MmsAttachment(optional MmsAttachment arg);
+   void AsyncScrollEventDetail(optional AsyncScrollEventDetail arg);
+   void OpenWindowEventDetail(optional OpenWindowEventDetail arg);
+   void DOMWindowResizeEventDetail(optional DOMWindowResizeEventDetail arg);
+diff -r 8a1ec2da7fb4 -r 3ed1063f85ae dom/webidl/Navigator.webidl
+--- a/dom/webidl/Navigator.webidl	Fri Feb 21 13:39:05 2014 +0800
++++ b/dom/webidl/Navigator.webidl	Fri Feb 21 13:45:47 2014 +0800
+@@ -213,13 +213,6 @@
+   boolean mozIsLocallyAvailable(DOMString uri, boolean whenOffline);
+ };
+ 
+-// nsIDOMMozNavigatorMobileMessage
+-interface MozMobileMessageManager;
+-partial interface Navigator {
+-  [Func="Navigator::HasMobileMessageSupport"]
+-  readonly attribute MozMobileMessageManager? mozMobileMessage;
+-};
+-
+ // nsIDOMMozNavigatorNetwork
+ interface MozConnection;
+ partial interface Navigator {
+diff -r 8a1ec2da7fb4 -r 3ed1063f85ae dom/webidl/moz.build
+--- a/dom/webidl/moz.build	Fri Feb 21 13:39:05 2014 +0800
++++ b/dom/webidl/moz.build	Fri Feb 21 13:45:47 2014 +0800
+@@ -220,11 +220,9 @@
+     'MessagePortList.webidl',
+     'MimeType.webidl',
+     'MimeTypeArray.webidl',
+-    'MobileMessageManager.webidl',
+     'MouseEvent.webidl',
+     'MouseScrollEvent.webidl',
+     'MozActivity.webidl',
+-    'MozMmsMessage.webidl',
+     'MozNamedAttrMap.webidl',
+     'MozPowerManager.webidl',
+     'MozTimeManager.webidl',
+@@ -492,9 +490,7 @@
+     'ElementReplaceEvent.webidl',
+     'HashChangeEvent.webidl',
+     'MozApplicationEvent.webidl',
+-    'MozMmsEvent.webidl',
+     'MozSettingsEvent.webidl',
+-    'MozSmsEvent.webidl',
+     'PageTransitionEvent.webidl',
+     'PopStateEvent.webidl',
+     'PopupBlockedEvent.webidl',
+@@ -507,6 +503,14 @@
+     'StyleSheetChangeEvent.webidl',
+ ]
+ 
++if CONFIG['MOZ_MOBILEMESSAGE']:
++    WEBIDL_FILES += [
++        'MobileMessageManager.webidl',
++        'MozMmsMessage.webidl',
++        'MozMmsEvent.webidl',
++        'MozSmsEvent.webidl',
++    ]
++
+ if CONFIG['MOZ_B2G_BT']:
+     WEBIDL_FILES += [
+         'BluetoothAdapter.webidl',
+diff -r 8a1ec2da7fb4 -r 3ed1063f85ae js/xpconnect/src/dictionary_helper_gen.conf
+--- a/js/xpconnect/src/dictionary_helper_gen.conf	Fri Feb 21 13:39:05 2014 +0800
++++ b/js/xpconnect/src/dictionary_helper_gen.conf	Fri Feb 21 13:45:47 2014 +0800
+@@ -9,9 +9,7 @@
+      [ 'CameraRegion', 'nsIDOMCameraManager.idl' ],
+      [ 'CameraPosition', 'nsIDOMCameraManager.idl' ],
+      [ 'CameraSelector', 'nsIDOMCameraManager.idl' ],
+-     [ 'CameraRecordingOptions', 'nsIDOMCameraManager.idl' ],
+-     [ 'SmsThreadListItem', 'nsIMobileMessageCallback.idl' ],
+-     [ 'MmsAttachment', 'nsIDOMMozMmsMessage.idl' ]
++     [ 'CameraRecordingOptions', 'nsIDOMCameraManager.idl' ]
+    ]
+ 
+ # include file names
+diff -r 8a1ec2da7fb4 -r 3ed1063f85ae js/xpconnect/src/event_impl_gen.conf.in
+--- a/js/xpconnect/src/event_impl_gen.conf.in	Fri Feb 21 13:39:05 2014 +0800
++++ b/js/xpconnect/src/event_impl_gen.conf.in	Fri Feb 21 13:45:47 2014 +0800
+@@ -42,8 +42,6 @@
+     'USSDReceivedEvent',
+ #endif
+     'ElementReplaceEvent',
+-    'MozSmsEvent',
+-    'MozMmsEvent',
+ #ifdef MOZ_WEBSPEECH
+     'SpeechSynthesisEvent',
+ #endif
+diff -r 8a1ec2da7fb4 -r 3ed1063f85ae layout/build/nsLayoutModule.cpp
+--- a/layout/build/nsLayoutModule.cpp	Fri Feb 21 13:39:05 2014 +0800
++++ b/layout/build/nsLayoutModule.cpp	Fri Feb 21 13:45:47 2014 +0800
+@@ -215,12 +215,14 @@
+ #include "mozilla/dom/GamepadService.h"
+ #endif
+ #include "nsCSPService.h"
++#ifdef MOZ_MOBILEMESSAGE
+ #include "nsISmsService.h"
+ #include "nsIMmsService.h"
+ #include "nsIMobileMessageService.h"
+ #include "nsIMobileMessageDatabaseService.h"
+ #include "mozilla/dom/mobilemessage/MobileMessageService.h"
+ #include "mozilla/dom/mobilemessage/SmsServicesFactory.h"
++#endif
+ #include "nsIPowerManagerService.h"
+ #include "nsIAlarmHalService.h"
+ #include "nsIMediaManager.h"
+@@ -243,7 +245,9 @@
+ 
+ using namespace mozilla;
+ using namespace mozilla::dom;
++#ifdef MOZ_MOBILEMESSAGE
+ using namespace mozilla::dom::mobilemessage;
++#endif
+ using namespace mozilla::dom::telephony;
+ using mozilla::dom::alarm::AlarmHalService;
+ using mozilla::dom::indexedDB::IndexedDatabaseManager;
+@@ -318,6 +322,7 @@
+ #endif
+ #endif
+ NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(ThirdPartyUtil, Init)
++#ifdef MOZ_MOBILEMESSAGE
+ NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsISmsService,
+                                          SmsServicesFactory::CreateSmsService)
+ NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIMmsService,
+@@ -326,6 +331,7 @@
+                                          MobileMessageService::GetInstance)
+ NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIMobileMessageDatabaseService,
+                                          SmsServicesFactory::CreateMobileMessageDatabaseService)
++#endif
+ NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIPowerManagerService,
+                                          PowerManagerService::GetInstance)
+ NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIAlarmHalService,
+@@ -801,10 +807,13 @@
+ NS_DEFINE_NAMED_CID(NS_HAPTICFEEDBACK_CID);
+ #endif
+ #endif
++
++#ifdef MOZ_MOBILEMESSAGE
+ NS_DEFINE_NAMED_CID(SMS_SERVICE_CID);
+ NS_DEFINE_NAMED_CID(MMS_SERVICE_CID);
+ NS_DEFINE_NAMED_CID(MOBILE_MESSAGE_SERVICE_CID);
+ NS_DEFINE_NAMED_CID(MOBILE_MESSAGE_DATABASE_SERVICE_CID);
++#endif
+ NS_DEFINE_NAMED_CID(NS_POWERMANAGERSERVICE_CID);
+ NS_DEFINE_NAMED_CID(OSFILECONSTANTSSERVICE_CID);
+ NS_DEFINE_NAMED_CID(NS_ALARMHALSERVICE_CID);
+@@ -1092,10 +1101,12 @@
+ #endif
+   { &kTHIRDPARTYUTIL_CID, false, nullptr, ThirdPartyUtilConstructor },
+   { &kNS_STRUCTUREDCLONECONTAINER_CID, false, nullptr, nsStructuredCloneContainerConstructor },
++#ifdef MOZ_MOBILEMESSAGE
+   { &kSMS_SERVICE_CID, false, nullptr, nsISmsServiceConstructor },
+   { &kMMS_SERVICE_CID, false, nullptr, nsIMmsServiceConstructor },
+   { &kMOBILE_MESSAGE_SERVICE_CID, false, nullptr, nsIMobileMessageServiceConstructor },
+   { &kMOBILE_MESSAGE_DATABASE_SERVICE_CID, false, nullptr, nsIMobileMessageDatabaseServiceConstructor },
++#endif
+   { &kNS_POWERMANAGERSERVICE_CID, false, nullptr, nsIPowerManagerServiceConstructor },
+   { &kOSFILECONSTANTSSERVICE_CID, true, nullptr, OSFileConstantsServiceConstructor },
+   { &kNS_ALARMHALSERVICE_CID, false, nullptr, nsIAlarmHalServiceConstructor },
+@@ -1250,10 +1261,12 @@
+ #endif
+   { THIRDPARTYUTIL_CONTRACTID, &kTHIRDPARTYUTIL_CID },
+   { NS_STRUCTUREDCLONECONTAINER_CONTRACTID, &kNS_STRUCTUREDCLONECONTAINER_CID },
++#ifdef MOZ_MOBILEMESSAGE
+   { SMS_SERVICE_CONTRACTID, &kSMS_SERVICE_CID },
+   { MMS_SERVICE_CONTRACTID, &kMMS_SERVICE_CID },
+   { MOBILE_MESSAGE_SERVICE_CONTRACTID, &kMOBILE_MESSAGE_SERVICE_CID },
+   { MOBILE_MESSAGE_DATABASE_SERVICE_CONTRACTID, &kMOBILE_MESSAGE_DATABASE_SERVICE_CID },
++#endif
+   { POWERMANAGERSERVICE_CONTRACTID, &kNS_POWERMANAGERSERVICE_CID },
+   { OSFILECONSTANTSSERVICE_CONTRACTID, &kOSFILECONSTANTSSERVICE_CID },
+   { ALARMHALSERVICE_CONTRACTID, &kNS_ALARMHALSERVICE_CID },
+diff -r 8a1ec2da7fb4 -r 3ed1063f85ae modules/libpref/src/init/all.js
+--- a/modules/libpref/src/init/all.js	Fri Feb 21 13:39:05 2014 +0800
++++ b/modules/libpref/src/init/all.js	Fri Feb 21 13:45:47 2014 +0800
+@@ -4387,6 +4387,7 @@
+ pref("dom.battery.enabled", true);
+ #endif
+ 
++#ifdef MOZ_MOBILEMESSAGE
+ // WebSMS
+ pref("dom.sms.enabled", false);
+ // Enable Latin characters replacement with corresponding ones in GSM SMS
+@@ -4396,6 +4397,7 @@
+ // Numeric default service id for SMS API calls with |serviceId| parameter
+ // omitted.
+ pref("dom.sms.defaultServiceId", 0);
++#endif
+ 
+ #ifdef MOZ_CONTACTS
+ // WebContacts

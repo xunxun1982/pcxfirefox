@@ -1,0 +1,97 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392971791 -28800
+#      Fri Feb 21 16:36:31 2014 +0800
+# Node ID f5398612fba821b0964e333e7452dceeb9a21b0f
+# Parent  2bb2ff631f188718f6aea685a4f5816dc210903f
+Exit
+
+diff -r 2bb2ff631f18 -r f5398612fba8 storage/src/mozStorageService.cpp
+--- a/storage/src/mozStorageService.cpp	Fri Feb 21 16:34:10 2014 +0800
++++ b/storage/src/mozStorageService.cpp	Fri Feb 21 16:36:31 2014 +0800
+@@ -888,15 +888,6 @@
+       }
+     } while (anyOpen);
+ 
+-    if (gShutdownChecks == SCM_CRASH) {
+-      nsTArray<nsRefPtr<Connection> > connections;
+-      getConnections(connections);
+-      for (uint32_t i = 0, n = connections.Length(); i < n; i++) {
+-        if (connections[i]->ConnectionReady()) {
+-          MOZ_CRASH();
+-        }
+-      }
+-    }
+   }
+ 
+   return NS_OK;
+diff -r 2bb2ff631f18 -r f5398612fba8 toolkit/xre/nsAppRunner.cpp
+--- a/toolkit/xre/nsAppRunner.cpp	Fri Feb 21 16:34:10 2014 +0800
++++ b/toolkit/xre/nsAppRunner.cpp	Fri Feb 21 16:36:31 2014 +0800
+@@ -3392,28 +3392,9 @@
+ #ifdef DEBUG
+   gShutdownChecks = SCM_CRASH;
+ #else
+-  const char* releaseChannel = NS_STRINGIFY(MOZ_UPDATE_CHANNEL);
+-  if (strcmp(releaseChannel, "nightly") == 0 ||
+-      strcmp(releaseChannel, "default") == 0) {
+-    gShutdownChecks = SCM_RECORD;
+-  } else {
+-    gShutdownChecks = SCM_NOTHING;
+-  }
++  gShutdownChecks = SCM_NOTHING;
+ #endif
+ 
+-  // We let an environment variable override the default so that addons
+-  // authors can use it for debugging shutdown with released firefox versions.
+-  const char* mozShutdownChecksEnv = PR_GetEnv("MOZ_SHUTDOWN_CHECKS");
+-  if (mozShutdownChecksEnv) {
+-    if (strcmp(mozShutdownChecksEnv, "crash") == 0) {
+-      gShutdownChecks = SCM_CRASH;
+-    } else if (strcmp(mozShutdownChecksEnv, "record") == 0) {
+-      gShutdownChecks = SCM_RECORD;
+-    } else if (strcmp(mozShutdownChecksEnv, "nothing") == 0) {
+-      gShutdownChecks = SCM_NOTHING;
+-    }
+-  }
+-
+ }
+ 
+ /*
+diff -r 2bb2ff631f18 -r f5398612fba8 xpcom/build/LateWriteChecks.cpp
+--- a/xpcom/build/LateWriteChecks.cpp	Fri Feb 21 16:34:10 2014 +0800
++++ b/xpcom/build/LateWriteChecks.cpp	Fri Feb 21 16:36:31 2014 +0800
+@@ -106,11 +106,6 @@
+ 
+ void LateWriteObserver::Observe(IOInterposeObserver::Observation& aOb)
+ {
+-  // Crash if that is the shutdown check mode
+-  if (gShutdownChecks == SCM_CRASH) {
+-    MOZ_CRASH();
+-  }
+-
+   // If we have shutdown mode SCM_NOTHING or we can't record then abort
+   if (gShutdownChecks == SCM_NOTHING || !Telemetry::CanRecord()) {
+     return;
+diff -r 2bb2ff631f18 -r f5398612fba8 xpcom/build/nsXPComInit.cpp
+--- a/xpcom/build/nsXPComInit.cpp	Fri Feb 21 16:34:10 2014 +0800
++++ b/xpcom/build/nsXPComInit.cpp	Fri Feb 21 16:36:31 2014 +0800
+@@ -763,18 +763,6 @@
+     nsCycleCollector_shutdown();
+ 
+     PROFILER_MARKER("Shutdown xpcom");
+-    // If we are doing any shutdown checks, poison writes.
+-    if (gShutdownChecks != SCM_NOTHING) {
+-        // Calling InitIOInterposer or InitPoisonIOInterposer twice doesn't
+-        // cause any problems, they'll safely abort the initialization on their
+-        // own initiative.
+-        mozilla::IOInterposer::Init();
+-        mozilla::InitPoisonIOInterposer();
+-#ifdef XP_MACOSX
+-        mozilla::OnlyReportDirtyWrites();
+-#endif /* XP_MACOSX */
+-        mozilla::BeginLateWriteChecks();
+-    }
+ 
+     // Shutdown nsLocalFile string conversion
+     NS_ShutdownLocalFile();

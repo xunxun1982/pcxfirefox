@@ -1,0 +1,116 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392970993 -28800
+#      Fri Feb 21 16:23:13 2014 +0800
+# Node ID d1f6eeafb6d5f2959aec82fbb863bc1ddc457a16
+# Parent  a8100f063cad234f3ac0069834dffac1e67cacfa
+Disable finalizationwitness
+
+diff -r a8100f063cad -r d1f6eeafb6d5 browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Fri Feb 21 16:21:43 2014 +0800
++++ b/browser/installer/package-manifest.in	Fri Feb 21 16:23:13 2014 +0800
+@@ -340,7 +340,9 @@
+ @BINPATH@/components/shistory.xpt
+ @BINPATH@/components/spellchecker.xpt
+ @BINPATH@/components/storage.xpt
++#ifdef MOZ_FINALIZATIONWITNESS
+ @BINPATH@/components/toolkit_finalizationwitness.xpt
++#endif
+ @BINPATH@/components/toolkitprofile.xpt
+ #ifdef MOZ_ENABLE_XREMOTE
+ @BINPATH@/components/toolkitremote.xpt
+diff -r a8100f063cad -r d1f6eeafb6d5 configure.in
+--- a/configure.in	Fri Feb 21 16:21:43 2014 +0800
++++ b/configure.in	Fri Feb 21 16:23:13 2014 +0800
+@@ -7594,6 +7594,15 @@
+ fi
+ AC_SUBST(MOZ_SHIP_SPELLCHECK)
+ 
++MOZ_ARG_DISABLE_BOOL(finalizationwitness,
++[  --disable-finalizationwitness          Disable finalizationwitness],
++    MOZ_FINALIZATIONWITNESS=,
++    MOZ_FINALIZATIONWITNESS=1)
++if test -n "$MOZ_FINALIZATIONWITNESS"; then
++    AC_DEFINE(MOZ_FINALIZATIONWITNESS)
++fi
++AC_SUBST(MOZ_FINALIZATIONWITNESS)
++
+ dnl ========================================================
+ dnl = Support for gcc stack unwinding (from gcc 3.3)
+ dnl ========================================================
+diff -r a8100f063cad -r d1f6eeafb6d5 toolkit/components/build/nsToolkitCompsModule.cpp
+--- a/toolkit/components/build/nsToolkitCompsModule.cpp	Fri Feb 21 16:21:43 2014 +0800
++++ b/toolkit/components/build/nsToolkitCompsModule.cpp	Fri Feb 21 16:23:13 2014 +0800
+@@ -34,7 +34,9 @@
+ #endif
+ 
+ #include "nsBrowserStatusFilter.h"
++#ifdef MOZ_FINALIZATIONWITNESS
+ #include "mozilla/FinalizationWitnessService.h"
++#endif
+ 
+ using namespace mozilla;
+ 
+@@ -88,8 +90,10 @@
+ #if defined(USE_MOZ_UPDATER)
+ NS_GENERIC_FACTORY_CONSTRUCTOR(nsUpdateProcessor)
+ #endif
++#ifdef MOZ_FINALIZATIONWITNESS
+ NS_GENERIC_FACTORY_CONSTRUCTOR(FinalizationWitnessService)
+-
++#endif
++    
+ NS_DEFINE_NAMED_CID(NS_TOOLKIT_APPSTARTUP_CID);
+ NS_DEFINE_NAMED_CID(NS_USERINFO_CID);
+ NS_DEFINE_NAMED_CID(NS_ALERTSSERVICE_CID);
+@@ -113,7 +117,9 @@
+ #if defined(USE_MOZ_UPDATER)
+ NS_DEFINE_NAMED_CID(NS_UPDATEPROCESSOR_CID);
+ #endif
++#ifdef MOZ_FINALIZATIONWITNESS
+ NS_DEFINE_NAMED_CID(FINALIZATIONWITNESSSERVICE_CID);
++#endif
+ 
+ static const Module::CIDEntry kToolkitCIDs[] = {
+   { &kNS_TOOLKIT_APPSTARTUP_CID, false, nullptr, nsAppStartupConstructor },
+@@ -139,7 +145,9 @@
+ #if defined(USE_MOZ_UPDATER)
+   { &kNS_UPDATEPROCESSOR_CID, false, nullptr, nsUpdateProcessorConstructor },
+ #endif
++#ifdef MOZ_FINALIZATIONWITNESS
+   { &kFINALIZATIONWITNESSSERVICE_CID, false, nullptr, FinalizationWitnessServiceConstructor },
++#endif
+   { nullptr }
+ };
+ 
+@@ -168,7 +176,9 @@
+ #if defined(USE_MOZ_UPDATER)
+   { NS_UPDATEPROCESSOR_CONTRACTID, &kNS_UPDATEPROCESSOR_CID },
+ #endif
++#ifdef MOZ_FINALIZATIONWITNESS
+   { FINALIZATIONWITNESSSERVICE_CONTRACTID, &kFINALIZATIONWITNESSSERVICE_CID },
++#endif
+   { nullptr }
+ };
+ 
+diff -r a8100f063cad -r d1f6eeafb6d5 toolkit/components/moz.build
+--- a/toolkit/components/moz.build	Fri Feb 21 16:21:43 2014 +0800
++++ b/toolkit/components/moz.build	Fri Feb 21 16:23:13 2014 +0800
+@@ -19,7 +19,6 @@
+     'downloads',
+     'exthelper',
+     'filepicker',
+-    'finalizationwitness',
+     'find',
+     'intl',
+     'jsdownloads',
+@@ -52,6 +51,9 @@
+ if not CONFIG['MOZ_DISABLE_PARENTAL_CONTROLS']:
+     PARALLEL_DIRS += ['parentalcontrols']
+ 
++if CONFIG['MOZ_FINALIZATIONWITNESS']:
++    PARALLEL_DIRS += ['finalizationwitness']
++
+ if CONFIG['BUILD_CTYPES']:
+     PARALLEL_DIRS += ['ctypes']
+ 

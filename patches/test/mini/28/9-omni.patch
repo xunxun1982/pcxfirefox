@@ -1,0 +1,20 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392959986 -28800
+#      Fri Feb 21 13:19:46 2014 +0800
+# Node ID 45827af96cd8e66f111ecf7d2894ad6579dc33ce
+# Parent  25703268cbe65782deb2a102d5218cc61518b986
+Don't compress omni.ja
+
+diff -r 25703268cbe6 -r 45827af96cd8 python/mozbuild/mozpack/mozjar.py
+--- a/python/mozbuild/mozpack/mozjar.py	Fri Feb 21 13:18:20 2014 +0800
++++ b/python/mozbuild/mozpack/mozjar.py	Fri Feb 21 13:19:46 2014 +0800
+@@ -649,7 +649,7 @@
+         self._data = BytesIO()
+         self.compress = compress
+         if compress:
+-            self._deflater = zlib.compressobj(9, zlib.DEFLATED, -MAX_WBITS)
++            self._deflater = zlib.compressobj(0, zlib.DEFLATED, -MAX_WBITS)
+             self._deflated = BytesIO()
+         else:
+             self._deflater = None

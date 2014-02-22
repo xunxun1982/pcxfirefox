@@ -1,0 +1,85 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392961645 -28800
+#      Fri Feb 21 13:47:25 2014 +0800
+# Node ID 209e2a65d5f85cd7c88958999b771055d7d7842d
+# Parent  3ed1063f85ae35557d459346b81e483cd07cbcca
+Disable phonenumberutil
+
+diff -r 3ed1063f85ae -r 209e2a65d5f8 browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Fri Feb 21 13:45:47 2014 +0800
++++ b/browser/installer/package-manifest.in	Fri Feb 21 13:47:25 2014 +0800
+@@ -534,8 +534,10 @@
+ @BINPATH@/components/ContactManager.js
+ @BINPATH@/components/ContactManager.manifest
+ #endif
++#ifdef MOZ_PHONENUMBERUTILS
+ @BINPATH@/components/PhoneNumberService.js
+ @BINPATH@/components/PhoneNumberService.manifest
++#endif
+ @BINPATH@/components/NotificationStorage.js
+ @BINPATH@/components/NotificationStorage.manifest
+ @BINPATH@/components/AlarmsManager.js
+diff -r 3ed1063f85ae -r 209e2a65d5f8 configure.in
+--- a/configure.in	Fri Feb 21 13:45:47 2014 +0800
++++ b/configure.in	Fri Feb 21 13:47:25 2014 +0800
+@@ -7452,6 +7452,15 @@
+ fi
+ AC_SUBST(MOZ_MOBILEMESSAGE)
+ 
++MOZ_ARG_DISABLE_BOOL(phonenumberutil,
++[  --disable-phonenumberutils          Disable phonenumberutil],
++    MOZ_PHONENUMBERUTILS=,
++    MOZ_PHONENUMBERUTILSE=1)
++if test -n "$MOZ_PHONENUMBERUTILS"; then
++    AC_DEFINE(MOZ_PHONENUMBERUTILS)
++fi
++AC_SUBST(MOZ_PHONENUMBERUTILS)
++
+ dnl ========================================================
+ dnl = Enable Support for AudioChannelManager API
+ dnl ========================================================
+diff -r 3ed1063f85ae -r 209e2a65d5f8 dom/moz.build
+--- a/dom/moz.build	Fri Feb 21 13:45:47 2014 +0800
++++ b/dom/moz.build	Fri Feb 21 13:47:25 2014 +0800
+@@ -42,7 +42,6 @@
+     'activities',
+     'bindings',
+     'browser-element',
+-    'phonenumberutils',
+     'alarm',
+     'datastore',
+     'devicestorage',
+@@ -90,6 +89,9 @@
+ if CONFIG['MOZ_MOBILEMESSAGE']:
+     PARALLEL_DIRS += ['mobilemessage']
+ 
++if CONFIG['MOZ_PHONENUMBERUTILS']:
++    PARALLEL_DIRS += ['phonenumberutils']
++
+ if CONFIG['OS_ARCH'] == 'WINNT':
+     PARALLEL_DIRS += ['plugins/ipc/hangui']
+ 
+diff -r 3ed1063f85ae -r 209e2a65d5f8 dom/webidl/moz.build
+--- a/dom/webidl/moz.build	Fri Feb 21 13:45:47 2014 +0800
++++ b/dom/webidl/moz.build	Fri Feb 21 13:47:25 2014 +0800
+@@ -248,7 +248,6 @@
+     'PerformanceNavigation.webidl',
+     'PerformanceTiming.webidl',
+     'PeriodicWave.webidl',
+-    'PhoneNumberService.webidl',
+     'Plugin.webidl',
+     'PluginArray.webidl',
+     'PointerEvent.webidl',
+@@ -441,6 +440,11 @@
+         'Contacts.webidl',
+     ]
+ 
++if CONFIG['MOZ_PHONENUMBERUTILS']:
++    WEBIDL_FILES += [
++        'PhoneNumberService.webidl',
++    ]
++
+ if CONFIG['MOZ_AUDIO_CHANNEL_MANAGER']:
+     WEBIDL_FILES += [
+         'AudioChannelManager.webidl',

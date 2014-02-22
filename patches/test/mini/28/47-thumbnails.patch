@@ -1,0 +1,222 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392971425 -28800
+#      Fri Feb 21 16:30:25 2014 +0800
+# Node ID 7c5c178ea9da343761697df3d917ecac42ffc490
+# Parent  cb7ca3934c043eb889c5988b766f71ca09e7f0c1
+Disable thumbnails
+
+diff -r cb7ca3934c04 -r 7c5c178ea9da browser/base/content/browser.js
+--- a/browser/base/content/browser.js	Fri Feb 21 16:28:29 2014 +0800
++++ b/browser/base/content/browser.js	Fri Feb 21 16:30:25 2014 +0800
+@@ -122,8 +122,10 @@
+   "resource:///modules/Social.jsm");
+ #endif
+ 
++#ifdef MOZ_THUMBNAILS
+ XPCOMUtils.defineLazyModuleGetter(this, "PageThumbs",
+   "resource://gre/modules/PageThumbs.jsm");
++#endif
+ 
+ #ifdef MOZ_SAFE_BROWSING
+ XPCOMUtils.defineLazyModuleGetter(this, "SafeBrowsing",
+@@ -171,7 +173,9 @@
+ #endif
+ #include browser-tabPreviews.js
+ #include browser-tabview.js
++#ifdef MOZ_THUMBNAILS
+ #include browser-thumbnails.js
++#endif
+ #ifdef MOZ_WEBRTC
+ #include browser-webrtcUI.js
+ #endif
+@@ -1158,8 +1162,10 @@
+     gDataNotificationInfoBar.init();
+ #endif
+ 
++#ifdef MOZ_THUMBNAILS
+     gBrowserThumbnails.init();
+-
++#endif
++    
+     setUrlAndSearchBarWidthForConditionalForwardButton();
+     window.addEventListener("resize", function resizeHandler(event) {
+       if (event.target == window)
+@@ -1316,7 +1322,9 @@
+       gPrefService.removeObserver(ctrlTab.prefName, ctrlTab);
+       ctrlTab.uninit();
+       TabView.uninit();
++#ifdef MOZ_THUMBNAILS
+       gBrowserThumbnails.uninit();
++#endif
+       FullZoom.destroy();
+ 
+       Services.obs.removeObserver(gSessionHistoryObserver, "browser:purge-session-history");
+diff -r cb7ca3934c04 -r 7c5c178ea9da browser/base/content/newtab/newTab.js
+--- a/browser/base/content/newtab/newTab.js	Fri Feb 21 16:28:29 2014 +0800
++++ b/browser/base/content/newtab/newTab.js	Fri Feb 21 16:30:25 2014 +0800
+@@ -9,8 +9,6 @@
+ 
+ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+ Cu.import("resource://gre/modules/Services.jsm");
+-Cu.import("resource://gre/modules/PageThumbs.jsm");
+-Cu.import("resource://gre/modules/BackgroundPageThumbs.jsm");
+ Cu.import("resource://gre/modules/NewTabUtils.jsm");
+ Cu.import("resource://gre/modules/commonjs/sdk/core/promise.js");
+ 
+diff -r cb7ca3934c04 -r 7c5c178ea9da browser/base/content/newtab/sites.js
+--- a/browser/base/content/newtab/sites.js	Fri Feb 21 16:28:29 2014 +0800
++++ b/browser/base/content/newtab/sites.js	Fri Feb 21 16:30:25 2014 +0800
+@@ -143,17 +143,12 @@
+    * existing thumbnail and the page allows background captures.
+    */
+   captureIfMissing: function Site_captureIfMissing() {
+-    if (gPage.allowBackgroundCaptures)
+-      BackgroundPageThumbs.captureIfMissing(this.url);
+   },
+ 
+   /**
+    * Refreshes the thumbnail for the site.
+    */
+   refreshThumbnail: function Site_refreshThumbnail() {
+-    let thumbnailURL = PageThumbs.getThumbnailURL(this.url);
+-    let thumbnail = this._querySelector(".newtab-thumbnail");
+-    thumbnail.style.backgroundImage = "url(" + thumbnailURL + ")";
+   },
+ 
+   /**
+diff -r cb7ca3934c04 -r 7c5c178ea9da browser/components/nsBrowserGlue.js
+--- a/browser/components/nsBrowserGlue.js	Fri Feb 21 16:28:29 2014 +0800
++++ b/browser/components/nsBrowserGlue.js	Fri Feb 21 16:30:25 2014 +0800
+@@ -41,8 +41,10 @@
+ XPCOMUtils.defineLazyModuleGetter(this, "webappsUI",
+                                   "resource:///modules/webappsUI.jsm");
+ 
++#ifdef MOZ_THUMBNAILS
+ XPCOMUtils.defineLazyModuleGetter(this, "PageThumbs",
+                                   "resource://gre/modules/PageThumbs.jsm");
++#endif
+ 
+ XPCOMUtils.defineLazyModuleGetter(this, "NewTabUtils",
+                                   "resource://gre/modules/NewTabUtils.jsm");
+@@ -472,7 +474,9 @@
+     this._syncSearchEngines();
+ 
+     webappsUI.init();
++#ifdef MOZ_THUMBNAILS
+     PageThumbs.init();
++#endif
+     NewTabUtils.init();
+     BrowserNewTabPreloader.init();
+     SignInToWebsiteUX.init();
+@@ -1190,8 +1194,10 @@
+    */
+   _onPlacesShutdown: function BG__onPlacesShutdown() {
+     this._sanitizer.onShutdown();
++#ifdef MOZ_THUMBNAILS
+     PageThumbs.uninit();
+-
++#endif
++    
+     if (this._isIdleObserver) {
+       this._idleService.removeIdleObserver(this, BOOKMARKS_BACKUP_IDLE_TIME);
+       this._isIdleObserver = false;
+diff -r cb7ca3934c04 -r 7c5c178ea9da browser/components/tabview/tabview.js
+--- a/browser/components/tabview/tabview.js	Fri Feb 21 16:28:29 2014 +0800
++++ b/browser/components/tabview/tabview.js	Fri Feb 21 16:30:25 2014 +0800
+@@ -29,8 +29,10 @@
+   return Services.prefs.getBranch("browser.panorama.");
+ });
+ 
++#ifdef MOZ_THUMBNAILS
+ XPCOMUtils.defineLazyModuleGetter(this, "gPageThumbnails",
+   "resource://gre/modules/PageThumbs.jsm", "PageThumbs");
++#endif
+ 
+ var gWindow = window.parent;
+ var gBrowser = gWindow.gBrowser;
+diff -r cb7ca3934c04 -r 7c5c178ea9da browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Fri Feb 21 16:28:29 2014 +0800
++++ b/browser/installer/package-manifest.in	Fri Feb 21 16:30:25 2014 +0800
+@@ -407,7 +407,9 @@
+ @BINPATH@/browser/components/devtools-clhandler.js
+ @BINPATH@/components/Downloads.manifest
+ @BINPATH@/components/DownloadLegacy.js
++#ifdef MOZ_THUMBNAILS
+ @BINPATH@/components/BrowserPageThumbs.manifest
++#endif
+ @BINPATH@/components/SiteSpecificUserAgent.js
+ @BINPATH@/components/SiteSpecificUserAgent.manifest
+ @BINPATH@/components/toolkitsearch.manifest
+@@ -470,7 +472,9 @@
+ @BINPATH@/browser/components/PlacesProtocolHandler.js
+ @BINPATH@/components/PlacesCategoriesStarter.js
+ @BINPATH@/components/ColorAnalyzer.js
++#ifdef MOZ_THUMBNAILS
+ @BINPATH@/components/PageThumbsProtocol.js
++#endif
+ @BINPATH@/components/nsDefaultCLH.manifest
+ @BINPATH@/components/nsDefaultCLH.js
+ @BINPATH@/components/nsContentPrefService.manifest
+diff -r cb7ca3934c04 -r 7c5c178ea9da toolkit/components/moz.build
+--- a/toolkit/components/moz.build	Fri Feb 21 16:28:29 2014 +0800
++++ b/toolkit/components/moz.build	Fri Feb 21 16:30:25 2014 +0800
+@@ -34,7 +34,6 @@
+     'startup',
+     'statusfilter',
+     'telemetry',
+-    'thumbnails',
+     'typeaheadfind',
+     'urlformatter',
+     'viewconfig',
+@@ -54,6 +53,9 @@
+ if CONFIG['MOZ_FINALIZATIONWITNESS']:
+     PARALLEL_DIRS += ['finalizationwitness']
+ 
++if CONFIG['MOZ_THUMBNAILS']:
++    PARALLEL_DIRS += ['thumbnails']
++
+ if CONFIG['BUILD_CTYPES']:
+     PARALLEL_DIRS += ['ctypes']
+ 
+diff -r cb7ca3934c04 -r 7c5c178ea9da toolkit/modules/NewTabUtils.jsm
+--- a/toolkit/modules/NewTabUtils.jsm	Fri Feb 21 16:28:29 2014 +0800
++++ b/toolkit/modules/NewTabUtils.jsm	Fri Feb 21 16:30:25 2014 +0800
+@@ -16,9 +16,6 @@
+ XPCOMUtils.defineLazyModuleGetter(this, "PlacesUtils",
+   "resource://gre/modules/PlacesUtils.jsm");
+ 
+-XPCOMUtils.defineLazyModuleGetter(this, "PageThumbs",
+-  "resource://gre/modules/PageThumbs.jsm");
+-
+ XPCOMUtils.defineLazyGetter(this, "gPrincipal", function () {
+   let uri = Services.io.newURI("about:newtab", null, null);
+   return Services.scriptSecurityManager.getNoAppCodebasePrincipal(uri);
+@@ -743,27 +740,10 @@
+ 
+ let ExpirationFilter = {
+   init: function ExpirationFilter_init() {
+-    PageThumbs.addExpirationFilter(this);
+   },
+ 
+   filterForThumbnailExpiration:
+   function ExpirationFilter_filterForThumbnailExpiration(aCallback) {
+-    if (!AllPages.enabled) {
+-      aCallback([]);
+-      return;
+-    }
+-
+-    Links.populateCache(function () {
+-      let urls = [];
+-
+-      // Add all URLs to the list that we want to keep thumbnails for.
+-      for (let link of Links.getLinks().slice(0, 25)) {
+-        if (link && link.url)
+-          urls.push(link.url);
+-      }
+-
+-      aCallback(urls);
+-    });
+   }
+ };
+ 

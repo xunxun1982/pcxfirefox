@@ -1,0 +1,30 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392965973 -28800
+#      Fri Feb 21 14:59:33 2014 +0800
+# Node ID df3332bf8cfba642910b8aa3d78588240df3ea76
+# Parent  22a8bf8e32fdf47bd8bcf9c06e3de228d037c0a0
+autopgo
+
+diff -r 22a8bf8e32fd -r df3332bf8cfb Makefile.in
+--- a/Makefile.in	Fri Feb 21 14:58:18 2014 +0800
++++ b/Makefile.in	Fri Feb 21 14:59:33 2014 +0800
+@@ -263,3 +263,6 @@
+ endif
+ endif
+ endif
++
++pgo-profile-run:
++	$(PYTHON) $(topsrcdir)/build/pgo/profileserver.py $(EXTRA_TEST_ARGS)
+diff -r 22a8bf8e32fd -r df3332bf8cfb build/pgo/profileserver.py
+--- a/build/pgo/profileserver.py	Fri Feb 21 14:58:18 2014 +0800
++++ b/build/pgo/profileserver.py	Fri Feb 21 14:59:33 2014 +0800
+@@ -59,7 +59,7 @@
+       env["MOZ_JAR_LOG_FILE"] = os.path.abspath(jarlog)
+       print "jarlog: %s" % env["MOZ_JAR_LOG_FILE"]
+ 
+-    cmdargs = ["http://localhost:%d/index.html" % PORT]
++    cmdargs = ["http://127.0.0.1:%d/index.html" % PORT]
+     runner = FirefoxRunner(profile=profile,
+                            binary=build.get_binary_path(where="staged-package"),
+                            cmdargs=cmdargs,

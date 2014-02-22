@@ -1,0 +1,101 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392961052 -28800
+#      Fri Feb 21 13:37:32 2014 +0800
+# Node ID ada79d0660f2877a55b4db9e2eedfaf40c388db5
+# Parent  1109b97b0b1a71f66ef5cf6739ab0073354f8add
+Disable contacts
+
+diff -r 1109b97b0b1a -r ada79d0660f2 browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Fri Feb 21 13:35:42 2014 +0800
++++ b/browser/installer/package-manifest.in	Fri Feb 21 13:37:32 2014 +0800
+@@ -528,8 +528,10 @@
+ 
+ @BINPATH@/components/PermissionSettings.js
+ @BINPATH@/components/PermissionSettings.manifest
++#ifdef MOZ_CONTACTS
+ @BINPATH@/components/ContactManager.js
+ @BINPATH@/components/ContactManager.manifest
++#endif
+ @BINPATH@/components/PhoneNumberService.js
+ @BINPATH@/components/PhoneNumberService.manifest
+ @BINPATH@/components/NotificationStorage.js
+diff -r 1109b97b0b1a -r ada79d0660f2 configure.in
+--- a/configure.in	Fri Feb 21 13:35:42 2014 +0800
++++ b/configure.in	Fri Feb 21 13:37:32 2014 +0800
+@@ -7425,6 +7425,15 @@
+ fi
+ AC_SUBST(MOZ_BLUETOOTH)
+ 
++MOZ_ARG_DISABLE_BOOL(contacts,
++[  --disable-contacts           Disable contacts],
++    MOZ_CONTACTS=,
++    MOZ_CONTACTS=1)
++if test -n "$MOZ_CONTACTS"; then
++    AC_DEFINE(MOZ_CONTACTS)
++fi
++AC_SUBST(MOZ_CONTACTS)
++
+ dnl ========================================================
+ dnl = Enable Support for AudioChannelManager API
+ dnl ========================================================
+diff -r 1109b97b0b1a -r ada79d0660f2 dom/moz.build
+--- a/dom/moz.build	Fri Feb 21 13:35:42 2014 +0800
++++ b/dom/moz.build	Fri Feb 21 13:37:32 2014 +0800
+@@ -42,7 +42,6 @@
+     'activities',
+     'bindings',
+     'browser-element',
+-    'contacts',
+     'phonenumberutils',
+     'alarm',
+     'datastore',
+@@ -84,6 +83,9 @@
+ if CONFIG['MOZ_BLUETOOTH']:
+     PARALLEL_DIRS += ['bluetooth']
+ 
++if CONFIG['MOZ_CONTACTS']:
++    PARALLEL_DIRS += ['contacts']
++
+ if CONFIG['OS_ARCH'] == 'WINNT':
+     PARALLEL_DIRS += ['plugins/ipc/hangui']
+ 
+diff -r 1109b97b0b1a -r ada79d0660f2 dom/webidl/moz.build
+--- a/dom/webidl/moz.build	Fri Feb 21 13:35:42 2014 +0800
++++ b/dom/webidl/moz.build	Fri Feb 21 13:37:32 2014 +0800
+@@ -53,7 +53,6 @@
+     'CommandEvent.webidl',
+     'Comment.webidl',
+     'CompositionEvent.webidl',
+-    'Contacts.webidl',
+     'ConvolverNode.webidl',
+     'Coordinates.webidl',
+     'CSS.webidl',
+@@ -439,6 +438,11 @@
+         'BatteryManager.webidl',
+     ]
+ 
++if CONFIG['MOZ_CONTACTS']:
++    WEBIDL_FILES += [
++        'Contacts.webidl',
++    ]
++
+ if CONFIG['MOZ_AUDIO_CHANNEL_MANAGER']:
+     WEBIDL_FILES += [
+         'AudioChannelManager.webidl',
+diff -r 1109b97b0b1a -r ada79d0660f2 modules/libpref/src/init/all.js
+--- a/modules/libpref/src/init/all.js	Fri Feb 21 13:35:42 2014 +0800
++++ b/modules/libpref/src/init/all.js	Fri Feb 21 13:37:32 2014 +0800
+@@ -4397,10 +4397,12 @@
+ // omitted.
+ pref("dom.sms.defaultServiceId", 0);
+ 
++#ifdef MOZ_CONTACTS
+ // WebContacts
+ pref("dom.mozContacts.enabled", false);
+ pref("dom.navigator-property.disable.mozContacts", true);
+ pref("dom.global-constructor.disable.mozContact", true);
++#endif
+ 
+ // WebAlarms
+ pref("dom.mozAlarms.enabled", false);

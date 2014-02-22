@@ -1,0 +1,392 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392960810 -28800
+#      Fri Feb 21 13:33:30 2014 +0800
+# Node ID 29b97fdaa5db4e63fa085987bec8468548bf5f58
+# Parent  98adf592f1ce85811e7ffcf8959ddd7525711fa2
+Disable diskspacewatcher
+
+diff -r 98adf592f1ce -r 29b97fdaa5db configure.in
+--- a/configure.in	Fri Feb 21 13:31:02 2014 +0800
++++ b/configure.in	Fri Feb 21 13:33:30 2014 +0800
+@@ -7407,6 +7407,15 @@
+ fi
+ AC_SUBST(MOZ_BATTERY)
+ 
++MOZ_ARG_DISABLE_BOOL(diskspacewatcher,
++[  --disable-diskspacewatcher           Disable diskspacewatcher],
++    MOZ_DISKSPACEWATCHER=,
++    MOZ_DISKSPACEWATCHER=1)
++if test -n "$MOZ_DISKSPACEWATCHER"; then
++    AC_DEFINE(MOZ_DISKSPACEWATCHER)
++fi
++AC_SUBST(MOZ_DISKSPACEWATCHER)
++
+ dnl ========================================================
+ dnl = Enable Support for AudioChannelManager API
+ dnl ========================================================
+diff -r 98adf592f1ce -r 29b97fdaa5db dom/indexedDB/IDBDatabase.cpp
+--- a/dom/indexedDB/IDBDatabase.cpp	Fri Feb 21 13:31:02 2014 +0800
++++ b/dom/indexedDB/IDBDatabase.cpp	Fri Feb 21 13:33:30 2014 +0800
+@@ -825,12 +825,14 @@
+ 
+   PROFILER_LABEL("IndexedDB", "CreateObjectStoreHelper::DoDatabaseWork");
+ 
++#ifdef MOZ_DISKSPACEWATCHER
+   if (IndexedDatabaseManager::InLowDiskSpaceMode()) {
+     NS_WARNING("Refusing to create additional objectStore because disk space "
+                "is low!");
+     return NS_ERROR_DOM_INDEXEDDB_QUOTA_ERR;
+   }
+-
++#endif
++  
+   nsCOMPtr<mozIStorageStatement> stmt =
+     mTransaction->GetCachedStatement(NS_LITERAL_CSTRING(
+     "INSERT INTO object_store (id, auto_increment, name, key_path) "
+@@ -911,11 +913,13 @@
+ 
+   PROFILER_LABEL("IndexedDB", "CreateFileHelper::DoDatabaseWork");
+ 
++#ifdef MOZ_DISKSPACEWATCHER
+   if (IndexedDatabaseManager::InLowDiskSpaceMode()) {
+     NS_WARNING("Refusing to create file because disk space is low!");
+     return NS_ERROR_DOM_INDEXEDDB_QUOTA_ERR;
+   }
+-
++#endif
++  
+   FileManager* fileManager = mDatabase->Manager();
+ 
+   mFileInfo = fileManager->GetNewFileInfo();
+diff -r 98adf592f1ce -r 29b97fdaa5db dom/indexedDB/IDBObjectStore.cpp
+--- a/dom/indexedDB/IDBObjectStore.cpp	Fri Feb 21 13:31:02 2014 +0800
++++ b/dom/indexedDB/IDBObjectStore.cpp	Fri Feb 21 13:33:30 2014 +0800
+@@ -3138,11 +3138,13 @@
+ 
+   PROFILER_LABEL("IndexedDB", "AddHelper::DoDatabaseWork");
+ 
++#ifdef MOZ_DISKSPACEWATCHER
+   if (IndexedDatabaseManager::InLowDiskSpaceMode()) {
+     NS_WARNING("Refusing to add more data because disk space is low!");
+     return NS_ERROR_DOM_INDEXEDDB_QUOTA_ERR;
+   }
+-
++#endif
++  
+   nsresult rv;
+   bool keyUnset = mKey.IsUnset();
+   int64_t osid = mObjectStore->Id();
+@@ -4418,11 +4420,13 @@
+ 
+   PROFILER_LABEL("IndexedDB", "CreateIndexHelper::DoDatabaseWork");
+ 
++#ifdef MOZ_DISKSPACEWATCHER
+   if (IndexedDatabaseManager::InLowDiskSpaceMode()) {
+     NS_WARNING("Refusing to create index because disk space is low!");
+     return NS_ERROR_DOM_INDEXEDDB_QUOTA_ERR;
+   }
+-
++#endif
++  
+   // Insert the data into the database.
+   nsCOMPtr<mozIStorageStatement> stmt =
+     mTransaction->GetCachedStatement(
+diff -r 98adf592f1ce -r 29b97fdaa5db dom/indexedDB/IndexedDatabaseManager.cpp
+--- a/dom/indexedDB/IndexedDatabaseManager.cpp	Fri Feb 21 13:31:02 2014 +0800
++++ b/dom/indexedDB/IndexedDatabaseManager.cpp	Fri Feb 21 13:33:30 2014 +0800
+@@ -7,7 +7,9 @@
+ #include "IndexedDatabaseManager.h"
+ 
+ #include "nsIConsoleService.h"
++#ifdef MOZ_DISKSPACEWATCHER
+ #include "nsIDiskSpaceWatcher.h"
++#endif
+ #include "nsIFile.h"
+ #include "nsIFileStorage.h"
+ #include "nsIObserverService.h"
+@@ -191,7 +193,9 @@
+ }
+ 
+ bool IndexedDatabaseManager::sIsMainProcess = false;
++#ifdef MOZ_DISKSPACEWATCHER
+ mozilla::Atomic<int32_t> IndexedDatabaseManager::sLowDiskSpaceMode(0);
++#endif
+ 
+ // static
+ IndexedDatabaseManager*
+@@ -207,6 +211,7 @@
+   if (!gInstance) {
+     sIsMainProcess = XRE_GetProcessType() == GeckoProcessType_Default;
+ 
++#ifdef MOZ_DISKSPACEWATCHER
+     if (sIsMainProcess) {
+       // See if we're starting up in low disk space conditions.
+       nsCOMPtr<nsIDiskSpaceWatcher> watcher =
+@@ -224,7 +229,8 @@
+         NS_WARNING("No disk space watcher component available!");
+       }
+     }
+-
++#endif
++    
+     nsRefPtr<IndexedDatabaseManager> instance(new IndexedDatabaseManager());
+ 
+     nsresult rv = instance->Init();
+@@ -281,9 +287,11 @@
+     nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
+     NS_ENSURE_STATE(obs);
+ 
++#ifdef MOZ_DISKSPACEWATCHER
+     nsresult rv =
+       obs->AddObserver(this, DISKSPACEWATCHER_OBSERVER_TOPIC, false);
+     NS_ENSURE_SUCCESS(rv, rv);
++#endif
+   }
+ 
+   return NS_OK;
+@@ -465,6 +473,7 @@
+   return sIsMainProcess;
+ }
+ 
++#ifdef MOZ_DISKSPACEWATCHER
+ //static
+ bool
+ IndexedDatabaseManager::InLowDiskSpaceMode()
+@@ -475,6 +484,7 @@
+   return !!sLowDiskSpaceMode;
+ }
+ #endif
++#endif
+ 
+ already_AddRefed<FileManager>
+ IndexedDatabaseManager::GetFileManager(PersistenceType aPersistenceType,
+@@ -680,6 +690,7 @@
+   NS_ASSERTION(IsMainProcess(), "Wrong process!");
+   NS_ASSERTION(NS_IsMainThread(), "Wrong thread!");
+ 
++#ifdef MOZ_DISKSPACEWATCHER
+   if (!strcmp(aTopic, DISKSPACEWATCHER_OBSERVER_TOPIC)) {
+     NS_ASSERTION(aData, "No data?!");
+ 
+@@ -697,7 +708,8 @@
+ 
+     return NS_OK;
+   }
+-
++#endif
++  
+    NS_NOTREACHED("Unknown topic!");
+    return NS_ERROR_UNEXPECTED;
+  }
+diff -r 98adf592f1ce -r 29b97fdaa5db dom/indexedDB/IndexedDatabaseManager.h
+--- a/dom/indexedDB/IndexedDatabaseManager.h	Fri Feb 21 13:31:02 2014 +0800
++++ b/dom/indexedDB/IndexedDatabaseManager.h	Fri Feb 21 13:33:30 2014 +0800
+@@ -74,6 +74,7 @@
+   }
+ #endif
+ 
++#ifdef MOZ_DISKSPACEWATCHER
+   static bool
+   InLowDiskSpaceMode()
+ #ifdef DEBUG
+@@ -83,6 +84,7 @@
+     return !!sLowDiskSpaceMode;
+   }
+ #endif
++#endif
+ 
+   already_AddRefed<FileManager>
+   GetFileManager(PersistenceType aPersistenceType,
+@@ -166,7 +168,9 @@
+   mozilla::Mutex mFileMutex;
+ 
+   static bool sIsMainProcess;
++#ifdef MOZ_DISKSPACEWATCHER
+   static mozilla::Atomic<int32_t> sLowDiskSpaceMode;
++#endif
+ };
+ 
+ END_INDEXEDDB_NAMESPACE
+diff -r 98adf592f1ce -r 29b97fdaa5db dom/indexedDB/OpenDatabaseHelper.cpp
+--- a/dom/indexedDB/OpenDatabaseHelper.cpp	Fri Feb 21 13:31:02 2014 +0800
++++ b/dom/indexedDB/OpenDatabaseHelper.cpp	Fri Feb 21 13:33:30 2014 +0800
+@@ -1937,6 +1937,7 @@
+   nsresult rv;
+   bool exists;
+ 
++#ifdef MOZ_DISKSPACEWATCHER
+   if (IndexedDatabaseManager::InLowDiskSpaceMode()) {
+     rv = aDBFile->Exists(&exists);
+     NS_ENSURE_SUCCESS(rv, rv);
+@@ -1946,7 +1947,8 @@
+       return NS_ERROR_DOM_INDEXEDDB_QUOTA_ERR;
+     }
+   }
+-
++#endif
++  
+   nsCOMPtr<nsIFileURL> dbFileUrl =
+     IDBFactory::GetDatabaseFileURL(aDBFile, aPersistenceType, aGroup, aOrigin);
+   NS_ENSURE_TRUE(dbFileUrl, NS_ERROR_FAILURE);
+diff -r 98adf592f1ce -r 29b97fdaa5db dom/src/storage/DOMStorageIPC.cpp
+--- a/dom/src/storage/DOMStorageIPC.cpp	Fri Feb 21 13:31:02 2014 +0800
++++ b/dom/src/storage/DOMStorageIPC.cpp	Fri Feb 21 13:33:30 2014 +0800
+@@ -10,7 +10,9 @@
+ #include "mozilla/dom/ContentChild.h"
+ #include "mozilla/dom/ContentParent.h"
+ #include "mozilla/unused.h"
++#ifdef MOZ_DISKSPACEWATCHER
+ #include "nsIDiskSpaceWatcher.h"
++#endif
+ #include "nsThreadUtils.h"
+ 
+ namespace mozilla {
+@@ -311,6 +313,7 @@
+       mozilla::unused << mParent->SendScopesHavingData(scopes);
+     }
+ 
++#ifdef MOZ_DISKSPACEWATCHER
+     // We need to check if the device is in a low disk space situation, so
+     // we can forbid in that case any write in localStorage.
+     nsCOMPtr<nsIDiskSpaceWatcher> diskSpaceWatcher =
+@@ -325,6 +328,7 @@
+       mozilla::unused << mParent->SendObserve(
+         nsDependentCString("low-disk-space"), EmptyCString());
+     }
++#endif
+ 
+     return NS_OK;
+   }
+diff -r 98adf592f1ce -r 29b97fdaa5db hal/Hal.cpp
+--- a/hal/Hal.cpp	Fri Feb 21 13:31:02 2014 +0800
++++ b/hal/Hal.cpp	Fri Feb 21 13:33:30 2014 +0800
+@@ -1189,6 +1189,7 @@
+   PROXY_IF_SANDBOXED(FactoryReset());
+ }
+ 
++#ifdef MOZ_DISKSPACEWATCHER
+ void
+ StartDiskSpaceWatcher()
+ {
+@@ -1204,6 +1205,7 @@
+   AssertMainThread();
+   PROXY_IF_SANDBOXED(StopDiskSpaceWatcher());
+ }
++#endif
+ 
+ uint32_t
+ GetTotalSystemMemory()
+diff -r 98adf592f1ce -r 29b97fdaa5db hal/Hal.h
+--- a/hal/Hal.h	Fri Feb 21 13:31:02 2014 +0800
++++ b/hal/Hal.h	Fri Feb 21 13:33:30 2014 +0800
+@@ -593,6 +593,7 @@
+ void StopMonitoringGamepadStatus();
+ #endif
+ 
++#ifdef MOZ_DISKSPACEWATCHER
+ /**
+  * Start monitoring disk space for low space situations.
+  *
+@@ -606,6 +607,7 @@
+  * This API is currently only allowed to be used from the main process.
+  */
+ void StopDiskSpaceWatcher();
++#endif
+ 
+ /**
+  * Get total system memory of device being run on in bytes.
+diff -r 98adf592f1ce -r 29b97fdaa5db hal/sandbox/SandboxHal.cpp
+--- a/hal/sandbox/SandboxHal.cpp	Fri Feb 21 13:31:02 2014 +0800
++++ b/hal/sandbox/SandboxHal.cpp	Fri Feb 21 13:33:30 2014 +0800
+@@ -431,6 +431,7 @@
+   Hal()->SendFactoryReset();
+ }
+ 
++#ifdef MOZ_DISKSPACEWATCHER
+ void
+ StartDiskSpaceWatcher()
+ {
+@@ -442,6 +443,7 @@
+ {
+   NS_RUNTIMEABORT("StopDiskSpaceWatcher() can't be called from sandboxed contexts.");
+ }
++#endif
+ 
+ class HalParent : public PHalParent
+                 , public NetworkObserver
+diff -r 98adf592f1ce -r 29b97fdaa5db toolkit/components/moz.build
+--- a/toolkit/components/moz.build	Fri Feb 21 13:31:02 2014 +0800
++++ b/toolkit/components/moz.build	Fri Feb 21 13:33:30 2014 +0800
+@@ -16,7 +16,6 @@
+     'console',
+     'contentprefs',
+     'cookie',
+-    'diskspacewatcher',
+     'downloads',
+     'exthelper',
+     'filepicker',
+@@ -44,6 +43,9 @@
+     'workerloader',
+ ]
+ 
++if CONFIG['MOZ_DISKSPACEWATCHER']:
++    PARALLEL_DIRS += ['diskspacewatcher']
++
+ if CONFIG['MOZ_SOCIAL']:
+     PARALLEL_DIRS += ['social']
+ 
+diff -r 98adf592f1ce -r 29b97fdaa5db toolkit/library/nsStaticXULComponents.cpp
+--- a/toolkit/library/nsStaticXULComponents.cpp	Fri Feb 21 13:31:02 2014 +0800
++++ b/toolkit/library/nsStaticXULComponents.cpp	Fri Feb 21 13:33:30 2014 +0800
+@@ -13,6 +13,12 @@
+ #define AUTH_MODULE
+ #endif
+ 
++#ifdef MOZ_DISKSPACEWATCHER
++#define DISKSPACEWATCHER_MODULE    MODULE(DiskSpaceWatcherModule)
++#else
++#define DISKSPACEWATCHER_MODULE
++#endif
++
+ #ifdef MOZ_PERMISSIONS
+ #define PERMISSIONS_MODULES                  \
+     MODULE(nsCookieModule)                   \
+@@ -239,7 +245,7 @@
+     PEERCONNECTION_MODULE                    \
+     GIO_MODULE                               \
+     SYNTH_PICO_MODULE                        \
+-    MODULE(DiskSpaceWatcherModule)           \
++    DISKSPACEWATCHER_MODULE                  \
+     /* end of list */
+ 
+ #define MODULE(_name) \
+diff -r 98adf592f1ce -r 29b97fdaa5db uriloader/prefetch/nsOfflineCacheUpdateService.cpp
+--- a/uriloader/prefetch/nsOfflineCacheUpdateService.cpp	Fri Feb 21 13:31:02 2014 +0800
++++ b/uriloader/prefetch/nsOfflineCacheUpdateService.cpp	Fri Feb 21 13:33:30 2014 +0800
+@@ -48,7 +48,9 @@
+ #include "nsIAsyncVerifyRedirectCallback.h"
+ #include "mozilla/Preferences.h"
+ #include "mozilla/Attributes.h"
++#ifdef MOZ_DISKSPACEWATCHER
+ #include "nsIDiskSpaceWatcher.h"
++#endif
+ #include "nsIDocShell.h"
+ #include "nsIDocShellTreeItem.h"
+ #include "nsIDocShellTreeOwner.h"
+@@ -315,6 +317,7 @@
+                                                true);
+     NS_ENSURE_SUCCESS(rv, rv);
+ 
++#ifdef MOZ_DISKSPACEWATCHER
+     // Get the current status of the disk in terms of free space and observe
+     // low device storage notifications.
+     nsCOMPtr<nsIDiskSpaceWatcher> diskSpaceWatcherService =
+@@ -326,6 +329,7 @@
+     }
+ 
+     rv = observerService->AddObserver(this, "disk-space-watcher", false);
++#endif
+     NS_ENSURE_SUCCESS(rv, rv);
+ 
+     gOfflineCacheUpdateService = this;

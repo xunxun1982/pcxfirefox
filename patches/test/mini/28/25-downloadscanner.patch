@@ -1,0 +1,68 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392962252 -28800
+#      Fri Feb 21 13:57:32 2014 +0800
+# Node ID 9b96043297b8437313c4883a7a2e55aa15ae9633
+# Parent  c96befb7d6c7a67123e3a6d85c462ec64dd72ac5
+Disable downloadscanner
+
+diff -r c96befb7d6c7 -r 9b96043297b8 toolkit/components/downloads/moz.build
+--- a/toolkit/components/downloads/moz.build	Fri Feb 21 13:55:30 2014 +0800
++++ b/toolkit/components/downloads/moz.build	Fri Feb 21 13:57:32 2014 +0800
+@@ -31,11 +31,6 @@
+         'csd.pb.cc'
+     ]
+ 
+-if CONFIG['OS_ARCH'] == 'WINNT':
+-    UNIFIED_SOURCES += [
+-        'nsDownloadScanner.cpp',
+-    ]
+-
+ # XXX - Until Suite builds off XULRunner we can't guarantee our implementation
+ # of nsIDownloadManagerUI overrides toolkit's.
+ if not CONFIG['MOZ_SUITE']:
+diff -r c96befb7d6c7 -r 9b96043297b8 toolkit/components/downloads/nsDownloadManager.h
+--- a/toolkit/components/downloads/nsDownloadManager.h	Fri Feb 21 13:55:30 2014 +0800
++++ b/toolkit/components/downloads/nsDownloadManager.h	Fri Feb 21 13:57:32 2014 +0800
+@@ -6,10 +6,6 @@
+ #ifndef downloadmanager___h___
+ #define downloadmanager___h___
+ 
+-#if defined(XP_WIN)
+-#define DOWNLOAD_SCANNER
+-#endif
+-
+ #include "nsIDownload.h"
+ #include "nsIDownloadManager.h"
+ #include "nsIDownloadProgressListener.h"
+diff -r c96befb7d6c7 -r 9b96043297b8 toolkit/mozapps/downloads/content/downloads.js
+--- a/toolkit/mozapps/downloads/content/downloads.js	Fri Feb 21 13:55:30 2014 +0800
++++ b/toolkit/mozapps/downloads/content/downloads.js	Fri Feb 21 13:57:32 2014 +0800
+@@ -8,7 +8,6 @@
+ 
+ const PREF_BDM_CLOSEWHENDONE = "browser.download.manager.closeWhenDone";
+ const PREF_BDM_ALERTONEXEOPEN = "browser.download.manager.alertOnEXEOpen";
+-const PREF_BDM_SCANWHENDONE = "browser.download.manager.scanWhenDone";
+ 
+ const nsLocalFile = Components.Constructor("@mozilla.org/file/local;1",
+                                            "nsILocalFile", "initWithPath");
+@@ -253,19 +252,6 @@
+       dontAsk = !pref.getBoolPref(PREF_BDM_ALERTONEXEOPEN);
+     } catch (e) { }
+ 
+-#ifdef XP_WIN
+-    // On Vista and above, we rely on native security prompting for
+-    // downloaded content unless it's disabled.
+-    try {
+-      var sysInfo = Cc["@mozilla.org/system-info;1"].
+-                    getService(Ci.nsIPropertyBag2);
+-      if (parseFloat(sysInfo.getProperty("version")) >= 6 &&
+-          pref.getBoolPref(PREF_BDM_SCANWHENDONE)) {
+-        dontAsk = true;
+-      }
+-    } catch (ex) { }
+-#endif
+-
+     if (!dontAsk) {
+       var strings = document.getElementById("downloadStrings");
+       var name = aDownload.getAttribute("target");

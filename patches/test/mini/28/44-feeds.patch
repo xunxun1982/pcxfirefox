@@ -1,0 +1,44 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392971087 -28800
+#      Fri Feb 21 16:24:47 2014 +0800
+# Node ID 75840f60b90f7afc03a041d99125ed5a34026c4f
+# Parent  d1f6eeafb6d5f2959aec82fbb863bc1ddc457a16
+Disable feeds
+
+diff -r d1f6eeafb6d5 -r 75840f60b90f browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Fri Feb 21 16:23:13 2014 +0800
++++ b/browser/installer/package-manifest.in	Fri Feb 21 16:24:47 2014 +0800
+@@ -260,7 +260,9 @@
+ @BINPATH@/components/exthandler.xpt
+ @BINPATH@/components/exthelper.xpt
+ @BINPATH@/components/fastfind.xpt
++#ifdef MOZ_FEEDS
+ @BINPATH@/components/feeds.xpt
++#endif
+ #ifdef MOZ_GTK
+ @BINPATH@/components/filepicker.xpt
+ #endif
+@@ -382,8 +384,10 @@
+ @BINPATH@/components/ConsoleAPI.js
+ @BINPATH@/components/BrowserElementParent.manifest
+ @BINPATH@/components/BrowserElementParent.js
++#ifdef MOZ_FEEDS
+ @BINPATH@/components/FeedProcessor.manifest
+ @BINPATH@/components/FeedProcessor.js
++#endif
+ @BINPATH@/browser/components/BrowserFeeds.manifest
+ @BINPATH@/browser/components/FeedConverter.js
+ @BINPATH@/browser/components/FeedWriter.js
+diff -r d1f6eeafb6d5 -r 75840f60b90f configure.in
+--- a/configure.in	Fri Feb 21 16:23:13 2014 +0800
++++ b/configure.in	Fri Feb 21 16:24:47 2014 +0800
+@@ -6402,7 +6402,7 @@
+ if test -n "$MOZ_FEEDS"; then
+     AC_DEFINE(MOZ_FEEDS)
+ else
+-    if test "$MOZ_BUILD_APP" = "browser"; then
++    if test "$MOZ_BUILD_APP" = "offcial browser"; then
+         AC_MSG_ERROR([Cannot build Firefox with --disable-feeds.])
+     fi
+ fi

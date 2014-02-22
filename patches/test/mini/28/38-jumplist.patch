@@ -1,0 +1,271 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392970299 -28800
+#      Fri Feb 21 16:11:39 2014 +0800
+# Node ID 056b1b90b9eb179843cf1753a42140f62139df52
+# Parent  80953a0e86516474b390ef7b266298b880a7c391
+Disable jumplist
+
+diff -r 80953a0e8651 -r 056b1b90b9eb browser/components/nsBrowserGlue.js
+--- a/browser/components/nsBrowserGlue.js	Fri Feb 21 16:09:39 2014 +0800
++++ b/browser/components/nsBrowserGlue.js	Fri Feb 21 16:11:39 2014 +0800
+@@ -617,7 +617,7 @@
+ 
+   // the first browser window has finished initializing
+   _onFirstWindowLoaded: function BG__onFirstWindowLoaded(aWindow) {
+-#ifdef XP_WIN
++#ifdef XP_WIN && MOZ_JUMPLIST
+     // For windows seven, initialize the jump list module.
+     const WINTASKBAR_CONTRACTID = "@mozilla.org/windows-taskbar;1";
+     if (WINTASKBAR_CONTRACTID in Cc &&
+diff -r 80953a0e8651 -r 056b1b90b9eb browser/modules/moz.build
+--- a/browser/modules/moz.build	Fri Feb 21 16:09:39 2014 +0800
++++ b/browser/modules/moz.build	Fri Feb 21 16:11:39 2014 +0800
+@@ -30,9 +30,13 @@
+         'Social.jsm',
+     ]
+ 
++if CONFIG['MOZ_JUMPLIST'] :
++    EXTRA_JS_MODULES += [
++        'WindowsJumpLists.jsm',
++    ]
++
+ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
+     EXTRA_JS_MODULES += [
+-        'WindowsJumpLists.jsm',
+         'WindowsPreviewPerTab.jsm',
+     ]
+ 
+diff -r 80953a0e8651 -r 056b1b90b9eb configure.in
+--- a/configure.in	Fri Feb 21 16:09:39 2014 +0800
++++ b/configure.in	Fri Feb 21 16:11:39 2014 +0800
+@@ -7576,6 +7576,15 @@
+ fi
+ AC_SUBST(MOZ_INPUTMETHOD)
+ 
++MOZ_ARG_DISABLE_BOOL(jumplist,
++[  --disable-jumplist          Disable jumplist],
++    MOZ_JUMPLIST=,
++    MOZ_JUMPLIST=1)
++if test -n "$MOZ_JUMPLIST"; then
++    AC_DEFINE(MOZ_JUMPLIST)
++fi
++AC_SUBST(MOZ_JUMPLIST)
++
+ dnl ========================================================
+ dnl = Support for gcc stack unwinding (from gcc 3.3)
+ dnl ========================================================
+diff -r 80953a0e8651 -r 056b1b90b9eb widget/moz.build
+--- a/widget/moz.build	Fri Feb 21 16:09:39 2014 +0800
++++ b/widget/moz.build	Fri Feb 21 16:11:39 2014 +0800
+@@ -17,8 +17,6 @@
+     DIRS += ['windows']
+ 
+     XPIDL_SOURCES += [
+-        'nsIJumpListBuilder.idl',
+-        'nsIJumpListItem.idl',
+         'nsIPrintSettingsWin.idl',
+         'nsITaskbarOverlayIconController.idl',
+         'nsITaskbarPreview.idl',
+@@ -128,5 +126,11 @@
+         'WidgetTraceEvent.h',
+     ]
+ 
++if CONFIG['MOZ_JUMPLIST']:
++    XPIDL_SOURCES += [
++        'nsijumplistbuilder.idl',
++        'nsijumplistitem.idl',
++    ]
++
+ EXPORTS.ipc = ['nsGUIEventIPC.h']
+ 
+diff -r 80953a0e8651 -r 056b1b90b9eb widget/nsIWinTaskbar.idl
+--- a/widget/nsIWinTaskbar.idl	Fri Feb 21 16:09:39 2014 +0800
++++ b/widget/nsIWinTaskbar.idl	Fri Feb 21 16:11:39 2014 +0800
+@@ -14,7 +14,6 @@
+ interface nsITaskbarPreviewController;
+ interface nsITaskbarProgress;
+ interface nsITaskbarOverlayIconController;
+-interface nsIJumpListBuilder;
+ interface nsIDOMWindow;
+ 
+ /*
+@@ -123,7 +122,6 @@
+    * @throw NS_ERROR_ALREADY_INITIALIZED if an nsIJumpListBuilder instance is
+    * currently building a list.
+    */
+-  nsIJumpListBuilder createJumpListBuilder();
+ 
+   /**
+    * Application window taskbar group settings
+diff -r 80953a0e8651 -r 056b1b90b9eb widget/nsWidgetsCID.h
+--- a/widget/nsWidgetsCID.h	Fri Feb 21 16:09:39 2014 +0800
++++ b/widget/nsWidgetsCID.h	Fri Feb 21 16:11:39 2014 +0800
+@@ -115,14 +115,17 @@
+ { 0xb8e5bc54, 0xa22f, 0x4eb2, {0xb0, 0x61, 0x24, 0xcb, 0x6d, 0x19, 0xc1, 0x5f } }
+ 
+ // {73A5946F-608D-454f-9D33-0B8F8C7294B6}
++#ifdef MOZ_JUMPLIST
+ #define NS_WIN_JUMPLISTBUILDER_CID \
+ { 0x73a5946f, 0x608d, 0x454f, { 0x9d, 0x33, 0xb, 0x8f, 0x8c, 0x72, 0x94, 0xb6 } }
++#endif
+ 
+ // {DE95B8C9-F0E8-4AD5-95A2-06C12F53EC2E}
+ #define NS_WIN_METROUTILS_CID \
+ { 0xde95b8c9, 0xf0e8, 0x4ad5, { 0x95, 0xa2, 0x06, 0xc1, 0x2f, 0x53, 0xec, 0x2e }}
+ 
+ // {2B9A1F2C-27CE-45b6-8D4E-755D0E34F8DB}
++#ifdef MOZ_JUMPLIST
+ #define NS_WIN_JUMPLISTITEM_CID \
+ { 0x2b9a1f2c, 0x27ce, 0x45b6, { 0x8d, 0x4e, 0x75, 0x5d, 0x0e, 0x34, 0xf8, 0xdb } }
+ 
+@@ -137,6 +140,7 @@
+ // {B16656B2-5187-498f-ABF4-56346126BFDB}
+ #define NS_WIN_JUMPLISTSHORTCUT_CID \
+ { 0xb16656b2, 0x5187, 0x498f, { 0xab, 0xf4, 0x56, 0x34, 0x61, 0x26, 0xbf, 0xdb } }
++#endif
+ 
+ // {e9096367-ddd9-45e4-b762-49c0c18b7119}
+ #define NS_MACWEBAPPUTILS_CID \
+diff -r 80953a0e8651 -r 056b1b90b9eb widget/windows/WinTaskbar.cpp
+--- a/widget/windows/WinTaskbar.cpp	Fri Feb 21 16:09:39 2014 +0800
++++ b/widget/windows/WinTaskbar.cpp	Fri Feb 21 16:11:39 2014 +0800
+@@ -17,13 +17,17 @@
+ #include <nsServiceManagerUtils.h>
+ #include <nsAutoPtr.h>
+ #include "nsIXULAppInfo.h"
++#ifdef MOZ_JUMPLIST
+ #include "nsIJumpListBuilder.h"
++#endif
+ #include "nsUXThemeData.h"
+ #include "nsWindow.h"
+ #include "WinUtils.h"
+ #include "TaskbarTabPreview.h"
+ #include "TaskbarWindowPreview.h"
++#ifdef MOZ_JUMPLIST
+ #include "JumpListBuilder.h"
++#endif
+ #include "nsWidgetsCID.h"
+ #include "nsPIDOMWindow.h"
+ #include "nsAppDirectoryServiceDefs.h"
+@@ -36,7 +40,9 @@
+ 
+ const wchar_t kShellLibraryName[] =  L"shell32.dll";
+ 
++#ifdef MOZ_JUMPLIST
+ static NS_DEFINE_CID(kJumpListBuilderCID, NS_WIN_JUMPLISTBUILDER_CID);
++#endif
+ 
+ namespace {
+ 
+@@ -446,6 +452,7 @@
+   return CallQueryInterface(preview, _retval);
+ }
+ 
++#ifdef MOZ_JUMPLIST
+ /* nsIJumpListBuilder createJumpListBuilder(); */
+ NS_IMETHODIMP
+ WinTaskbar::CreateJumpListBuilder(nsIJumpListBuilder * *aJumpListBuilder) {
+@@ -463,6 +470,7 @@
+ 
+   return NS_OK;
+ }
++#endif
+ 
+ /* void setGroupIdForWindow (in nsIDOMWindow aParent, in AString aIdentifier); */
+ NS_IMETHODIMP
+diff -r 80953a0e8651 -r 056b1b90b9eb widget/windows/moz.build
+--- a/widget/windows/moz.build	Fri Feb 21 16:09:39 2014 +0800
++++ b/widget/windows/moz.build	Fri Feb 21 16:11:39 2014 +0800
+@@ -23,8 +23,6 @@
+     'AudioSession.cpp',
+     'GfxInfo.cpp',
+     'IEnumFE.cpp',
+-    'JumpListBuilder.cpp',
+-    'JumpListItem.cpp',
+     'KeyboardLayout.cpp',
+     'nsAppShell.cpp',
+     'nsBidiKeyboard.cpp',
+@@ -85,6 +83,12 @@
+         'nsTextStore.cpp',
+     ]
+ 
++if CONFIG['MOZ_JUMPLIST']:
++    SOURCES += [
++        'JumpListBuilder.cpp',
++        'JumpListItem.cpp',
++    ]
++
+ MSVC_ENABLE_PGO = True
+ 
+ LIBRARY_NAME = 'widget_windows'
+diff -r 80953a0e8651 -r 056b1b90b9eb widget/windows/nsWidgetFactory.cpp
+--- a/widget/windows/nsWidgetFactory.cpp	Fri Feb 21 16:09:39 2014 +0800
++++ b/widget/windows/nsWidgetFactory.cpp	Fri Feb 21 16:11:39 2014 +0800
+@@ -47,8 +47,10 @@
+ #include "nsHTMLFormatConverter.h"
+ 
+ #include "WinTaskbar.h"
++#ifdef MOZ_JUMPLIST
+ #include "JumpListBuilder.h"
+ #include "JumpListItem.h"
++#endif
+ 
+ #ifdef NS_PRINTING
+ #include "nsDeviceContextSpecWin.h"
+@@ -157,11 +159,13 @@
+ NS_GENERIC_FACTORY_CONSTRUCTOR(nsClipboardHelper)
+ NS_GENERIC_FACTORY_CONSTRUCTOR(nsSound)
+ NS_GENERIC_FACTORY_CONSTRUCTOR(WinTaskbar)
++#ifdef MOZ_JUMPLIST
+ NS_GENERIC_FACTORY_CONSTRUCTOR(JumpListBuilder)
+ NS_GENERIC_FACTORY_CONSTRUCTOR(JumpListItem)
+ NS_GENERIC_FACTORY_CONSTRUCTOR(JumpListSeparator)
+ NS_GENERIC_FACTORY_CONSTRUCTOR(JumpListLink)
+ NS_GENERIC_FACTORY_CONSTRUCTOR(JumpListShortcut)
++#endif
+ NS_GENERIC_FACTORY_CONSTRUCTOR(nsTransferable)
+ NS_GENERIC_FACTORY_CONSTRUCTOR(nsHTMLFormatConverter)
+ NS_GENERIC_FACTORY_CONSTRUCTOR(nsDragService)
+@@ -198,11 +202,13 @@
+ NS_DEFINE_NAMED_CID(NS_TRANSFERABLE_CID);
+ NS_DEFINE_NAMED_CID(NS_HTMLFORMATCONVERTER_CID);
+ NS_DEFINE_NAMED_CID(NS_WIN_TASKBAR_CID);
++#ifdef MOZ_JUMPLIST
+ NS_DEFINE_NAMED_CID(NS_WIN_JUMPLISTBUILDER_CID);
+ NS_DEFINE_NAMED_CID(NS_WIN_JUMPLISTITEM_CID);
+ NS_DEFINE_NAMED_CID(NS_WIN_JUMPLISTSEPARATOR_CID);
+ NS_DEFINE_NAMED_CID(NS_WIN_JUMPLISTLINK_CID);
+ NS_DEFINE_NAMED_CID(NS_WIN_JUMPLISTSHORTCUT_CID);
++#endif
+ #ifdef MOZ_METRO
+ NS_DEFINE_NAMED_CID(NS_WIN_METROUTILS_CID);
+ #endif
+@@ -232,11 +238,13 @@
+   { &kNS_TRANSFERABLE_CID, false, nullptr, nsTransferableConstructor },
+   { &kNS_HTMLFORMATCONVERTER_CID, false, nullptr, nsHTMLFormatConverterConstructor },
+   { &kNS_WIN_TASKBAR_CID, false, nullptr, WinTaskbarConstructor },
++#ifdef MOZ_JUMPLIST
+   { &kNS_WIN_JUMPLISTBUILDER_CID, false, nullptr, JumpListBuilderConstructor },
+   { &kNS_WIN_JUMPLISTITEM_CID, false, nullptr, JumpListItemConstructor },
+   { &kNS_WIN_JUMPLISTSEPARATOR_CID, false, nullptr, JumpListSeparatorConstructor },
+   { &kNS_WIN_JUMPLISTLINK_CID, false, nullptr, JumpListLinkConstructor },
+   { &kNS_WIN_JUMPLISTSHORTCUT_CID, false, nullptr, JumpListShortcutConstructor },
++#endif
+   { &kNS_DRAGSERVICE_CID, false, nullptr, nsDragServiceConstructor },
+   { &kNS_BIDIKEYBOARD_CID, false, nullptr, nsBidiKeyboardConstructor },
+ #ifdef MOZ_METRO
+@@ -267,11 +275,13 @@
+   { "@mozilla.org/widget/transferable;1", &kNS_TRANSFERABLE_CID },
+   { "@mozilla.org/widget/htmlformatconverter;1", &kNS_HTMLFORMATCONVERTER_CID },
+   { "@mozilla.org/windows-taskbar;1", &kNS_WIN_TASKBAR_CID },
++#ifdef MOZ_JUMPLIST
+   { "@mozilla.org/windows-jumplistbuilder;1", &kNS_WIN_JUMPLISTBUILDER_CID },
+   { "@mozilla.org/windows-jumplistitem;1", &kNS_WIN_JUMPLISTITEM_CID },
+   { "@mozilla.org/windows-jumplistseparator;1", &kNS_WIN_JUMPLISTSEPARATOR_CID },
+   { "@mozilla.org/windows-jumplistlink;1", &kNS_WIN_JUMPLISTLINK_CID },
+   { "@mozilla.org/windows-jumplistshortcut;1", &kNS_WIN_JUMPLISTSHORTCUT_CID },
++#endif
+   { "@mozilla.org/widget/dragservice;1", &kNS_DRAGSERVICE_CID },
+   { "@mozilla.org/widget/bidikeyboard;1", &kNS_BIDIKEYBOARD_CID },
+ #ifdef MOZ_METRO

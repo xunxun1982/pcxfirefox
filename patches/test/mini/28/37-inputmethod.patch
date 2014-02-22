@@ -1,0 +1,73 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392969909 -28800
+#      Fri Feb 21 16:05:09 2014 +0800
+# Node ID 876e8b8e7aa0cf1726e74fd3078cfdb4ee81349c
+# Parent  8c9f17a4fb25f19515bd282afffba8f1ce6e030c
+Disable inputmethod
+
+diff -r 8c9f17a4fb25 -r 876e8b8e7aa0 browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Fri Feb 21 15:40:58 2014 +0800
++++ b/browser/installer/package-manifest.in	Fri Feb 21 16:05:09 2014 +0800
+@@ -217,7 +217,9 @@
+ @BINPATH@/components/dom_notification.xpt
+ @BINPATH@/components/dom_html.xpt
+ @BINPATH@/components/dom_indexeddb.xpt
++#ifdef MOZ_INPUTMETHOD
+ @BINPATH@/components/dom_inputmethod.xpt
++#endif
+ @BINPATH@/components/dom_offline.xpt
+ @BINPATH@/components/dom_json.xpt
+ @BINPATH@/components/dom_power.xpt
+@@ -611,9 +613,11 @@
+ @BINPATH@/components/dom_webspeechsynth.xpt
+ #endif
+ 
++#ifdef MOZ_INPUTMETHOD
+ ; InputMethod API
+ @BINPATH@/components/MozKeyboard.js
+ @BINPATH@/components/InputMethod.manifest
++#endif
+ 
+ ; Modules
+ @BINPATH@/browser/modules/*
+diff -r 8c9f17a4fb25 -r 876e8b8e7aa0 configure.in
+--- a/configure.in	Fri Feb 21 15:40:58 2014 +0800
++++ b/configure.in	Fri Feb 21 16:05:09 2014 +0800
+@@ -7567,6 +7567,15 @@
+ fi
+ AC_SUBST(MOZ_TIME)
+ 
++MOZ_ARG_DISABLE_BOOL(inputmethod,
++[  --disable-inputmethod          Disable inputmethod],
++    MOZ_INPUTMETHOD=,
++    MOZ_INPUTMETHOD=1)
++if test -n "$MOZ_INPUTMETHOD"; then
++    AC_DEFINE(MOZ_INPUTMETHOD)
++fi
++AC_SUBST(MOZ_INPUTMETHOD)
++
+ dnl ========================================================
+ dnl = Support for gcc stack unwinding (from gcc 3.3)
+ dnl ========================================================
+diff -r 8c9f17a4fb25 -r 876e8b8e7aa0 dom/moz.build
+--- a/dom/moz.build	Fri Feb 21 15:40:58 2014 +0800
++++ b/dom/moz.build	Fri Feb 21 16:05:09 2014 +0800
+@@ -63,7 +63,6 @@
+     'ipc',
+     'workers',
+     'audiochannel',
+-    'inputmethod',
+     'webidl',
+ ]
+ 
+@@ -112,6 +111,9 @@
+ if CONFIG['MOZ_TIME']:
+     PARALLEL_DIRS += ['time']
+ 
++if CONFIG['MOZ_INPUTMETHOD']:
++    PARALLEL_DIRS += ['inputmethod']
++
+ if CONFIG['OS_ARCH'] == 'WINNT':
+     PARALLEL_DIRS += ['plugins/ipc/hangui']
+ 

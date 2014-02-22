@@ -1,0 +1,516 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392964949 -28800
+#      Fri Feb 21 14:42:29 2014 +0800
+# Node ID be8f1d1344ffba4acd760710140feacaa9a55ae0
+# Parent  ac33fd1f983b4233c09fa631d88dfb8c9c5813d2
+Disable social
+
+diff -r ac33fd1f983b -r be8f1d1344ff browser/base/content/browser-context.inc
+--- a/browser/base/content/browser-context.inc	Fri Feb 21 14:01:43 2014 +0800
++++ b/browser/base/content/browser-context.inc	Fri Feb 21 14:42:29 2014 +0800
+@@ -37,18 +37,22 @@
+                 label="&bookmarkThisLinkCmd.label;"
+                 accesskey="&bookmarkThisLinkCmd.accesskey;"
+                 oncommand="gContextMenu.bookmarkLink();"/>
++#ifdef MOZ_SOCIAL
+       <menuitem id="context-sharelink"
+                 label="&shareLinkCmd.label;"
+                 accesskey="&shareLinkCmd.accesskey;"
+                 oncommand="gContextMenu.shareLink();"/>
++#endif
+       <menuitem id="context-savelink"
+                 label="&saveLinkCmd.label;"
+                 accesskey="&saveLinkCmd.accesskey;"
+                 oncommand="gContextMenu.saveLink();"/>
++#ifdef MOZ_SOCIAL
+       <menu id="context-marklinkMenu" label="&social.marklinkMenu.label;"
+             accesskey="&social.marklinkMenu.accesskey;">
+         <menupopup/>
+       </menu>
++#endif
+       <menuitem id="context-copyemail"
+                 label="&copyEmailCmd.label;"
+                 accesskey="&copyEmailCmd.accesskey;"
+@@ -165,10 +169,12 @@
+                 label="&saveImageCmd.label;"
+                 accesskey="&saveImageCmd.accesskey;"
+                 oncommand="gContextMenu.saveMedia();"/>
++#ifdef MOZ_SOCIAL
+       <menuitem id="context-shareimage"
+                 label="&shareImageCmd.label;"
+                 accesskey="&shareImageCmd.accesskey;"
+                 oncommand="gContextMenu.shareImage();"/>
++#endif
+       <menuitem id="context-sendimage"
+                 label="&emailImageCmd.label;"
+                 accesskey="&emailImageCmd.accesskey;"
+@@ -190,10 +196,12 @@
+                 label="&saveVideoCmd.label;"
+                 accesskey="&saveVideoCmd.accesskey;"
+                 oncommand="gContextMenu.saveMedia();"/>
++#ifdef MOZ_SOCIAL
+       <menuitem id="context-sharevideo"
+                 label="&shareVideoCmd.label;"
+                 accesskey="&shareVideoCmd.accesskey;"
+                 oncommand="gContextMenu.shareVideo();"/>
++#endif
+       <menuitem id="context-saveaudio"
+                 label="&saveAudioCmd.label;"
+                 accesskey="&saveAudioCmd.accesskey;"
+@@ -243,18 +251,22 @@
+                 label="&bookmarkPageCmd2.label;"
+                 accesskey="&bookmarkPageCmd2.accesskey;"
+                 oncommand="gContextMenu.bookmarkThisPage();"/>
++#ifdef MOZ_SOCIAL
+       <menuitem id="context-sharepage"
+                 label="&sharePageCmd.label;"
+                 accesskey="&sharePageCmd.accesskey;"
+                 oncommand="SocialShare.sharePage();"/>
++#endif
+       <menuitem id="context-savepage"
+                 label="&savePageCmd.label;"
+                 accesskey="&savePageCmd.accesskey2;"
+                 oncommand="gContextMenu.savePageAs();"/>
++#ifdef MOZ_SOCIAL
+       <menu id="context-markpageMenu" label="&social.markpageMenu.label;"
+             accesskey="&social.markpageMenu.accesskey;">
+         <menupopup/>
+       </menu>
++#endif
+       <menuseparator id="context-sep-viewbgimage"/>
+       <menuitem id="context-viewbgimage"
+                 label="&viewBGImageCmd.label;"
+@@ -294,10 +306,12 @@
+                 oncommand="AddKeywordForSearchField();"/>
+       <menuitem id="context-searchselect"
+                 oncommand="BrowserSearch.loadSearchFromContext(getBrowserSelection());"/>
++#ifdef MOZ_SOCIAL
+       <menuitem id="context-shareselect"
+                 label="&shareSelectCmd.label;"
+                 accesskey="&shareSelectCmd.accesskey;"
+                 oncommand="gContextMenu.shareSelect(getBrowserSelection());"/>
++#endif
+       <menuseparator id="frame-sep"/>
+       <menu id="frame" label="&thisFrameMenu.label;" accesskey="&thisFrameMenu.accesskey;">
+         <menupopup>
+diff -r ac33fd1f983b -r be8f1d1344ff browser/base/content/browser-menubar.inc
+--- a/browser/base/content/browser-menubar.inc	Fri Feb 21 14:01:43 2014 +0800
++++ b/browser/base/content/browser-menubar.inc	Fri Feb 21 14:42:29 2014 +0800
+@@ -207,10 +207,12 @@
+                               key="key_gotoHistory"
+                               observes="viewHistorySidebar"
+                               label="&historyButton.label;"/>
++#ifdef MOZ_SOCIAL
+                     <menuitem id="menu_socialSidebar"
+                               type="checkbox"
+                               autocheck="false"
+                               command="Social:ToggleSidebar"/>
++#endif
+                   </menupopup>
+                 </menu>
+                 <menuseparator/>
+@@ -452,6 +454,7 @@
+                         accesskey="&addons.accesskey;"
+                         key="key_openAddons"
+                         command="Tools:Addons"/>
++#ifdef MOZ_SOCIAL
+               <menu id="menu_socialAmbientMenu"
+                     observes="socialActiveBroadcaster">
+                 <menupopup id="menu_social-statusarea-popup">
+@@ -495,6 +498,7 @@
+                             label="&social.addons.label;"/>
+                 </menupopup>
+               </menu>
++#endif
+ #ifdef MOZ_SERVICES_SYNC
+               <!-- only one of sync-setup or sync-menu will be showing at once -->
+               <menuitem id="sync-setup"
+diff -r ac33fd1f983b -r be8f1d1344ff browser/base/content/browser-sets.inc
+--- a/browser/base/content/browser-sets.inc	Fri Feb 21 14:01:43 2014 +0800
++++ b/browser/base/content/browser-sets.inc	Fri Feb 21 14:42:29 2014 +0800
+@@ -110,12 +110,14 @@
+     <command id="History:UndoCloseTab" oncommand="undoCloseTab();"/>
+     <command id="History:UndoCloseWindow" oncommand="undoCloseWindow();"/>
+     <command id="Browser:ToggleAddonBar" oncommand="toggleAddonBar();"/>
++#ifdef MOZ_SOCIAL
+     <command id="Social:SharePage" oncommand="SocialShare.sharePage();" disabled="true"/>
+     <command id="Social:ToggleSidebar" oncommand="Social.toggleSidebar();" hidden="true"/>
+     <command id="Social:ToggleNotifications" oncommand="Social.toggleNotifications();" hidden="true"/>
+     <command id="Social:FocusChat" oncommand="SocialChatBar.focus();" hidden="true" disabled="true"/>
+     <command id="Social:Toggle" oncommand="Social.toggle();" hidden="true"/>
+     <command id="Social:Addons" oncommand="BrowserOpenAddonsMgr('addons://list/service');"/>
++#endif
+   </commandset>
+ 
+   <commandset id="placesCommands">
+@@ -169,8 +171,10 @@
+     <broadcaster id="sync-syncnow-state"/>
+ #endif
+     <broadcaster id="workOfflineMenuitemState"/>
++#ifdef MOZ_SOCIAL
+     <broadcaster id="socialSidebarBroadcaster" hidden="true"/>
+     <broadcaster id="socialActiveBroadcaster" hidden="true"/>
++#endif
+ 
+     <!-- DevTools broadcasters -->
+     <broadcaster id="devtoolsMenuBroadcaster_DevToolbox"
+@@ -216,9 +220,11 @@
+                  label="&devtoolsConnect.label;"
+                  command="Tools:DevToolsConnect"/>
+ 
++#ifdef MOZ_SOCIAL
+     <!-- SocialAPI broadcasters -->
+     <broadcaster id="socialBroadcaster_userDetails"
+                  notLoggedInLabel="&social.notLoggedIn.label;"/>
++#endif
+   </broadcasterset>
+ 
+   <keyset id="mainKeyset">
+@@ -366,8 +372,10 @@
+     <key id="viewBookmarksSidebarWinKb" key="&bookmarksWinCmd.commandkey;" command="viewBookmarksSidebar" modifiers="accel"/>
+ #endif
+ 
++#ifdef MOZ_SOCIAL
+     <!--<key id="markPage" key="&markPageCmd.commandkey;" command="Social:TogglePageMark" modifiers="accel,shift"/>-->
+     <key id="focusChatBar" key="&social.chatBar.commandkey;" command="Social:FocusChat" modifiers="accel,shift"/>
++#endif
+ 
+     <key id="key_stop" keycode="VK_ESCAPE" command="Browser:Stop"/>
+ 
+diff -r ac33fd1f983b -r be8f1d1344ff browser/base/content/browser.js
+--- a/browser/base/content/browser.js	Fri Feb 21 14:01:43 2014 +0800
++++ b/browser/base/content/browser.js	Fri Feb 21 14:42:29 2014 +0800
+@@ -117,8 +117,10 @@
+   return tmp.BrowserToolboxProcess;
+ });
+ 
++#ifdef MOZ_SOCIAL
+ XPCOMUtils.defineLazyModuleGetter(this, "Social",
+   "resource:///modules/Social.jsm");
++#endif
+ 
+ XPCOMUtils.defineLazyModuleGetter(this, "PageThumbs",
+   "resource://gre/modules/PageThumbs.jsm");
+@@ -164,7 +166,9 @@
+ #include browser-places.js
+ #include browser-plugins.js
+ #include browser-safebrowsing.js
++#ifdef MOZ_SOCIAL
+ #include browser-social.js
++#endif
+ #include browser-tabPreviews.js
+ #include browser-tabview.js
+ #include browser-thumbnails.js
+@@ -946,9 +950,11 @@
+     gBrowser.addEventListener("MozApplicationManifest",
+                               OfflineApps, false);
+     // listen for offline apps on social
++#ifdef MOZ_SOCIAL
+     let socialBrowser = document.getElementById("social-sidebar-browser");
+     socialBrowser.addEventListener("MozApplicationManifest",
+                               OfflineApps, false);
++#endif
+ 
+     let uriToLoad = this._getUriToLoad();
+     var isLoadingBlank = isBlankPageURL(uriToLoad);
+@@ -1023,7 +1029,9 @@
+     OfflineApps.init();
+     IndexedDBPromptHelper.init();
+     gFormSubmitObserver.init();
++#ifdef MOZ_SOCIAL
+     SocialUI.init();
++#endif
+     AddonManager.addAddonListener(AddonsMgrListener);
+ #ifdef MOZ_WEBRTC
+     WebrtcIndicator.init();
+@@ -1333,7 +1341,9 @@
+       OfflineApps.uninit();
+       IndexedDBPromptHelper.uninit();
+       AddonManager.removeAddonListener(AddonsMgrListener);
++#ifdef MOZ_SOCIAL
+       SocialUI.uninit();
++#endif
+     }
+ 
+     // Final window teardown, do this last.
+@@ -1399,7 +1409,9 @@
+       }
+     }
+ 
++#ifdef MOZ_SOCIAL
+     SocialUI.nonBrowserWindowInit();
++#endif
+ 
+     if (PrivateBrowsingUtils.permanentPrivateBrowsing) {
+       document.getElementById("macDockMenuNewWindow").hidden = true;
+@@ -3462,7 +3474,9 @@
+     URLBarSetURI();
+     XULBrowserWindow.asyncUpdateUI();
+     BookmarkingUI.updateStarState();
++#ifdef MOZ_SOCIAL
+     SocialUI.updateState();
++#endif
+   }
+ 
+   TabsInTitlebar.allowedBy("customizing-toolbars", true);
+@@ -3736,7 +3750,9 @@
+   // Called before links are navigated to to allow us to retarget them if needed.
+   onBeforeLinkTraversal: function(originalTarget, linkURI, linkNode, isAppTab) {
+     let target = this._onBeforeLinkTraversal(originalTarget, linkURI, linkNode, isAppTab);
++#ifdef MOZ_SOCIAL
+     SocialUI.closeSocialPanelForLinkTraversal(target, linkNode);
++#endif
+     return target;
+   },
+ 
+@@ -3921,7 +3937,9 @@
+ 
+         // Update starring UI
+         BookmarkingUI.updateStarState();
++#ifdef MOZ_SOCIAL
+         SocialUI.updateState();
++#endif
+       }
+ 
+       // Show or hide browser chrome based on the whitelist
+diff -r ac33fd1f983b -r be8f1d1344ff browser/base/content/browser.xul
+--- a/browser/base/content/browser.xul	Fri Feb 21 14:01:43 2014 +0800
++++ b/browser/base/content/browser.xul	Fri Feb 21 14:42:29 2014 +0800
+@@ -197,6 +197,7 @@
+       <html:div id="UITourHighlight"></html:div>
+     </html:div>
+ 
++#ifdef MOZ_SOCIAL
+     <panel id="socialActivatedNotification"
+            type="arrow"
+            hidden="true"
+@@ -223,7 +224,9 @@
+         </hbox>
+       </vbox>
+     </panel>
++#endif
+ 
++#ifdef MOZ_SOCIAL    
+     <panel id="social-share-panel"
+            class="social-panel"
+            type="arrow"
+@@ -252,6 +255,7 @@
+            rolluponmousewheel="true"
+            noautofocus="true"
+            position="topcenter topright"/>
++#endif
+ 
+     <menupopup id="toolbar-context-menu"
+                onpopupshowing="onViewToolbarsPopupShowing(event);">
+@@ -709,6 +713,7 @@
+                      onclick="BrowserGoHome(event);"
+                      aboutHomeOverrideTooltip="&abouthome.pageTitle;"/>
+ 
++#ifdef MOZ_SOCIAL
+       <toolbarbutton id="social-share-button"
+                      class="toolbarbutton-1 chromeclass-toolbar-additional"
+                      hidden="true"
+@@ -766,6 +771,7 @@
+           </menupopup>
+         </toolbarbutton>
+       </toolbaritem>
++#endif
+ 
+       <hbox id="window-controls" hidden="true" pack="end">
+         <toolbarbutton id="minimize-button"
+@@ -1048,6 +1054,7 @@
+                   selectpopup="ContentSelectDropdown"/>
+       <chatbar id="pinnedchats" layer="true" mousethrough="always" hidden="true"/>
+     </vbox>
++#ifdef MOZ_SOCIAL
+     <splitter id="social-sidebar-splitter"
+               class="chromeclass-extrachrome sidebar-splitter"
+               observes="socialSidebarBroadcaster"/>
+@@ -1064,6 +1071,7 @@
+                flex="1"
+                style="min-width: 14em; width: 18em; max-width: 36em;"/>
+     </vbox>
++#endif
+     <vbox id="browser-border-end" hidden="true" layer="true"/>
+   </hbox>
+ 
+diff -r ac33fd1f983b -r be8f1d1344ff browser/base/content/nsContextMenu.js
+--- a/browser/base/content/nsContextMenu.js	Fri Feb 21 14:01:43 2014 +0800
++++ b/browser/base/content/nsContextMenu.js	Fri Feb 21 14:42:29 2014 +0800
+@@ -151,15 +151,15 @@
+   initNavigationItems: function CM_initNavigationItems() {
+     var shouldShow = !(this.isContentSelected || this.onLink || this.onImage ||
+                        this.onCanvas || this.onVideo || this.onAudio ||
+-                       this.onTextInput || this.onSocial);
++                       this.onTextInput);
+     this.showItem("context-back", shouldShow);
+     this.showItem("context-forward", shouldShow);
+ 
+     let stopped = XULBrowserWindow.stopCommand.getAttribute("disabled") == "true";
+ 
+     let stopReloadItem = "";
+-    if (shouldShow || this.onSocial) {
+-      stopReloadItem = (stopped || this.onSocial) ? "reload" : "stop";
++    if (shouldShow) {
++      stopReloadItem = (stopped) ? "reload" : "stop";
+     }
+ 
+     this.showItem("context-reload", stopReloadItem == "reload");
+@@ -215,7 +215,7 @@
+                        this.onImage || this.onCanvas ||
+                        this.onVideo || this.onAudio ||
+                        this.onLink || this.onTextInput);
+-    var showInspect = !this.onSocial && gPrefService.getBoolPref("devtools.inspector.enabled");
++    var showInspect = gPrefService.getBoolPref("devtools.inspector.enabled");
+     this.showItem("context-viewsource", shouldShow);
+     this.showItem("context-viewinfo", shouldShow);
+     this.showItem("inspect-separator", showInspect);
+@@ -273,9 +273,9 @@
+     // Use "Bookmark This Link" if on a link.
+     this.showItem("context-bookmarkpage",
+                   !(this.isContentSelected || this.onTextInput || this.onLink ||
+-                    this.onImage || this.onVideo || this.onAudio || this.onSocial));
+-    this.showItem("context-bookmarklink", (this.onLink && !this.onMailtoLink &&
+-                                           !this.onSocial) || this.onPlainTextLink);
++                    this.onImage || this.onVideo || this.onAudio));
++    this.showItem("context-bookmarklink", (this.onLink && !this.onMailtoLink
++                                           ) || this.onPlainTextLink);
+     this.showItem("context-searchselect", isTextSelected);
+     this.showItem("context-keywordfield",
+                   this.onTextInput && this.onKeywordField);
+@@ -309,6 +309,7 @@
+     this.showItem("context-bidi-page-direction-toggle",
+                   !this.onTextInput && top.gBidiUI);
+ 
++#ifdef MOZ_SOCIAL
+     // SocialMarks. Marks does not work with text selections, only links. If
+     // there is more than MENU_LIMIT providers, we show a submenu for them,
+     // otherwise we have a menuitem per provider (added in SocialMarks class).
+@@ -339,6 +340,7 @@
+     this.showItem("context-shareimage", shareEnabled && this.onImage);
+     this.showItem("context-sharevideo", shareEnabled && this.onVideo);
+     this.setItemAttr("context-sharevideo", "disabled", !this.mediaURL);
++#endif
+   },
+ 
+   initSpellingItems: function() {
+@@ -555,8 +557,10 @@
+                                   .QueryInterface(Ci.nsIDocShell)
+                                   .chromeEventHandler;
+     }
++#ifdef MOZ_SOCIAL
+     this.onSocial = !!this.browser.getAttribute("origin");
+-
++#endif
++    
+     // Check if we are in a synthetic document (stand alone image, video, etc.).
+     this.inSyntheticDoc =  this.target.ownerDocument.mozSyntheticDocument;
+     // First, do checks for nodes that never have children.
+@@ -913,12 +917,7 @@
+   },
+ 
+   reload: function(event) {
+-    if (this.onSocial) {
+-      // full reload of social provider
+-      Social.provider.reload();
+-    } else {
+       BrowserReloadOrDuplicate(event);
+-    }
+   },
+ 
+   // View Partial Source
+@@ -1606,6 +1605,7 @@
+                                        }, window.top);
+     }
+   },
++#ifdef MOZ_SOCIAL
+   markLink: function CM_markLink(origin) {
+     // send link to social, if it is the page url linkURI will be null
+     SocialMarks.markLink(origin, this.linkURI ? this.linkURI.spec : null);
+@@ -1625,7 +1625,8 @@
+   shareSelect: function CM_shareSelect(selection) {
+     SocialShare.sharePage(null, { url: this.browser.currentURI.spec, text: selection });
+   },
+-
++#endif
++  
+   savePageAs: function CM_savePageAs() {
+     saveDocument(this.browser.contentDocument);
+   },
+diff -r ac33fd1f983b -r be8f1d1344ff browser/base/jar.mn
+--- a/browser/base/jar.mn	Fri Feb 21 14:01:43 2014 +0800
++++ b/browser/base/jar.mn	Fri Feb 21 14:42:29 2014 +0800
+@@ -53,13 +53,17 @@
+ #endif
+         content/browser/aboutRobots-icon.png          (content/aboutRobots-icon.png)
+         content/browser/aboutRobots-widget-left.png   (content/aboutRobots-widget-left.png)
++#ifdef MOZ_SOCIAL
+         content/browser/aboutSocialError.xhtml        (content/aboutSocialError.xhtml)
++#endif
+         content/browser/aboutTabCrashed.xhtml         (content/aboutTabCrashed.xhtml)
+ *       content/browser/browser.css                   (content/browser.css)
+ *       content/browser/browser.js                    (content/browser.js)
+ *       content/browser/browser.xul                   (content/browser.xul)
+ *       content/browser/browser-tabPreviews.xml       (content/browser-tabPreviews.xml)
++#ifdef MOZ_SOCIAL
+ *       content/browser/chatWindow.xul                (content/chatWindow.xul)
++#endif
+         content/browser/content.js                    (content/content.js)
+         content/browser/newtab/newTab.xul             (content/newtab/newTab.xul)
+ *       content/browser/newtab/newTab.js              (content/newtab/newTab.js)
+@@ -121,8 +125,10 @@
+ #ifdef XP_WIN
+         content/browser/win6BrowserOverlay.xul        (content/win6BrowserOverlay.xul)
+ #endif
++#ifdef MOZ_SOCIAL
+         content/browser/socialmarks.xml               (content/socialmarks.xml)
+         content/browser/socialchat.xml                (content/socialchat.xml)
++#endif
+ # the following files are browser-specific overrides
+ *       content/browser/license.html                  (/toolkit/content/license.html)
+ % override chrome://global/content/license.html chrome://browser/content/license.html
+diff -r ac33fd1f983b -r be8f1d1344ff browser/modules/moz.build
+--- a/browser/modules/moz.build	Fri Feb 21 14:01:43 2014 +0800
++++ b/browser/modules/moz.build	Fri Feb 21 14:42:29 2014 +0800
+@@ -15,7 +15,6 @@
+     'SharedFrame.jsm',
+     'SignInToWebsite.jsm',
+     'SitePermissions.jsm',
+-    'Social.jsm',
+     'TabCrashReporter.jsm',
+     'UITour.jsm',
+     'webappsUI.jsm',
+@@ -26,6 +25,11 @@
+         'webrtcUI.jsm',
+     ]
+ 
++if CONFIG['MOZ_SOCIAL'] :
++    EXTRA_JS_MODULES += [
++        'Social.jsm',
++    ]
++
+ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
+     EXTRA_JS_MODULES += [
+         'WindowsJumpLists.jsm',
+diff -r ac33fd1f983b -r be8f1d1344ff configure.in
+--- a/configure.in	Fri Feb 21 14:01:43 2014 +0800
++++ b/configure.in	Fri Feb 21 14:42:29 2014 +0800
+@@ -8294,9 +8294,14 @@
+ fi
+ 
+ dnl Build SocialAPI if required
+-if test "$MOZ_SOCIAL"; then
+-  AC_DEFINE(MOZ_SOCIAL)
+-fi
++MOZ_ARG_DISABLE_BOOL(social,
++[  --disable-social           Disable social],
++    MOZ_SOCIAL=,
++    MOZ_SOCIAL=1)
++if test -n "$MOZ_SOCIAL"; then
++    AC_DEFINE(MOZ_SOCIAL)
++fi
++AC_SUBST(MOZ_SOCIAL)
+ 
+ dnl Build Common JS modules provided by services.
+ AC_SUBST(MOZ_SERVICES_COMMON)

@@ -1,0 +1,430 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392962048 -28800
+#      Fri Feb 21 13:54:08 2014 +0800
+# Node ID 2580a161145b8ad84dfd765540f76b0fa86d03bc
+# Parent  8c3b51ae63404d4c187d501a8cc85dae71ee9339
+Disable datastorepromise
+
+diff -r 8c3b51ae6340 -r 2580a161145b browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Fri Feb 21 13:52:51 2014 +0800
++++ b/browser/installer/package-manifest.in	Fri Feb 21 13:54:08 2014 +0800
+@@ -859,10 +859,11 @@
+ @BINPATH@/metro/modules
+ #endif
+ 
++#ifdef MOZ_DATASTOREPROMISE
+ @BINPATH@/components/DataStore.manifest
+ @BINPATH@/components/DataStoreService.js
+ @BINPATH@/components/dom_datastore.xpt
+-
++#endif
+ 
+ #ifdef MOZ_ASAN
+ @BINPATH@/llvm-symbolizer
+diff -r 8c3b51ae6340 -r 2580a161145b configure.in
+--- a/configure.in	Fri Feb 21 13:52:51 2014 +0800
++++ b/configure.in	Fri Feb 21 13:54:08 2014 +0800
+@@ -7488,6 +7488,15 @@
+ fi
+ AC_SUBST(MOZ_IDENTITY)
+ 
++MOZ_ARG_DISABLE_BOOL(datastorepromise,
++[  --disable-datastorepromise          Disable datastorepromise],
++    MOZ_DATASTOREPROMISE=,
++    MOZ_DATASTOREPROMISE=1)
++if test -n "$MOZ_DATASTOREPROMISE"; then
++    AC_DEFINE(MOZ_DATASTOREPROMISE)
++fi
++AC_SUBST(MOZ_DATASTOREPROMISE)
++
+ dnl ========================================================
+ dnl = Enable Support for AudioChannelManager API
+ dnl ========================================================
+diff -r 8c3b51ae6340 -r 2580a161145b dom/base/Navigator.cpp
+--- a/dom/base/Navigator.cpp	Fri Feb 21 13:52:51 2014 +0800
++++ b/dom/base/Navigator.cpp	Fri Feb 21 13:54:08 2014 +0800
+@@ -76,13 +76,17 @@
+ #endif
+ 
+ #include "nsIDOMGlobalPropertyInitializer.h"
++#ifdef MOZ_DATASTOREPROMISE
+ #include "nsIDataStoreService.h"
++#endif
+ #include "nsJSUtils.h"
+ 
+ #include "nsScriptNameSpaceManager.h"
+ 
+ #include "mozilla/dom/NavigatorBinding.h"
++#ifdef MOZ_DATASTOREPROMISE
+ #include "mozilla/dom/Promise.h"
++#endif
+ 
+ namespace mozilla {
+ namespace dom {
+@@ -1111,6 +1115,7 @@
+ }
+ #endif
+ 
++#ifdef MOZ_DATASTOREPROMISE
+ already_AddRefed<Promise>
+ Navigator::GetDataStores(const nsAString& aName, ErrorResult& aRv)
+ {
+@@ -1132,6 +1137,7 @@
+   nsRefPtr<Promise> p = static_cast<Promise*>(promise.get());
+   return p.forget();
+ }
++#endif
+ 
+ PowerManager*
+ Navigator::GetMozPower(ErrorResult& aRv)
+@@ -1881,6 +1887,7 @@
+           win && CheckPermission(win, "input"));
+ }
+ 
++#ifdef MOZ_DATASTOREPROMISE
+ /* static */
+ bool
+ Navigator::HasDataStoreSupport(JSContext* /* unused */, JSObject* aGlobal)
+@@ -1912,6 +1919,7 @@
+ 
+   return status == nsIPrincipal::APP_STATUS_CERTIFIED;
+ }
++#endif
+ 
+ /* static */
+ already_AddRefed<nsPIDOMWindow>
+diff -r 8c3b51ae6340 -r 2580a161145b dom/base/Navigator.h
+--- a/dom/base/Navigator.h	Fri Feb 21 13:52:51 2014 +0800
++++ b/dom/base/Navigator.h	Fri Feb 21 13:54:08 2014 +0800
+@@ -59,7 +59,9 @@
+ class FMRadio;
+ #endif
+ 
++#ifdef MOZ_DATASTOREPROMISE
+ class Promise;
++#endif
+ 
+ class DesktopNotificationCenter;
+ #ifdef MOZ_MOBILEMESSAGE
+@@ -164,8 +166,10 @@
+ #ifdef MOZ_BATTERY
+   battery::BatteryManager* GetBattery(ErrorResult& aRv);
+ #endif
++#ifdef MOZ_DATASTOREPROMISE
+   already_AddRefed<Promise> GetDataStores(const nsAString &aName,
+                                           ErrorResult& aRv);
++#endif
+   bool Vibrate(uint32_t aDuration);
+   bool Vibrate(const nsTArray<uint32_t>& aDuration);
+   void GetAppCodeName(nsString& aAppCodeName, ErrorResult& aRv)
+@@ -306,7 +310,9 @@
+ 
+   static bool HasInputMethodSupport(JSContext* /* unused */, JSObject* aGlobal);
+ 
++#ifdef MOZ_DATASTOREPROMISE
+   static bool HasDataStoreSupport(JSContext* /* unused */, JSObject* aGlobal);
++#endif
+ 
+   nsPIDOMWindow* GetParentObject() const
+   {
+diff -r 8c3b51ae6340 -r 2580a161145b dom/moz.build
+--- a/dom/moz.build	Fri Feb 21 13:52:51 2014 +0800
++++ b/dom/moz.build	Fri Feb 21 13:54:08 2014 +0800
+@@ -43,7 +43,6 @@
+     'bindings',
+     'browser-element',
+     'alarm',
+-    'datastore',
+     'devicestorage',
+     'encoding',
+     'file',
+@@ -66,7 +65,6 @@
+     'workers',
+     'camera',
+     'audiochannel',
+-    'promise',
+     'inputmethod',
+     'webidl',
+ ]
+@@ -98,6 +96,12 @@
+ if CONFIG['MOZ_IDENTITY']:
+     PARALLEL_DIRS += ['identity']
+ 
++if CONFIG['MOZ_DATASTOREPROMISE']:
++    PARALLEL_DIRS += [
++        'datastore',
++        'promise',
++    ]
++
+ if CONFIG['OS_ARCH'] == 'WINNT':
+     PARALLEL_DIRS += ['plugins/ipc/hangui']
+ 
+diff -r 8c3b51ae6340 -r 2580a161145b dom/src/notification/Notification.cpp
+--- a/dom/src/notification/Notification.cpp	Fri Feb 21 13:52:51 2014 +0800
++++ b/dom/src/notification/Notification.cpp	Fri Feb 21 13:54:08 2014 +0800
+@@ -6,7 +6,9 @@
+ #include "mozilla/dom/Notification.h"
+ #include "mozilla/dom/AppNotificationServiceOptionsBinding.h"
+ #include "mozilla/dom/OwningNonNull.h"
++#ifdef MOZ_DATASTOREPROMISE
+ #include "mozilla/dom/Promise.h"
++#endif
+ #include "mozilla/Preferences.h"
+ #include "TabChild.h"
+ #include "nsContentUtils.h"
+@@ -37,14 +39,12 @@
+   NS_DECL_CYCLE_COLLECTING_ISUPPORTS
+   NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(NotificationStorageCallback)
+ 
+-  NotificationStorageCallback(const GlobalObject& aGlobal, nsPIDOMWindow* aWindow, Promise* aPromise)
++  NotificationStorageCallback(const GlobalObject& aGlobal, nsPIDOMWindow* aWindow)
+     : mCount(0),
+       mGlobal(aGlobal.Get()),
+-      mWindow(aWindow),
+-      mPromise(aPromise)
++      mWindow(aWindow)
+   {
+     MOZ_ASSERT(aWindow);
+-    MOZ_ASSERT(aPromise);
+     JSContext* cx = aGlobal.GetContext();
+     JSAutoCompartment ac(cx, mGlobal);
+     mNotifications = JS_NewArrayObject(cx, 0, nullptr);
+@@ -88,7 +88,9 @@
+   {
+     JSAutoCompartment ac(aCx, mGlobal);
+     JS::Rooted<JS::Value> result(aCx, JS::ObjectValue(*mNotifications));
++#ifdef MOZ_DATASTOREPROMISE
+     mPromise->MaybeResolve(aCx, result);
++#endif
+     return NS_OK;
+   }
+ 
+@@ -113,7 +115,9 @@
+   uint32_t  mCount;
+   JS::Heap<JSObject *> mGlobal;
+   nsCOMPtr<nsPIDOMWindow> mWindow;
++#ifdef MOZ_DATASTOREPROMISE
+   nsRefPtr<Promise> mPromise;
++#endif
+   JS::Heap<JSObject *> mNotifications;
+ };
+ 
+@@ -134,12 +138,16 @@
+ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(NotificationStorageCallback)
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mWindow)
++#ifdef MOZ_DATASTOREPROMISE
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mPromise)
++#endif
+ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
+ 
+ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(NotificationStorageCallback)
+   NS_IMPL_CYCLE_COLLECTION_UNLINK(mWindow)
++#ifdef MOZ_DATASTOREPROMISE
+   NS_IMPL_CYCLE_COLLECTION_UNLINK(mPromise)
++#endif
+   tmp->DropData();
+ NS_IMPL_CYCLE_COLLECTION_UNLINK_END
+ 
+@@ -677,6 +685,7 @@
+   }
+ }
+ 
++#ifdef MOZ_DATASTOREPROMISE
+ already_AddRefed<Promise>
+ Notification::Get(const GlobalObject& aGlobal,
+                   const GetNotificationOptions& aFilter,
+@@ -717,6 +726,7 @@
+ 
+   return promise.forget();
+ }
++#endif
+ 
+ bool
+ Notification::PrefEnabled()
+diff -r 8c3b51ae6340 -r 2580a161145b dom/src/notification/Notification.h
+--- a/dom/src/notification/Notification.h	Fri Feb 21 13:52:51 2014 +0800
++++ b/dom/src/notification/Notification.h	Fri Feb 21 13:54:08 2014 +0800
+@@ -19,7 +19,9 @@
+ 
+ 
+ class NotificationObserver;
++#ifdef MOZ_DATASTOREPROMISE
+ class Promise;
++#endif
+ 
+ class Notification : public nsDOMEventTargetHelper
+ {
+@@ -79,10 +81,12 @@
+   static NotificationPermission GetPermission(const GlobalObject& aGlobal,
+                                               ErrorResult& aRv);
+ 
++#ifdef MOZ_DATASTOREPROMISE
+   static already_AddRefed<Promise> Get(const GlobalObject& aGlobal,
+                                        const GetNotificationOptions& aFilter,
+                                        ErrorResult& aRv);
+-
++#endif
++  
+   void Close();
+ 
+   static bool PrefEnabled();
+diff -r 8c3b51ae6340 -r 2580a161145b dom/webidl/InputMethod.webidl
+--- a/dom/webidl/InputMethod.webidl	Fri Feb 21 13:52:51 2014 +0800
++++ b/dom/webidl/InputMethod.webidl	Fri Feb 21 13:54:08 2014 +0800
+@@ -84,7 +84,6 @@
+     * Get the whole text content of the input field.
+     * @return DOMString
+     */
+-   Promise getText(optional long offset, optional long length);
+    // The start and stop position of the selection.
+    readonly attribute long selectionStart;
+    readonly attribute long selectionEnd;
+@@ -105,7 +104,6 @@
+      *
+      * @return boolean
+      */
+-    Promise setSelectionRange(long start, long length);
+ 
+     /* User moves the cursor, or changes the selection with other means. If the text around
+      * cursor has changed, but the cursor has not been moved, the IME won't get notification.
+@@ -121,7 +119,6 @@
+      * @param length The length of text to replace. Defaults to 0.
+      * @return boolean
+      */
+-     Promise replaceSurroundingText(DOMString text, optional long offset, optional long length);
+ 
+     /*
+      *
+@@ -131,7 +128,6 @@
+      * TODO: maybe updateSurroundingText(DOMString beforeText, DOMString afterText); ?
+      * @return boolean
+      */
+-    Promise deleteSurroundingText(long offset, long length);
+ 
+     /*
+     * Notifies when the text around the cursor is changed, due to either text
+@@ -154,7 +150,6 @@
+       * Alternative: sendKey(KeyboardEvent event), but we will likely
+       * waste memory for creating the KeyboardEvent object.
+       */
+-    Promise sendKey(long keyCode, long charCode, long modifiers);
+ 
+     /*
+      * Set current composing text. This method will start composition or update
+@@ -183,8 +178,6 @@
+      * To finish composition and commit text to current input field, an IME
+      * should call |endComposition|.
+      */
+-    Promise setComposition(DOMString text, optional long cursor,
+-                           optional sequence<CompositionClauseParameters> clauses);
+ 
+     /*
+      * End composition, clear the composing text and commit given text to
+@@ -199,7 +192,6 @@
+      * |replaceSurroundingText|, |deleteSurroundingText|, user moving the
+      * cursor, changing the focus, etc.
+      */
+-    Promise endComposition(optional DOMString text);
+ };
+ 
+ enum CompositionClauseSelectionType {
+diff -r 8c3b51ae6340 -r 2580a161145b dom/webidl/Navigator.webidl
+--- a/dom/webidl/Navigator.webidl	Fri Feb 21 13:52:51 2014 +0800
++++ b/dom/webidl/Navigator.webidl	Fri Feb 21 13:54:08 2014 +0800
+@@ -102,14 +102,6 @@
+ };
+ Navigator implements NavigatorGeolocation;
+ 
+-// https://wiki.mozilla.org/WebAPI/DataStore
+-[NoInterfaceObject]
+-interface NavigatorDataStore {
+-    [Throws, NewObject, Func="Navigator::HasDataStoreSupport"]
+-    Promise getDataStores(DOMString name);
+-};
+-Navigator implements NavigatorDataStore;
+-
+ // http://www.w3.org/TR/vibration/#vibration-interface
+ partial interface Navigator {
+     // We don't support sequences in unions yet
+diff -r 8c3b51ae6340 -r 2580a161145b dom/webidl/Notification.webidl
+--- a/dom/webidl/Notification.webidl	Fri Feb 21 13:52:51 2014 +0800
++++ b/dom/webidl/Notification.webidl	Fri Feb 21 13:54:08 2014 +0800
+@@ -19,9 +19,6 @@
+   [Throws]
+   static void requestPermission(optional NotificationPermissionCallback permissionCallback);
+ 
+-  [Throws]
+-  static Promise get(optional GetNotificationOptions filter);
+-
+   attribute EventHandler onclick;
+ 
+   attribute EventHandler onshow;
+diff -r 8c3b51ae6340 -r 2580a161145b dom/webidl/moz.build
+--- a/dom/webidl/moz.build	Fri Feb 21 13:52:51 2014 +0800
++++ b/dom/webidl/moz.build	Fri Feb 21 13:54:08 2014 +0800
+@@ -60,7 +60,6 @@
+     'CSSValue.webidl',
+     'CSSValueList.webidl',
+     'DataContainerEvent.webidl',
+-    'DataStore.webidl',
+     'DedicatedWorkerGlobalScope.webidl',
+     'DelayNode.webidl',
+     'DesktopNotification.webidl',
+@@ -252,7 +251,6 @@
+     'Position.webidl',
+     'PositionError.webidl',
+     'ProcessingInstruction.webidl',
+-    'Promise.webidl',
+     'Range.webidl',
+     'Rect.webidl',
+     'RGBColor.webidl',
+@@ -590,7 +588,6 @@
+ GENERATED_EVENTS_WEBIDL_FILES = [
+     'BlobEvent.webidl',
+     'CallGroupErrorEvent.webidl',
+-    'DataStoreChangeEvent.webidl',
+     'DeviceLightEvent.webidl',
+     'DeviceProximityEvent.webidl',
+     'ErrorEvent.webidl',
+@@ -605,6 +602,17 @@
+     'UserProximityEvent.webidl',
+ ]
+ 
++if CONFIG['MOZ_DATASTOREPROMISE']:
++    WEBIDL_FILES += [
++        'DataStore.webidl',
++        'Promise.webidl',
++    ]
++
++if CONFIG['MOZ_DATASTOREPROMISE']:
++    GENERATED_EVENTS_WEBIDL_FILES += [
++        'DataStoreChangeEvent.webidl',
++    ]
++
+ if CONFIG['MOZ_GAMEPAD']:
+     GENERATED_EVENTS_WEBIDL_FILES += [
+         'GamepadAxisMoveEvent.webidl',
+diff -r 8c3b51ae6340 -r 2580a161145b dom/workers/RegisterBindings.cpp
+--- a/dom/workers/RegisterBindings.cpp	Fri Feb 21 13:52:51 2014 +0800
++++ b/dom/workers/RegisterBindings.cpp	Fri Feb 21 13:54:08 2014 +0800
+@@ -20,7 +20,9 @@
+ #include "mozilla/dom/ImageDataBinding.h"
+ #include "mozilla/dom/MessageEventBinding.h"
+ #include "mozilla/dom/MessagePortBinding.h"
++#ifdef MOZ_DATASTOREPROMISE
+ #include "mozilla/dom/PromiseBinding.h"
++#endif
+ #include "mozilla/dom/TextDecoderBinding.h"
+ #include "mozilla/dom/TextEncoderBinding.h"
+ #include "mozilla/dom/XMLHttpRequestBinding.h"
+@@ -63,8 +65,6 @@
+       !ImageDataBinding::GetConstructorObject(aCx, aGlobal) ||
+       !MessageEventBinding::GetConstructorObject(aCx, aGlobal) ||
+       !MessagePortBinding::GetConstructorObject(aCx, aGlobal) ||
+-      (PromiseEnabled() &&
+-        !PromiseBinding::GetConstructorObject(aCx, aGlobal)) ||
+       !TextDecoderBinding::GetConstructorObject(aCx, aGlobal) ||
+       !TextEncoderBinding::GetConstructorObject(aCx, aGlobal) ||
+       !XMLHttpRequestBinding_workers::GetConstructorObject(aCx, aGlobal) ||

@@ -1,0 +1,32 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392952914 -28800
+#      Fri Feb 21 11:21:54 2014 +0800
+# Node ID 12cb20a53a006609a286d3cb59406a7d4b825c24
+# Parent  9f1877d83806a013a38d48af66adcfd6f3138bae
+Disable Autoconfig
+
+diff -r 9f1877d83806 -r 12cb20a53a00 browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Fri Feb 21 11:18:37 2014 +0800
++++ b/browser/installer/package-manifest.in	Fri Feb 21 11:21:54 2014 +0800
+@@ -167,7 +167,9 @@
+ @BINPATH@/components/appshell.xpt
+ @BINPATH@/components/appstartup.xpt
+ @BINPATH@/components/autocomplete.xpt
++#ifdef MOZ_PREF_EXTENSIONS
+ @BINPATH@/components/autoconfig.xpt
++#endif
+ @BINPATH@/browser/components/browsercompsbase.xpt
+ @BINPATH@/browser/components/browser-feeds.xpt
+ @BINPATH@/components/caps.xpt
+@@ -636,8 +638,10 @@
+ @BINPATH@/browser/@PREF_DIR@/firefox.js
+ @BINPATH@/browser/@PREF_DIR@/firefox-branding.js
+ @BINPATH@/greprefs.js
++#ifdef MOZ_PREF_EXTENSIONS
+ @BINPATH@/defaults/autoconfig/platform.js
+ @BINPATH@/defaults/autoconfig/prefcalls.js
++#endif
+ @BINPATH@/browser/defaults/profile/prefs.js
+ 
+ #ifndef LIBXUL_SDK

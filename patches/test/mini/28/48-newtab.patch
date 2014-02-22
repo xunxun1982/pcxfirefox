@@ -1,0 +1,86 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392971547 -28800
+#      Fri Feb 21 16:32:27 2014 +0800
+# Node ID c1a9b8313983098dd60c440b7e05437c62b7e7c9
+# Parent  7c5c178ea9da343761697df3d917ecac42ffc490
+Disable newtab
+
+diff -r 7c5c178ea9da -r c1a9b8313983 browser/app/profile/firefox.js
+--- a/browser/app/profile/firefox.js	Fri Feb 21 16:30:25 2014 +0800
++++ b/browser/app/profile/firefox.js	Fri Feb 21 16:32:27 2014 +0800
+@@ -1251,12 +1251,12 @@
+ pref("browser.panorama.animate_zoom", true);
+ 
+ // Defines the url to be used for new tabs.
+-pref("browser.newtab.url", "about:newtab");
++pref("browser.newtab.url", "about:blank");
+ // Activates preloading of the new tab url.
+-pref("browser.newtab.preload", true);
++pref("browser.newtab.preload", false);
+ 
+ // Toggles the content of 'about:newtab'. Shows the grid when enabled.
+-pref("browser.newtabpage.enabled", true);
++pref("browser.newtabpage.enabled", false);
+ 
+ // number of rows of newtab grid
+ pref("browser.newtabpage.rows", 3);
+diff -r 7c5c178ea9da -r c1a9b8313983 browser/base/content/tabbrowser.xml
+--- a/browser/base/content/tabbrowser.xml	Fri Feb 21 16:30:25 2014 +0800
++++ b/browser/base/content/tabbrowser.xml	Fri Feb 21 16:32:27 2014 +0800
+@@ -1577,16 +1577,6 @@
+ 
+             b.droppedLinkHandler = handleDroppedLink;
+ 
+-            // If we just created a new tab that loads the default
+-            // newtab url, swap in a preloaded page if possible.
+-            // Do nothing if we're a private window.
+-            let docShellsSwapped = false;
+-            if (aURI == BROWSER_NEW_TAB_URL &&
+-                !PrivateBrowsingUtils.isWindowPrivate(window) &&
+-                !gMultiProcessBrowser) {
+-              docShellsSwapped = gBrowserNewTabPreloader.newTab(t);
+-            }
+-
+             // Dispatch a new tab notification.  We do this once we're
+             // entirely done, so that things are in a consistent state
+             // even if the event listener opens or closes tabs.
+@@ -1596,7 +1586,7 @@
+ 
+             // If we didn't swap docShells with a preloaded browser
+             // then let's just continue loading the page normally.
+-            if (!docShellsSwapped && !uriIsAboutBlank) {
++            if (!uriIsAboutBlank) {
+               // pretend the user typed this so it'll be available till
+               // the document successfully loads
+               if (aURI && gInitialPages.indexOf(aURI) == -1)
+diff -r 7c5c178ea9da -r c1a9b8313983 browser/base/jar.mn
+--- a/browser/base/jar.mn	Fri Feb 21 16:30:25 2014 +0800
++++ b/browser/base/jar.mn	Fri Feb 21 16:32:27 2014 +0800
+@@ -65,10 +65,12 @@
+ *       content/browser/chatWindow.xul                (content/chatWindow.xul)
+ #endif
+         content/browser/content.js                    (content/content.js)
++#ifdef MOZ_NEWTAB
+         content/browser/newtab/newTab.xul             (content/newtab/newTab.xul)
+ *       content/browser/newtab/newTab.js              (content/newtab/newTab.js)
+         content/browser/newtab/newTab.css             (content/newtab/newTab.css)
+         content/browser/newtab/preloaderContent.js    (content/newtab/preloaderContent.js)
++#endif
+ *       content/browser/pageinfo/pageInfo.xul         (content/pageinfo/pageInfo.xul)
+         content/browser/pageinfo/pageInfo.js          (content/pageinfo/pageInfo.js)
+         content/browser/pageinfo/pageInfo.css         (content/pageinfo/pageInfo.css)
+diff -r 7c5c178ea9da -r c1a9b8313983 browser/components/about/AboutRedirector.cpp
+--- a/browser/components/about/AboutRedirector.cpp	Fri Feb 21 16:30:25 2014 +0800
++++ b/browser/components/about/AboutRedirector.cpp	Fri Feb 21 16:32:27 2014 +0800
+@@ -78,8 +78,10 @@
+   { "home", "chrome://browser/content/abouthome/aboutHome.xhtml",
+     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+     nsIAboutModule::ALLOW_SCRIPT },
++#ifdef MOZ_NEWTAB
+   { "newtab", "chrome://browser/content/newtab/newTab.xul",
+     nsIAboutModule::ALLOW_SCRIPT },
++#endif
+   { "permissions", "chrome://browser/content/preferences/aboutPermissions.xul",
+     nsIAboutModule::ALLOW_SCRIPT },
+   { "preferences", "chrome://browser/content/preferences/in-content/preferences.xul",

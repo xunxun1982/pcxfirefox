@@ -1,0 +1,86 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392961901 -28800
+#      Fri Feb 21 13:51:41 2014 +0800
+# Node ID b092891d2ea1eac3355c2e59d640931af5e86b94
+# Parent  1c9997ad4f2ec3558edbd5b8930c67df0d886c75
+Disable push
+
+diff -r 1c9997ad4f2e -r b092891d2ea1 browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Fri Feb 21 13:48:49 2014 +0800
++++ b/browser/installer/package-manifest.in	Fri Feb 21 13:51:41 2014 +0800
+@@ -544,9 +544,11 @@
+ @BINPATH@/components/NotificationStorage.manifest
+ @BINPATH@/components/AlarmsManager.js
+ @BINPATH@/components/AlarmsManager.manifest
++#ifdef MOZ_PUSH
+ @BINPATH@/components/Push.js
+ @BINPATH@/components/Push.manifest
+ @BINPATH@/components/PushServiceLauncher.js
++#endif
+ @BINPATH@/components/TCPSocket.js
+ @BINPATH@/components/TCPServerSocket.js
+ @BINPATH@/components/TCPSocketParentIntermediary.js
+diff -r 1c9997ad4f2e -r b092891d2ea1 configure.in
+--- a/configure.in	Fri Feb 21 13:48:49 2014 +0800
++++ b/configure.in	Fri Feb 21 13:51:41 2014 +0800
+@@ -7470,6 +7470,15 @@
+ fi
+ AC_SUBST(MOZ_TELEPHONY)
+ 
++MOZ_ARG_DISABLE_BOOL(push,
++[  --disable-push          Disable push],
++    MOZ_PUSH=,
++    MOZ_PUSH=1)
++if test -n "$MOZ_PUSH"; then
++    AC_DEFINE(MOZ_PUSH)
++fi
++AC_SUBST(MOZ_PUSH)
++
+ dnl ========================================================
+ dnl = Enable Support for AudioChannelManager API
+ dnl ========================================================
+diff -r 1c9997ad4f2e -r b092891d2ea1 dom/moz.build
+--- a/dom/moz.build	Fri Feb 21 13:48:49 2014 +0800
++++ b/dom/moz.build	Fri Feb 21 13:51:41 2014 +0800
+@@ -51,7 +51,6 @@
+     'media',
+     'messages',
+     'power',
+-    'push',
+     'quota',
+     'settings',
+     'src',
+@@ -94,6 +93,9 @@
+ if CONFIG['MOZ_TELEPHONY']:
+     PARALLEL_DIRS += ['telephony']
+ 
++if CONFIG['MOZ_PUSH']:
++    PARALLEL_DIRS += ['push']
++
+ if CONFIG['OS_ARCH'] == 'WINNT':
+     PARALLEL_DIRS += ['plugins/ipc/hangui']
+ 
+diff -r 1c9997ad4f2e -r b092891d2ea1 dom/webidl/moz.build
+--- a/dom/webidl/moz.build	Fri Feb 21 13:48:49 2014 +0800
++++ b/dom/webidl/moz.build	Fri Feb 21 13:51:41 2014 +0800
+@@ -253,7 +253,6 @@
+     'PositionError.webidl',
+     'ProcessingInstruction.webidl',
+     'Promise.webidl',
+-    'PushManager.webidl',
+     'Range.webidl',
+     'Rect.webidl',
+     'RGBColor.webidl',
+@@ -449,6 +448,11 @@
+         'TelephonyCallGroup.webidl',
+     ]
+ 
++if CONFIG['MOZ_PUSH']:
++    WEBIDL_FILES += [
++        'PushManager.webidl',
++    ]
++
+ if CONFIG['MOZ_AUDIO_CHANNEL_MANAGER']:
+     WEBIDL_FILES += [
+         'AudioChannelManager.webidl',

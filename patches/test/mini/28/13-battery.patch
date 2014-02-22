@@ -1,0 +1,450 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392960662 -28800
+#      Fri Feb 21 13:31:02 2014 +0800
+# Node ID 98adf592f1ce85811e7ffcf8959ddd7525711fa2
+# Parent  0ac2db66b98f54b41763502a3cab22fa5cec78b5
+Disable battery
+
+diff -r 0ac2db66b98f -r 98adf592f1ce configure.in
+--- a/configure.in	Fri Feb 21 13:29:19 2014 +0800
++++ b/configure.in	Fri Feb 21 13:31:02 2014 +0800
+@@ -7398,6 +7398,15 @@
+ fi
+ AC_SUBST(MOZ_ACTIVITIES)
+ 
++MOZ_ARG_DISABLE_BOOL(battery,
++[  --disable-battery           Disable battery],
++    MOZ_BATTERY=,
++    MOZ_BATTERY=1)
++if test -n "$MOZ_BATTERY"; then
++    AC_DEFINE(MOZ_BATTERY)
++fi
++AC_SUBST(MOZ_BATTERY)
++
+ dnl ========================================================
+ dnl = Enable Support for AudioChannelManager API
+ dnl ========================================================
+diff -r 0ac2db66b98f -r 98adf592f1ce dom/base/Navigator.cpp
+--- a/dom/base/Navigator.cpp	Fri Feb 21 13:29:19 2014 +0800
++++ b/dom/base/Navigator.cpp	Fri Feb 21 13:31:02 2014 +0800
+@@ -24,7 +24,9 @@
+ #include "nsUnicharUtils.h"
+ #include "mozilla/Preferences.h"
+ #include "mozilla/Telemetry.h"
++#ifdef MOZ_BATTERY
+ #include "BatteryManager.h"
++#endif
+ #include "mozilla/dom/PowerManager.h"
+ #include "nsIDOMWakeLock.h"
+ #include "nsIPowerManagerService.h"
+@@ -136,7 +138,9 @@
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mMimeTypes)
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mGeolocation)
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mNotification)
++#ifdef MOZ_BATTERY
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mBatteryManager)
++#endif
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mPowerManager)
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mMobileMessageManager)
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mTelephony)
+@@ -188,11 +192,13 @@
+     mNotification = nullptr;
+   }
+ 
++#ifdef MOZ_BATTERY
+   if (mBatteryManager) {
+     mBatteryManager->Shutdown();
+     mBatteryManager = nullptr;
+   }
+-
++#endif
++  
+ #ifdef MOZ_B2G_FM
+   if (mFMRadio) {
+     mFMRadio->Shutdown();
+@@ -1070,6 +1076,7 @@
+ 
+ #endif  // MOZ_B2G_FM
+ 
++#ifdef MOZ_BATTERY
+ //*****************************************************************************
+ //    Navigator::nsINavigatorBattery
+ //*****************************************************************************
+@@ -1090,6 +1097,7 @@
+ 
+   return mBatteryManager;
+ }
++#endif
+ 
+ already_AddRefed<Promise>
+ Navigator::GetDataStores(const nsAString& aName, ErrorResult& aRv)
+@@ -1624,12 +1632,14 @@
+   return NavigatorBinding::Wrap(cx, scope, this);
+ }
+ 
++#ifdef MOZ_BATTERY
+ /* static */
+ bool
+ Navigator::HasBatterySupport(JSContext* /* unused*/, JSObject* /*unused */)
+ {
+   return battery::BatteryManager::HasSupport();
+ }
++#endif
+ 
+ /* static */
+ bool
+diff -r 0ac2db66b98f -r 98adf592f1ce dom/base/Navigator.h
+--- a/dom/base/Navigator.h	Fri Feb 21 13:29:19 2014 +0800
++++ b/dom/base/Navigator.h	Fri Feb 21 13:31:02 2014 +0800
+@@ -47,9 +47,11 @@
+ namespace mozilla {
+ namespace dom {
+ 
++#ifdef MOZ_BATTERY
+ namespace battery {
+ class BatteryManager;
+ } // namespace battery
++#endif
+ 
+ #ifdef MOZ_B2G_FM
+ class FMRadio;
+@@ -153,7 +155,9 @@
+   nsPluginArray* GetPlugins(ErrorResult& aRv);
+   // The XPCOM GetDoNotTrack is ok
+   Geolocation* GetGeolocation(ErrorResult& aRv);
++#ifdef MOZ_BATTERY
+   battery::BatteryManager* GetBattery(ErrorResult& aRv);
++#endif
+   already_AddRefed<Promise> GetDataStores(const nsAString &aName,
+                                           ErrorResult& aRv);
+   bool Vibrate(uint32_t aDuration);
+@@ -238,7 +242,9 @@
+                            ErrorResult& aRv);
+ 
+   // WebIDL helper methods
++#ifdef MOZ_BATTERY
+   static bool HasBatterySupport(JSContext* /* unused*/, JSObject* /*unused */);
++#endif
+   static bool HasPowerSupport(JSContext* /* unused */, JSObject* aGlobal);
+   static bool HasPhoneNumberSupport(JSContext* /* unused */, JSObject* aGlobal);
+   static bool HasIdleSupport(JSContext* /* unused */, JSObject* aGlobal);
+@@ -307,7 +313,9 @@
+   nsRefPtr<nsPluginArray> mPlugins;
+   nsRefPtr<Geolocation> mGeolocation;
+   nsRefPtr<DesktopNotificationCenter> mNotification;
++#ifdef MOZ_BATTERY
+   nsRefPtr<battery::BatteryManager> mBatteryManager;
++#endif
+ #ifdef MOZ_B2G_FM
+   nsRefPtr<FMRadio> mFMRadio;
+ #endif
+diff -r 0ac2db66b98f -r 98adf592f1ce dom/base/moz.build
+--- a/dom/base/moz.build	Fri Feb 21 13:29:19 2014 +0800
++++ b/dom/base/moz.build	Fri Feb 21 13:31:02 2014 +0800
+@@ -131,7 +131,6 @@
+ MSVC_ENABLE_PGO = True
+ 
+ LOCAL_INCLUDES += [
+-    '../battery',
+     '../bluetooth',
+     '../media',
+     '../network/src',
+@@ -148,6 +147,11 @@
+     '/layout/xul',
+ ]
+ 
++if CONFIG['MOZ_BATTERY'] :
++    LOCAL_INCLUDES += [
++        '../battery',
++    ]
++
+ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
+     LOCAL_INCLUDES += [
+         '../fmradio',
+diff -r 0ac2db66b98f -r 98adf592f1ce dom/bindings/Bindings.conf
+--- a/dom/bindings/Bindings.conf	Fri Feb 21 13:29:19 2014 +0800
++++ b/dom/bindings/Bindings.conf	Fri Feb 21 13:31:02 2014 +0800
+@@ -160,11 +160,6 @@
+     'workers': True,
+ }],
+ 
+-'BatteryManager': {
+-    'nativeType': 'mozilla::dom::battery::BatteryManager',
+-    'headerFile': 'BatteryManager.h'
+-},
+-
+ 'BluetoothAdapter': {
+     'nativeType': 'mozilla::dom::bluetooth::BluetoothAdapter',
+     'headerFile': 'BluetoothAdapter.h'
+diff -r 0ac2db66b98f -r 98adf592f1ce dom/moz.build
+--- a/dom/moz.build	Fri Feb 21 13:29:19 2014 +0800
++++ b/dom/moz.build	Fri Feb 21 13:31:02 2014 +0800
+@@ -41,7 +41,6 @@
+     'base',
+     'activities',
+     'bindings',
+-    'battery',
+     'bluetooth',
+     'browser-element',
+     'contacts',
+@@ -80,6 +79,9 @@
+     'webidl',
+ ]
+ 
++if CONFIG['MOZ_BATTERY']:
++    PARALLEL_DIRS += ['battery']
++
+ if CONFIG['OS_ARCH'] == 'WINNT':
+     PARALLEL_DIRS += ['plugins/ipc/hangui']
+ 
+diff -r 0ac2db66b98f -r 98adf592f1ce dom/webidl/Navigator.webidl
+--- a/dom/webidl/Navigator.webidl	Fri Feb 21 13:29:19 2014 +0800
++++ b/dom/webidl/Navigator.webidl	Fri Feb 21 13:31:02 2014 +0800
+@@ -102,16 +102,6 @@
+ };
+ Navigator implements NavigatorGeolocation;
+ 
+-// http://www.w3.org/TR/battery-status/#navigatorbattery-interface
+-[NoInterfaceObject]
+-interface NavigatorBattery {
+-    // XXXbz Per spec this should be non-nullable, but we return null in
+-    // torn-down windows.  See bug 884925.
+-    [Throws, Func="Navigator::HasBatterySupport"]
+-    readonly attribute BatteryManager? battery;
+-};
+-Navigator implements NavigatorBattery;
+-
+ // https://wiki.mozilla.org/WebAPI/DataStore
+ [NoInterfaceObject]
+ interface NavigatorDataStore {
+diff -r 0ac2db66b98f -r 98adf592f1ce dom/webidl/moz.build
+--- a/dom/webidl/moz.build	Fri Feb 21 13:29:19 2014 +0800
++++ b/dom/webidl/moz.build	Fri Feb 21 13:31:02 2014 +0800
+@@ -34,7 +34,6 @@
+     'AudioProcessingEvent.webidl',
+     'AudioStreamTrack.webidl',
+     'BarProp.webidl',
+-    'BatteryManager.webidl',
+     'BeforeUnloadEvent.webidl',
+     'BiquadFilterNode.webidl',
+     'Blob.webidl',
+@@ -435,6 +434,11 @@
+     'XULElement.webidl',
+ ]
+ 
++if CONFIG['MOZ_BATTERY']:
++    WEBIDL_FILES += [
++        'BatteryManager.webidl',
++    ]
++
+ if CONFIG['MOZ_AUDIO_CHANNEL_MANAGER']:
+     WEBIDL_FILES += [
+         'AudioChannelManager.webidl',
+diff -r 0ac2db66b98f -r 98adf592f1ce hal/Hal.cpp
+--- a/hal/Hal.cpp	Fri Feb 21 13:29:19 2014 +0800
++++ b/hal/Hal.cpp	Fri Feb 21 13:31:02 2014 +0800
+@@ -271,6 +271,7 @@
+   bool                    mHasValidCache;
+ };
+ 
++#ifdef MOZ_BATTERY
+ class BatteryObserversManager : public CachingObserversManager<BatteryInformation>
+ {
+ protected:
+@@ -288,6 +289,7 @@
+ };
+ 
+ static BatteryObserversManager sBatteryObservers;
++#endif
+ 
+ class NetworkObserversManager : public CachingObserversManager<NetworkInformation>
+ {
+@@ -339,6 +341,7 @@
+ 
+ static ScreenConfigurationObserversManager sScreenConfigurationObservers;
+ 
++#ifdef MOZ_BATTERY
+ void
+ RegisterBatteryObserver(BatteryObserver* aObserver)
+ {
+@@ -367,6 +370,7 @@
+   sBatteryObservers.CacheInformation(aInfo);
+   sBatteryObservers.BroadcastCachedInformation();
+ }
++#endif
+ 
+ bool GetScreenEnabled()
+ {
+diff -r 0ac2db66b98f -r 98adf592f1ce hal/Hal.h
+--- a/hal/Hal.h	Fri Feb 21 13:29:19 2014 +0800
++++ b/hal/Hal.h	Fri Feb 21 13:31:02 2014 +0800
+@@ -14,7 +14,9 @@
+ #include "mozilla/Types.h"
+ #include "nsTArray.h"
+ #include "prlog.h"
++#ifdef MOZ_BATTERY
+ #include "mozilla/dom/battery/Types.h"
++#endif
+ #include "mozilla/dom/network/Types.h"
+ #include "mozilla/dom/power/Types.h"
+ #include "mozilla/hal_sandbox/PHal.h"
+@@ -91,6 +93,7 @@
+ void CancelVibrate(nsIDOMWindow* aWindow);
+ void CancelVibrate(const hal::WindowIdentifier &id);
+ 
++#ifdef MOZ_BATTERY
+ /**
+  * Inform the battery backend there is a new battery observer.
+  * @param aBatteryObserver The observer that should be added.
+@@ -113,6 +116,7 @@
+  * @param aBatteryInfo The new battery information.
+  */
+ void NotifyBatteryChange(const hal::BatteryInformation& aBatteryInfo);
++#endif
+ 
+ /**
+  * Determine whether the device's screen is currently enabled.
+diff -r 0ac2db66b98f -r 98adf592f1ce hal/moz.build
+--- a/hal/moz.build	Fri Feb 21 13:29:19 2014 +0800
++++ b/hal/moz.build	Fri Feb 21 13:31:02 2014 +0800
+@@ -101,9 +101,10 @@
+         'windows/WindowsSensor.cpp',
+     ]
+     # WindowsBattery.cpp cannot be built in unified mode because it relies on HalImpl.h.
+-    SOURCES += [
++    if CONFIG['MOZ_BATTERY']:
++        SOURCES += [
+         'windows/WindowsBattery.cpp',
+-    ]
++        ]
+ elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
+     UNIFIED_SOURCES += [
+         'cocoa/CocoaBattery.cpp',
+diff -r 0ac2db66b98f -r 98adf592f1ce hal/sandbox/PHal.ipdl
+--- a/hal/sandbox/PHal.ipdl	Fri Feb 21 13:29:19 2014 +0800
++++ b/hal/sandbox/PHal.ipdl	Fri Feb 21 13:31:02 2014 +0800
+@@ -26,12 +26,6 @@
+ namespace mozilla {
+ 
+ namespace hal {
+-struct BatteryInformation {
+-  double level;
+-  bool   charging;
+-  double remainingTime;
+-};
+-
+ struct LightConfiguration {
+   LightType light;
+   LightMode mode;
+@@ -103,7 +97,6 @@
+     manager PContent;
+ 
+ child:
+-    NotifyBatteryChange(BatteryInformation aBatteryInfo);
+     NotifyNetworkChange(NetworkInformation aNetworkInfo);
+     NotifyWakeLockChange(WakeLockInformation aWakeLockInfo);
+     NotifyScreenConfigurationChange(ScreenConfiguration aScreenOrientation);
+@@ -115,11 +108,6 @@
+     Vibrate(uint32_t[] pattern, uint64_t[] id, PBrowser browser);
+     CancelVibrate(uint64_t[] id, PBrowser browser);
+ 
+-    EnableBatteryNotifications();
+-    DisableBatteryNotifications();
+-    sync GetCurrentBatteryInformation()
+-      returns (BatteryInformation aBatteryInfo);
+-
+     EnableNetworkNotifications();
+     DisableNetworkNotifications();
+     sync GetCurrentNetworkInformation()
+diff -r 0ac2db66b98f -r 98adf592f1ce hal/sandbox/SandboxHal.cpp
+--- a/hal/sandbox/SandboxHal.cpp	Fri Feb 21 13:29:19 2014 +0800
++++ b/hal/sandbox/SandboxHal.cpp	Fri Feb 21 13:31:02 2014 +0800
+@@ -12,7 +12,9 @@
+ #include "mozilla/hal_sandbox/PHalParent.h"
+ #include "mozilla/dom/TabParent.h"
+ #include "mozilla/dom/TabChild.h"
++#ifdef MOZ_BATTERY
+ #include "mozilla/dom/battery/Types.h"
++#endif
+ #include "mozilla/dom/network/Types.h"
+ #include "mozilla/dom/ScreenOrientation.h"
+ #include "mozilla/Observer.h"
+@@ -66,6 +68,7 @@
+   Hal()->SendCancelVibrate(newID.AsArray(), TabChild::GetFrom(newID.GetWindow()));
+ }
+ 
++#ifdef MOZ_BATTERY
+ void
+ EnableBatteryNotifications()
+ {
+@@ -83,6 +86,7 @@
+ {
+   Hal()->SendGetCurrentBatteryInformation(aBatteryInfo);
+ }
++#endif
+ 
+ void
+ EnableNetworkNotifications()
+@@ -440,7 +444,6 @@
+ }
+ 
+ class HalParent : public PHalParent
+-                , public BatteryObserver
+                 , public NetworkObserver
+                 , public ISensorObserver
+                 , public WakeLockObserver
+@@ -455,7 +458,9 @@
+   {
+     // NB: you *must* unconditionally unregister your observer here,
+     // if it *may* be registered below.
++#ifdef MOZ_BATTERY
+     hal::UnregisterBatteryObserver(this);
++#endif
+     hal::UnregisterNetworkObserver(this);
+     hal::UnregisterScreenConfigurationObserver(this);
+     for (int32_t sensor = SENSOR_UNKNOWN + 1;
+@@ -497,6 +502,7 @@
+     return true;
+   }
+ 
++#ifdef MOZ_BATTERY
+   virtual bool
+   RecvEnableBatteryNotifications() MOZ_OVERRIDE {
+     // We give all content battery-status permission.
+@@ -520,6 +526,7 @@
+   void Notify(const BatteryInformation& aBatteryInfo) MOZ_OVERRIDE {
+     unused << SendNotifyBatteryChange(aBatteryInfo);
+   }
++#endif
+ 
+   virtual bool
+   RecvEnableNetworkNotifications() MOZ_OVERRIDE {
+@@ -873,11 +880,13 @@
+     sHalChildDestroyed = true;
+   }
+ 
++#ifdef MOZ_BATTERY  
+   virtual bool
+   RecvNotifyBatteryChange(const BatteryInformation& aBatteryInfo) MOZ_OVERRIDE {
+     hal::NotifyBatteryChange(aBatteryInfo);
+     return true;
+   }
++#endif
+ 
+   virtual bool
+   RecvNotifySensorChange(const hal::SensorData &aSensorData) MOZ_OVERRIDE;
+diff -r 0ac2db66b98f -r 98adf592f1ce modules/libpref/src/init/all.js
+--- a/modules/libpref/src/init/all.js	Fri Feb 21 13:29:19 2014 +0800
++++ b/modules/libpref/src/init/all.js	Fri Feb 21 13:31:02 2014 +0800
+@@ -4382,8 +4382,10 @@
+ pref("dom.vibrator.max_vibrate_ms", 10000);
+ pref("dom.vibrator.max_vibrate_list_len", 128);
+ 
++#ifdef MOZ_BATTERY
+ // Battery API
+ pref("dom.battery.enabled", true);
++#endif
+ 
+ // WebSMS
+ pref("dom.sms.enabled", false);

@@ -1,0 +1,19 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1393047480 -28800
+#      Sat Feb 22 13:38:00 2014 +0800
+# Node ID 665fccc7c3bfaedc854c6925dc8c9a4b79f9d37c
+# Parent  ab0f707f5ccfa11bc0b0d6b95149d957d6cec151
+Disable newtab 3
+
+diff -r ab0f707f5ccf -r 665fccc7c3bf browser/base/content/tabbrowser.xml
+--- a/browser/base/content/tabbrowser.xml	Sat Feb 22 12:18:42 2014 +0800
++++ b/browser/base/content/tabbrowser.xml	Sat Feb 22 13:38:00 2014 +0800
+@@ -4236,7 +4236,6 @@
+         canvas.mozOpaque = true;
+         canvas.width = 160 * scale;
+         canvas.height = 90 * scale;
+-        PageThumbs.captureToCanvas(browser.contentWindow, canvas);
+         dt.setDragImage(canvas, -16 * scale, -16 * scale);
+ 
+         // _dragData.offsetX/Y give the coordinates that the mouse should be

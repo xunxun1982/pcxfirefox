@@ -1,0 +1,53 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1393042722 -28800
+#      Sat Feb 22 12:18:42 2014 +0800
+# Node ID ab0f707f5ccfa11bc0b0d6b95149d957d6cec151
+# Parent  f5398612fba821b0964e333e7452dceeb9a21b0f
+Disable migration 2
+
+diff -r f5398612fba8 -r ab0f707f5ccf configure.in
+--- a/configure.in	Fri Feb 21 16:36:31 2014 +0800
++++ b/configure.in	Sat Feb 22 12:18:42 2014 +0800
+@@ -7523,6 +7523,15 @@
+ fi
+ AC_SUBST(MOZ_HYPHENATION)
+ 
++MOZ_ARG_DISABLE_BOOL(migration,
++[  --disable-migration          Disable migration],
++    MOZ_MIGRATION=,
++    MOZ_MIGRATION=1)
++if test -n "$MOZ_MIGRATION"; then
++    AC_DEFINE(MOZ_MIGRATION)
++fi
++AC_SUBST(MOZ_MIGRATION)
++
+ dnl ========================================================
+ dnl = Enable Support for AudioChannelManager API
+ dnl ========================================================
+@@ -9426,15 +9435,6 @@
+     AC_OUTPUT_SUBDIRS(build/clang-plugin)
+ fi
+ 
+-MOZ_ARG_DISABLE_BOOL(migration,
+-[  --disable-migration          Disable migration],
+-    MOZ_MIGRATION=,
+-    MOZ_MIGRATION=1)
+-if test -n "$MOZ_MIGRATION"; then
+-    AC_DEFINE(MOZ_MIGRATION)
+-fi
+-AC_SUBST(MOZ_MIGRATION)
+-
+ # Run the SpiderMonkey 'configure' script.
+ dist=$MOZ_BUILD_ROOT/dist
+ ac_configure_args="$_SUBDIR_CONFIG_ARGS"
+diff -r f5398612fba8 -r ab0f707f5ccf python/mozbuild/mozbuild/util.py
+--- a/python/mozbuild/mozbuild/util.py	Fri Feb 21 16:36:31 2014 +0800
++++ b/python/mozbuild/mozbuild/util.py	Sat Feb 22 12:18:42 2014 +0800
+@@ -572,4 +572,5 @@
+     # Single quoted strings can contain any characters unescaped except the
+     # single quote itself, which can't even be escaped, so the string needs to
+     # be closed, an escaped single quote added, and reopened.
+-    return "'%s'" % s.replace("'", "'\\''")
++    t = type(s)
++    return t("'%s'") % s.replace(t("'"), t("'\\''"))

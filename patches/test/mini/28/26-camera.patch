@@ -1,0 +1,293 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392962382 -28800
+#      Fri Feb 21 13:59:42 2014 +0800
+# Node ID 54ffb92f0e4e010b097f92bdcb2611ef1b1a7093
+# Parent  9b96043297b8437313c4883a7a2e55aa15ae9633
+Disable camera
+
+diff -r 9b96043297b8 -r 54ffb92f0e4e browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Fri Feb 21 13:57:32 2014 +0800
++++ b/browser/installer/package-manifest.in	Fri Feb 21 13:59:42 2014 +0800
+@@ -197,7 +197,9 @@
+ #ifdef MOZ_B2G_BT
+ @BINPATH@/components/dom_bluetooth.xpt
+ #endif
++#ifdef MOZ_CAMERA
+ @BINPATH@/components/dom_camera.xpt
++#endif
+ @BINPATH@/components/dom_canvas.xpt
+ @BINPATH@/components/dom_alarm.xpt
+ @BINPATH@/components/dom_core.xpt
+diff -r 9b96043297b8 -r 54ffb92f0e4e configure.in
+--- a/configure.in	Fri Feb 21 13:57:32 2014 +0800
++++ b/configure.in	Fri Feb 21 13:59:42 2014 +0800
+@@ -7506,6 +7506,15 @@
+ fi
+ AC_SUBST(MOZ_SETTINGS)
+ 
++MOZ_ARG_DISABLE_BOOL(camera,
++[  --disable-camera          Disable camera],
++    MOZ_CAMERA=,
++    MOZ_CAMERA=1)
++if test -n "$MOZ_CAMERA"; then
++    AC_DEFINE(MOZ_CAMERA)
++fi
++AC_SUBST(MOZ_CAMERA)
++
+ dnl ========================================================
+ dnl = Enable Support for AudioChannelManager API
+ dnl ========================================================
+diff -r 9b96043297b8 -r 54ffb92f0e4e dom/base/Navigator.cpp
+--- a/dom/base/Navigator.cpp	Fri Feb 21 13:57:32 2014 +0800
++++ b/dom/base/Navigator.cpp	Fri Feb 21 13:59:42 2014 +0800
+@@ -65,7 +65,9 @@
+ #ifdef MOZ_B2G_BT
+ #include "BluetoothManager.h"
+ #endif
++#ifdef MOZ_CAMERA
+ #include "DOMCameraManager.h"
++#endif
+ 
+ #ifdef MOZ_AUDIO_CHANNEL_MANAGER
+ #include "AudioChannelManager.h"
+@@ -169,7 +171,9 @@
+ #ifdef MOZ_AUDIO_CHANNEL_MANAGER
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mAudioChannelManager)
+ #endif
++#ifdef MOZ_CAMERA
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mCameraManager)
++#endif
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mMessagesManager)
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDeviceStorageStores)
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mTimeManager)
+@@ -266,7 +270,9 @@
+   }
+ #endif
+ 
++#ifdef MOZ_CAMERA
+   mCameraManager = nullptr;
++#endif
+ 
+   if (mMessagesManager) {
+     mMessagesManager = nullptr;
+@@ -1418,6 +1424,7 @@
+ }
+ #endif
+ 
++#ifdef MOZ_CAMERA
+ nsDOMCameraManager*
+ Navigator::GetMozCameras(ErrorResult& aRv)
+ {
+@@ -1434,6 +1441,7 @@
+ 
+   return mCameraManager;
+ }
++#endif
+ 
+ size_t
+ Navigator::SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) const
+@@ -1470,9 +1478,11 @@
+     manager->OnNavigation(mWindow->WindowID());
+   }
+ #endif
++#ifdef MOZ_CAMERA
+   if (mCameraManager) {
+     mCameraManager->OnNavigation(mWindow->WindowID());
+   }
++#endif
+ }
+ 
+ bool
+@@ -1743,6 +1753,7 @@
+ }
+ #endif
+ 
++#ifdef MOZ_CAMERA
+ /* static */
+ bool
+ Navigator::HasCameraSupport(JSContext* /* unused */, JSObject* aGlobal)
+@@ -1750,6 +1761,7 @@
+   nsCOMPtr<nsPIDOMWindow> win = GetWindowFromGlobal(aGlobal);
+   return win && nsDOMCameraManager::CheckPermission(win);
+ }
++#endif
+ 
+ #ifdef MOZ_B2G_RIL
+ /* static */
+diff -r 9b96043297b8 -r 54ffb92f0e4e dom/base/Navigator.h
+--- a/dom/base/Navigator.h	Fri Feb 21 13:57:32 2014 +0800
++++ b/dom/base/Navigator.h	Fri Feb 21 13:59:42 2014 +0800
+@@ -24,7 +24,9 @@
+ class nsIDOMMozMobileMessageManager;
+ #endif
+ class nsIDOMNavigatorSystemMessages;
++#ifdef MOZ_CAMERA
+ class nsDOMCameraManager;
++#endif
+ class nsDOMDeviceStorage;
+ 
+ namespace mozilla {
+@@ -213,7 +215,9 @@
+   Telephony* GetMozTelephony(ErrorResult& aRv);
+ #endif
+   nsIDOMMozConnection* GetMozConnection();
++#ifdef MOZ_CAMERA
+   nsDOMCameraManager* GetMozCameras(ErrorResult& aRv);
++#endif
+   void MozSetMessageHandler(const nsAString& aType,
+                             systemMessageCallback* aCallback,
+                             ErrorResult& aRv);
+@@ -276,8 +280,10 @@
+   static bool HasTelephonySupport(JSContext* /* unused */,
+                                   JSObject* aGlobal);
+ #endif
++#ifdef MOZ_CAMERA
+   static bool HasCameraSupport(JSContext* /* unused */,
+                                JSObject* aGlobal);
++#endif
+ #ifdef MOZ_B2G_RIL
+   static bool HasMobileConnectionSupport(JSContext* /* unused */,
+                                          JSObject* aGlobal);
+@@ -359,7 +365,9 @@
+ #ifdef MOZ_AUDIO_CHANNEL_MANAGER
+   nsRefPtr<system::AudioChannelManager> mAudioChannelManager;
+ #endif
++#ifdef MOZ_CAMERA
+   nsRefPtr<nsDOMCameraManager> mCameraManager;
++#endif
+   nsCOMPtr<nsIDOMNavigatorSystemMessages> mMessagesManager;
+   nsTArray<nsRefPtr<nsDOMDeviceStorage> > mDeviceStorageStores;
+   nsRefPtr<time::TimeManager> mTimeManager;
+diff -r 9b96043297b8 -r 54ffb92f0e4e dom/base/nsDOMClassInfo.cpp
+--- a/dom/base/nsDOMClassInfo.cpp	Fri Feb 21 13:57:32 2014 +0800
++++ b/dom/base/nsDOMClassInfo.cpp	Fri Feb 21 13:59:42 2014 +0800
+@@ -178,7 +178,9 @@
+ #include "BluetoothDevice.h"
+ #endif
+ 
++#ifdef MOZ_CAMERA
+ #include "nsIDOMCameraManager.h"
++#endif
+ #include "nsIDOMGlobalObjectConstructor.h"
+ #include "nsIDOMLockedFile.h"
+ #include "nsDebug.h"
+@@ -523,8 +525,10 @@
+                            EVENTTARGET_SCRIPTABLE_FLAGS)
+ #endif
+ 
++#ifdef MOZ_CAMERA
+   NS_DEFINE_CLASSINFO_DATA(CameraCapabilities, nsDOMGenericSH,
+                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
++#endif
+ 
+   NS_DEFINE_CLASSINFO_DATA(LockedFile, nsEventTargetSH,
+                            EVENTTARGET_SCRIPTABLE_FLAGS)
+@@ -1289,10 +1293,12 @@
+   DOM_CLASSINFO_MAP_END
+ #endif
+ 
++#ifdef MOZ_CAMERA
+   DOM_CLASSINFO_MAP_BEGIN(CameraCapabilities, nsICameraCapabilities)
+     DOM_CLASSINFO_MAP_ENTRY(nsICameraCapabilities)
+   DOM_CLASSINFO_MAP_END
+-
++#endif
++  
+   DOM_CLASSINFO_MAP_BEGIN(LockedFile, nsIDOMLockedFile)
+     DOM_CLASSINFO_MAP_ENTRY(nsIDOMLockedFile)
+   DOM_CLASSINFO_MAP_END
+diff -r 9b96043297b8 -r 54ffb92f0e4e dom/base/nsDOMClassInfoClasses.h
+--- a/dom/base/nsDOMClassInfoClasses.h	Fri Feb 21 13:57:32 2014 +0800
++++ b/dom/base/nsDOMClassInfoClasses.h	Fri Feb 21 13:59:42 2014 +0800
+@@ -125,8 +125,10 @@
+ DOMCI_CLASS(BluetoothDevice)
+ #endif
+ 
++#ifdef MOZ_CAMERA
+ DOMCI_CLASS(CameraCapabilities)
+-
++#endif
++    
+ DOMCI_CLASS(LockedFile)
+ 
+ DOMCI_CLASS(CSSFontFeatureValuesRule)
+diff -r 9b96043297b8 -r 54ffb92f0e4e dom/moz.build
+--- a/dom/moz.build	Fri Feb 21 13:57:32 2014 +0800
++++ b/dom/moz.build	Fri Feb 21 13:59:42 2014 +0800
+@@ -64,7 +64,6 @@
+     'system',
+     'ipc',
+     'workers',
+-    'camera',
+     'audiochannel',
+     'inputmethod',
+     'webidl',
+@@ -106,6 +105,9 @@
+ if CONFIG['MOZ_SETTINGS']:
+     PARALLEL_DIRS += ['settings']
+ 
++if CONFIG['MOZ_CAMERA']:
++    PARALLEL_DIRS += ['camera']
++
+ if CONFIG['OS_ARCH'] == 'WINNT':
+     PARALLEL_DIRS += ['plugins/ipc/hangui']
+ 
+diff -r 9b96043297b8 -r 54ffb92f0e4e dom/webidl/Navigator.webidl
+--- a/dom/webidl/Navigator.webidl	Fri Feb 21 13:57:32 2014 +0800
++++ b/dom/webidl/Navigator.webidl	Fri Feb 21 13:59:42 2014 +0800
+@@ -212,12 +212,6 @@
+   readonly attribute MozConnection? mozConnection;
+ };
+ 
+-// nsIDOMNavigatorCamera
+-partial interface Navigator {
+-  [Throws, Func="Navigator::HasCameraSupport"]
+-  readonly attribute CameraManager mozCameras;
+-};
+-
+ // nsIDOMNavigatorSystemMessages and sort of maybe
+ // http://www.w3.org/2012/sysapps/runtime/#extension-to-the-navigator-interface-1
+ callback systemMessageCallback = void (optional object message);
+diff -r 9b96043297b8 -r 54ffb92f0e4e dom/webidl/moz.build
+--- a/dom/webidl/moz.build	Fri Feb 21 13:57:32 2014 +0800
++++ b/dom/webidl/moz.build	Fri Feb 21 13:59:42 2014 +0800
+@@ -38,8 +38,6 @@
+     'BiquadFilterNode.webidl',
+     'Blob.webidl',
+     'BrowserElementDictionaries.webidl',
+-    'CameraControl.webidl',
+-    'CameraManager.webidl',
+     'CanvasRenderingContext2D.webidl',
+     'CaretPosition.webidl',
+     'CDATASection.webidl',
+@@ -450,6 +448,12 @@
+         'PushManager.webidl',
+     ]
+ 
++if CONFIG['MOZ_CAMERA']:
++    WEBIDL_FILES += [
++        'CameraControl.webidl',
++        'CameraManager.webidl',
++    ]
++
+ if CONFIG['MOZ_AUDIO_CHANNEL_MANAGER']:
+     WEBIDL_FILES += [
+         'AudioChannelManager.webidl',
+diff -r 9b96043297b8 -r 54ffb92f0e4e js/xpconnect/src/dictionary_helper_gen.conf
+--- a/js/xpconnect/src/dictionary_helper_gen.conf	Fri Feb 21 13:57:32 2014 +0800
++++ b/js/xpconnect/src/dictionary_helper_gen.conf	Fri Feb 21 13:59:42 2014 +0800
+@@ -4,12 +4,7 @@
+ 
+ # Dictionary interface name, interface file name
+ dictionaries = [
+-     [ 'DOMFileMetadataParameters', 'nsIDOMLockedFile.idl' ],
+-     [ 'CameraSize', 'nsIDOMCameraManager.idl' ],
+-     [ 'CameraRegion', 'nsIDOMCameraManager.idl' ],
+-     [ 'CameraPosition', 'nsIDOMCameraManager.idl' ],
+-     [ 'CameraSelector', 'nsIDOMCameraManager.idl' ],
+-     [ 'CameraRecordingOptions', 'nsIDOMCameraManager.idl' ]
++     [ 'DOMFileMetadataParameters', 'nsIDOMLockedFile.idl' ]
+    ]
+ 
+ # include file names
