@@ -16,6 +16,7 @@
 #define CRT_LEN						100
 #define MAX_ENV_SIZE				32767
 
+static  HANDLE env_thread;
 static  WCHAR  appdata_path[VALUE_LEN+1];	
 static  WCHAR  localdata_path[VALUE_LEN+1];
 
@@ -95,47 +96,38 @@ BOOL WINAPI WaitWriteFile(LPCWSTR ap_path)
 /* 初始化全局变量 */
 unsigned WINAPI init_global_env(void * pParam)
 {
-	BOOL diff = (char *)pParam?TRUE:FALSE;
-	if ( !read_appkey(L"General",L"PortableDataPath",appdata_path,sizeof(appdata_path)) )
-	{
-		return (0);
-	} 
-	/* 如果ini文件里的appdata设置路径为相对路径 */
-	if (appdata_path[1] != L':')
-	{
-		if ( !PathToCombineW(appdata_path,VALUE_LEN) )
+	BOOL diff = read_appint(L"General", L"Nocompatete") > 0;
+	if ( read_appkey(L"General",L"PortableDataPath",appdata_path,sizeof(appdata_path)) )
+	{ 
+		/* 如果ini文件里的appdata设置路径为相对路径 */
+		if (appdata_path[1] != L':')
 		{
-			appdata_path[0] = L'\0';
-			return (0);
+			PathToCombineW(appdata_path,VALUE_LEN);
+		}
+		/* 处理localdata变量 */
+		if ( !read_appkey(L"Env",L"TmpDataPath",localdata_path,sizeof(appdata_path)) )
+		{
+			wcsncpy(localdata_path,appdata_path,VALUE_LEN);
+		}
+		/* 修正相对路径问题 */
+		if (localdata_path[1] != L':')
+		{
+			PathToCombineW(localdata_path,VALUE_LEN);
+		}
+		/* 为appdata建立目录 */
+		charTochar(appdata_path);
+		wcsncat(appdata_path,L"\\AppData",VALUE_LEN);
+		SHCreateDirectoryExW(NULL,appdata_path,NULL);
+		/* 为localdata建立目录 */
+		charTochar(localdata_path);
+		wcsncat(localdata_path,L"\\LocalAppData\\Temp\\Fx",VALUE_LEN);
+		SHCreateDirectoryExW(NULL,localdata_path,NULL);
+		if ( diff )
+		{
+			WaitWriteFile(appdata_path);
 		}
 	}
-	/* 处理localdata变量 */
-	if ( !read_appkey(L"Env",L"TmpDataPath",localdata_path,sizeof(appdata_path)) )
-	{
-		wcsncpy(localdata_path,appdata_path,VALUE_LEN);
-	}
-	/* 修正相对路径问题 */
-	if (localdata_path[1] != L':')
-	{
-		if ( !PathToCombineW(localdata_path,VALUE_LEN) )
-		{
-			localdata_path[0] = L'\0';
-			return (0);
-		}
-	}
-	/* 为appdata建立目录 */
-	charTochar(appdata_path);
-	wcsncat(appdata_path,L"\\AppData",VALUE_LEN);
-	SHCreateDirectoryExW(NULL,appdata_path,NULL);
-	/* 为localdata建立目录 */
-	charTochar(localdata_path);
-	wcsncat(localdata_path,L"\\LocalAppData\\Temp\\Fx",VALUE_LEN);
-	SHCreateDirectoryExW(NULL,localdata_path,NULL);
-	if ( diff )
-	{
-		WaitWriteFile(appdata_path);
-	}
-	return (1);
+	return (unsigned)diff;
 }
 
 HRESULT WINAPI HookSHGetSpecialFolderLocation(HWND hwndOwner,
@@ -175,6 +167,7 @@ HRESULT WINAPI HookSHGetFolderPathW(HWND hwndOwner,int nFolder,HANDLE hToken,
 	BOOL        dwFf = FALSE;
 	WCHAR		dllname[VALUE_LEN+1];
 	int			folder = nFolder & 0xff;
+	HRESULT     ret = E_FAIL;
 #ifdef __GNUC__
 	dwCaller = (UINT_PTR)__builtin_return_address(0);
 #else
@@ -184,6 +177,12 @@ HRESULT WINAPI HookSHGetFolderPathW(HWND hwndOwner,int nFolder,HANDLE hToken,
 	dwFf = is_specialdll(dwCaller, dllname)       ||
 		   is_specialdll(dwCaller, L"*\\xul.dll") || 
 		   is_specialdll(dwCaller, L"*\\npswf*.dll");
+	if (env_thread)
+	{
+		WaitForSingleObject(env_thread,1500);
+		CloseHandle(env_thread);
+		env_thread = NULL;
+	}
 	if ( dwFf )
 	{
 		switch (folder)
@@ -193,19 +192,25 @@ HRESULT WINAPI HookSHGetFolderPathW(HWND hwndOwner,int nFolder,HANDLE hToken,
 			{
 				num = _snwprintf(pszPath,MAX_PATH,L"%ls",appdata_path);
 				pszPath[num] = L'\0';
-				return S_OK;
+				ret = S_OK;
+				break;
 			}
 			case CSIDL_LOCAL_APPDATA:
 			{
 				num = _snwprintf(pszPath,MAX_PATH,L"%ls",localdata_path);
 				pszPath[num] = L'\0';
-				return S_OK;
+				ret = S_OK;
+				break;
 			}
 			default:
 				break;
 		}
 	}
-	return TrueSHGetFolderPathW(hwndOwner, nFolder, hToken, dwFlags, pszPath);
+	if (S_OK != ret)
+	{
+		ret = TrueSHGetFolderPathW(hwndOwner, nFolder, hToken, dwFlags, pszPath);
+	}
+	return ret;
 }
 
 BOOL WINAPI HookSHGetSpecialFolderPathW(HWND hwndOwner,LPWSTR lpszPath,int csidl,BOOL fCreate)                                                      
@@ -411,14 +416,12 @@ BOOL WINAPI DllMain(HINSTANCE hModule, DWORD dwReason, LPVOID lpvReserved)
 			}
 			if ( read_appint(L"General", L"Portable") > 0 )
 			{
-				BOOL	diff = read_appint(L"General", L"Nocompatete") > 0;
-				HANDLE	h_thread = (HANDLE)_beginthreadex(NULL,0,&init_global_env,diff?&diff:NULL,0,NULL);
-				if (h_thread)
+				env_thread = (HANDLE)_beginthreadex(NULL,0,&init_global_env,NULL,0,NULL);
+				if (env_thread) 
 				{
-					SetThreadPriority(h_thread,THREAD_PRIORITY_HIGHEST);
-					CloseHandle(h_thread);
+					SetThreadPriority(env_thread,THREAD_PRIORITY_HIGHEST);
+					init_portable(NULL);
 				}
-				init_portable(NULL);
 			}
 			if ( is_browser() || is_thunderbird() )
 			{
