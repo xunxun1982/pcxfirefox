@@ -1,0 +1,103 @@
+. $topsrcdir/browser/config/mozconfig
+
+mk_add_options MOZ_MAKE_FLAGS=-j4
+
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/../obju-vc-nopgo
+
+export MOZ_OPTIMIZE_LDFLAGS="-opt:ref,icf -LARGEADDRESSAWARE"
+mk_add_options MOZ_OPTIMIZE_LDFLAGS="-opt:ref,icf -LARGEADDRESSAWARE"
+
+ac_add_options --disable-tests
+ac_add_options --enable-installer
+ac_add_options --enable-official-branding
+
+ac_add_options --enable-optimize="-O1"
+
+# diasble updater
+ac_add_options --disable-updater
+
+# diasble crashreporter
+ac_add_options --disable-crashreporter
+
+# Enable jemalloc
+ac_add_options --enable-jemalloc
+
+# for debug
+ac_add_options --enable-debugger-info-modules=yes
+ac_add_options --enable-debugger-info-modules
+ac_add_options --enable-debug-symbols
+
+ac_add_options --disable-activex
+ac_add_options --disable-activex-scripting
+ac_add_options --disable-metro
+ac_add_options --disable-cpp-rtti
+
+ac_add_options --disable-maintenance-service
+
+# crt dir
+WIN32_REDIST_DIR=$VCINSTALLDIR/redist/x86/Microsoft.VC100.CRT
+
+#Mini Edition
+ac_add_options --disable-webrtc
+ac_add_options --disable-webgl
+ac_add_options --disable-gamepad
+ac_add_options --disable-accessibility
+ac_add_options --disable-websms-backend
+ac_add_options --disable-jsd
+ac_add_options --disable-webspeech
+ac_add_options --disable-apple-media
+ac_add_options --disable-negotiateauth
+ac_add_options --disable-pref-extensions
+ac_add_options --disable-webapp-runtime
+ac_add_options --disable-parental-controls
+ac_add_options --disable-safe-browsing
+ac_add_options --disable-url-classifier
+ac_add_options --disable-logging
+ac_add_options --disable-necko-wifi
+ac_add_options --without-intl-api
+
+ac_add_options --disable-shared-js
+
+ac_add_options --disable-webm
+# Ogg Opus
+ac_add_options --disable-opus
+ac_add_options --disable-ogg
+# WAVE PCM
+ac_add_options --disable-wave
+# RAW media
+ac_add_options --disable-raw
+
+ac_add_options --disable-directshow
+ac_add_options --disable-skia
+ac_add_options --disable-media-navigator
+
+ac_add_options --disable-pdfjs
+ac_add_options --disable-healthreport
+ac_add_options --disable-pay
+ac_add_options --disable-battery
+ac_add_options --disable-diskspacewatcher
+ac_add_options --disable-bluetooth
+ac_add_options --disable-contacts
+ac_add_options --disable-fmradio
+ac_add_options --disable-mobilemessage
+ac_add_options --disable-phonenumberutils 
+ac_add_options --disable-telephony
+ac_add_options --disable-push
+ac_add_options --disable-identity
+ac_add_options --disable-datastorepromise
+ac_add_options --disable-settings
+ac_add_options --disable-camera
+ac_add_options --disable-social
+ac_add_options --disable-hyphenation
+ac_add_options --disable-migration
+ac_add_options --disable-printing
+ac_add_options --disable-alarm
+ac_add_options --disable-time
+ac_add_options --disable-inputmethod
+ac_add_options --disable-jumplist
+ac_add_options --disable-ship-spellcheck
+ac_add_options --disable-finalizationwitness
+ac_add_options --disable-feeds
+ac_add_options --disable-recording
+
+mk_add_options AUTOCLOBBER=1
