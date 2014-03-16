@@ -44,7 +44,7 @@ LONG WINAPI ProcessException_ice(PEXCEPTION_POINTERS pExceptionInfo)
 	{
 		return EXCEPTION_CONTINUE_SEARCH;
 	}
-    PathAppendW(appdir,L"pcxFirefox.dmp");
+    PathAppendW(appdir,L"Iceweasel.dmp");
     /* 创建文件句柄 */
     hFile = CreateFileW(appdir,
         GENERIC_WRITE,
