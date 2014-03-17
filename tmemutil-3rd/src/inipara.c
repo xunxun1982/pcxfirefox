@@ -345,10 +345,7 @@ BOOL is_browser(void)
 {
 	WCHAR	process_name[VALUE_LEN+1];
 	GetCurrentProcessName(process_name,VALUE_LEN);
-	return ( !(_wcsicmp(process_name, L"Iceweasel.exe") &&
-			   _wcsicmp(process_name, L"firefox.exe")	&&
-			   _wcsicmp(process_name, L"lawlietfox.exe") ) 
-		   );
+	return ( !(_wcsicmp(process_name, L"firefox.exe")) );
 }
 
 BOOL WINAPI is_specialdll(UINT_PTR callerAddress,LPCWSTR dll_file)
