@@ -14,13 +14,13 @@ BEGIN
     BLOCK "080904E4"
     BEGIN
       VALUE "CompanyName", "ZH_CN NetWork\0"
-      VALUE "FileDescription", "Memory utility and Portable dll for Mozilla pcxfirefox and tete009 builds\0"
-      VALUE "FileVersion", "0.0.2"
+      VALUE "FileDescription", "Memory utility and Portable dll for Mozilla Products\0"
+      VALUE "FileVersion", "0.0.3.1"
       VALUE "InternalName", "tmemutil\0"
-      VALUE "LegalCopyright", " Copyright (C) 2013 pcxfirefox & adonais\0"
+      VALUE "LegalCopyright", " Copyright (C) 2013 adonais & pcxfirefox\0"
       VALUE "OriginalFilename", "tmemutil.dll\0"
       VALUE "ProductName", "tmemutil.dll"
-      VALUE "ProductVersion", "0.0.2"
+      VALUE "ProductVersion", "0.0.3.1"
     END
   END
 
