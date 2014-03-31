@@ -1,0 +1,444 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1396103466 -28800
+#      Sat Mar 29 22:31:06 2014 +0800
+# Node ID f00dea41cd74ffc95055fbda666c30e00eff64b1
+# Parent  70b645a5f1ca6c9ffaef7c22daa1cc64266735ed
+https://code.google.com/p/dynamic-loop-prediction/#Predicting_trip_counts
+
+diff -r 70b645a5f1ca -r f00dea41cd74 js/src/jit/BaselineCompiler.cpp
+--- a/js/src/jit/BaselineCompiler.cpp	Sat Mar 29 00:39:41 2014 +0800
++++ b/js/src/jit/BaselineCompiler.cpp	Sat Mar 29 22:31:06 2014 +0800
+@@ -11,6 +11,7 @@
+ #include "jit/BaselineJIT.h"
+ #include "jit/FixedList.h"
+ #include "jit/IonLinker.h"
++#include "jit/IonOptimizationLevels.h"
+ #include "jit/IonSpewer.h"
+ #ifdef JS_ION_PERF
+ # include "jit/PerfSpewer.h"
+@@ -26,6 +27,7 @@
+ 
+ BaselineCompiler::BaselineCompiler(JSContext *cx, TempAllocator &alloc, HandleScript script)
+   : BaselineCompilerSpecific(cx, alloc, script),
++    lastLoopEntry_(NULL),
+     modifiesArguments_(false)
+ {
+ }
+@@ -637,11 +639,29 @@
+     }
+ 
+     Label skipCall;
++    Label skipUseCountCheck;
++
++    OptimizationLevel level = js_IonOptimizations.nextLevel(Optimization_DontCompile);
++    const OptimizationInfo *info_temp = js_IonOptimizations.get(level);
++
++    // Try to use Trip Count Prediction information.
++    if (jit::js_JitOptions.tcp) {
++        // Avoid jumping into Ion before gathering enough type info. 
++        uint32_t tcpWarmup = 0.03 * info_temp->usesBeforeCompile(script, pc);
++        masm.branch32(Assembler::LessThan, countReg, Imm32(tcpWarmup), &skipCall);
++
++        // Skip use counter check if the script was predicted to be hot.
++        Register predictedHotnessReg = R1.scratchReg();
++        Address predictedHotnessAddr(scriptReg, JSScript::offsetOfPredictedHotness());
++        masm.load8ZeroExtend(predictedHotnessAddr, predictedHotnessReg);
++        masm.branch32(Assembler::GreaterThanOrEqual, predictedHotnessReg, Imm32(JSScript::HOT_FOR_ION), &skipUseCountCheck);
++    }
+ 
+     const OptimizationInfo *info = js_IonOptimizations.get(js_IonOptimizations.firstLevel());
+     uint32_t minUses = info->usesBeforeCompile(script, pc);
+     masm.branch32(Assembler::LessThan, countReg, Imm32(minUses), &skipCall);
+ 
++    masm.bind(&skipUseCountCheck);
+     masm.branchPtr(Assembler::Equal,
+                    Address(scriptReg, JSScript::offsetOfIonScript()),
+                    ImmPtr(ION_COMPILING_SCRIPT), &skipCall);
+@@ -1057,6 +1077,7 @@
+ bool
+ BaselineCompiler::emit_JSOP_LOOPENTRY()
+ {
++    lastLoopEntry_ = pc;
+     frame.syncStack(0);
+     return emitUseCountIncrement();
+ }
+@@ -1450,6 +1471,10 @@
+     // Keep top JSStack value in R0 and R1.
+     frame.popRegsAndSync(2);
+ 
++    // Try to augment compare with Trip Count Prediction.
++    if (shouldAugmentCompare())
++        augmentCompare();
++
+     // Call IC.
+     ICCompare_Fallback::Compiler stubCompiler(cx);
+     if (!emitOpIC(stubCompiler.getStub(&stubSpace_)))
+@@ -1461,6 +1486,78 @@
+ }
+ 
+ bool
++BaselineCompiler::shouldAugmentCompare()
++{
++    if (!js_JitOptions.tcp)
++        return false;
++
++    bool ionEnabled = (ionCompileable_ || ionOSRCompileable_);
++    if (!ionEnabled)
++        return false;
++
++    // Do not augment if we cannot estimate the loop depth.
++    if (!lastLoopEntry_)
++        return false;
++
++    if (!analysis_.isIntervalLoopCompare(pc))
++        return false;
++
++    return true;
++}
++
++void
++BaselineCompiler::augmentCompare()
++{
++    // Save comparison operands on the stack.
++    Register counterReg = R0.scratchReg();
++    Register boundReg = R1.scratchReg();
++    masm.push(boundReg);
++    masm.push(counterReg);
++
++    // Guard that both operands are integers.
++    Label exitAugment;
++    masm.branchTestInt32(Assembler::NotEqual, R0, &exitAugment);
++    masm.branchTestInt32(Assembler::NotEqual, R1, &exitAugment);
++
++    // Take the difference between the loop bound and counter,
++    // which is the inferred trip count.
++    masm.sub32(counterReg, boundReg);
++    masm.j(Assembler::Overflow, &exitAugment);
++
++    // Take the absolute value of the difference, which is in boundReg. 
++    Label skipAbs;
++    masm.branch32(Assembler::GreaterThanOrEqual, boundReg, Imm32(0), &skipAbs);
++    masm.xor32(Imm32(0xFFFFFFFF), boundReg);
++    masm.add32(Imm32(1), boundReg);
++    masm.bind(&skipAbs);
++
++    // If the inferred range is large enough (a fraction of minUses), update the script hotness,
++    // so it will be Ion compiled right away. (lastLoopEntry_ is used to estimate the loop depth)
++    OptimizationLevel level = js_IonOptimizations.nextLevel(Optimization_DontCompile);
++    const OptimizationInfo *info = js_IonOptimizations.get(level);
++
++    uint32_t minIonUses = 0.7 * info->usesBeforeCompile(script, lastLoopEntry_);
++    masm.branch32(Assembler::LessThan, boundReg, Imm32(minIonUses), &exitAugment);
++
++    Register scriptReg = counterReg;
++    masm.movePtr(ImmGCPtr(script), scriptReg);
++    Address predictedHotnessAddr(scriptReg, JSScript::offsetOfPredictedHotness());
++    masm.store8(Imm32(JSScript::HOT_FOR_ION), predictedHotnessAddr);
++
++    // If the script is hot for Ion, we test its hotness for Inlining.
++    const OptimizationInfo *optimizationInfo;
++    uint32_t minInlineUses = optimizationInfo->usesBeforeInlining();
++    masm.branch32(Assembler::LessThan, boundReg, Imm32(minInlineUses), &exitAugment);
++    masm.store8(Imm32(JSScript::HOT_FOR_INLINING), predictedHotnessAddr);
++
++    masm.bind(&exitAugment);
++
++    // Restore comparison operands.
++    masm.pop(counterReg);
++    masm.pop(boundReg);
++}
++
++bool
+ BaselineCompiler::emit_JSOP_STRICTEQ()
+ {
+     return emitCompare();
+diff -r 70b645a5f1ca -r f00dea41cd74 js/src/jit/BaselineCompiler.h
+--- a/js/src/jit/BaselineCompiler.h	Sat Mar 29 00:39:41 2014 +0800
++++ b/js/src/jit/BaselineCompiler.h	Sat Mar 29 22:31:06 2014 +0800
+@@ -172,6 +172,9 @@
+     NonAssertingLabel           postBarrierSlot_;
+ #endif
+ 
++    // Last visited loop entry, used to estimate the nearest loop's depth anywhere in the code.
++    jsbytecode* lastLoopEntry_;
++
+     // Native code offset right before the scope chain is initialized.
+     CodeOffsetLabel prologueOffset_;
+ 
+@@ -238,6 +241,10 @@
+     // Handles JSOP_LT, JSOP_GT, and friends
+     bool emitCompare();
+ 
++    // Augments compare with Trip Count Prediction.
++    bool shouldAugmentCompare();
++    void augmentCompare();
++
+     bool emitReturn();
+ 
+     bool emitToBoolean();
+diff -r 70b645a5f1ca -r f00dea41cd74 js/src/jit/BaselineJIT.cpp
+--- a/js/src/jit/BaselineJIT.cpp	Sat Mar 29 00:39:41 2014 +0800
++++ b/js/src/jit/BaselineJIT.cpp	Sat Mar 29 22:31:06 2014 +0800
+@@ -278,7 +278,8 @@
+     if (IsJSDEnabled(cx) || cx->runtime()->parallelWarmup > 0) {
+         if (osr)
+             return Method_Skipped;
+-    } else if (script->incUseCount() <= js_JitOptions.baselineUsesBeforeCompile) {
++    } else if (script->incUseCount() <= js_JitOptions.baselineUsesBeforeCompile &&
++            script->predictedHotness < JSScript::HOT_FOR_BASELINE) {
+         return Method_Skipped;
+     }
+ 
+diff -r 70b645a5f1ca -r f00dea41cd74 js/src/jit/BytecodeAnalysis.cpp
+--- a/js/src/jit/BytecodeAnalysis.cpp	Sat Mar 29 00:39:41 2014 +0800
++++ b/js/src/jit/BytecodeAnalysis.cpp	Sat Mar 29 22:31:06 2014 +0800
+@@ -215,3 +215,78 @@
+ 
+     return true;
+ }
++
++bool
++BytecodeAnalysis::isIntervalLoopCompare(jsbytecode *pc)
++{
++    JSOp cmp = JSOp(*pc);
++    bool intervalCompare = ((cmp == JSOP_LT) || (cmp == JSOP_LE) || (cmp == JSOP_GT) || (cmp == JSOP_GE));
++    if (!intervalCompare)
++        return false;
++
++    // Verify if it is a loop conditional (compare followed by jump back).
++    jsbytecode *next = pc + GetBytecodeLength(pc);
++    bool incomingJumpBack = (IsJumpOpcode(JSOp(*next)) && (GET_JUMP_OFFSET(next) < 0));
++    if (!incomingJumpBack)
++        return false;
++
++    // Verify the loop stride in a heuristic way: if the last SET operation before the loop
++    // conditional is the increment or decrement of a variable (any variable) by 1, then the loop
++    // stride is probably 1. This leads to more precise interval information.
++    //
++    // We are looking for the pattern:
++    // ONE
++    // ADD or SUB
++    // PICK   -.
++    // POP     |-> in case of post increment/decrement
++    // SWAP   -'
++    // SET var
++    jsbytecode *pcIt = (pc - 1);
++    uint32_t patternOffset = 5;
++
++    if (pcIt < (script_->code() + patternOffset))
++        return false;
++
++    // Step backwards through the bytecode, looking for the first SET operation.
++    while (pcIt >= (script_->code() + patternOffset)) {
++        JSOp op = JSOp(*pcIt);
++        bool foundSet = false;
++
++        switch (op) {
++          case JSOP_SETLOCAL:
++          case JSOP_SETARG:
++          case JSOP_SETALIASEDVAR:
++          case JSOP_SETNAME:
++          case JSOP_SETGNAME:
++          case JSOP_SETPROP:
++          case JSOP_SETELEM:
++            foundSet = true;
++            break;
++          case JSOP_LOOPHEAD:
++            return false;
++          default:
++            pcIt--;
++        }
++
++        if (foundSet)
++            break;
++    }
++
++    pcIt--;
++
++    // Handle post increment/decrement cases.
++    JSOp mayBeSwap = JSOp(*pcIt), mayBePop = JSOp(*(pcIt - 1)), mayBePick = JSOp(*(pcIt - 2));
++
++    if (mayBeSwap == JSOP_SWAP &&
++        (mayBePop == JSOP_POP || mayBePop == JSOP_SETRVAL || mayBePop == JSOP_POPN) &&
++        mayBePick == JSOP_PICK)
++        pcIt -= 3;
++
++    // Verify the increment/decrement value.
++    JSOp shouldBeAddOrSub = JSOp(*pcIt), shouldBeOne = JSOp(*(pcIt - 1));
++
++    if ((shouldBeAddOrSub != JSOP_ADD && shouldBeAddOrSub != JSOP_SUB) || shouldBeOne != JSOP_ONE)
++        return false;
++
++    return true;
++}
+diff -r 70b645a5f1ca -r f00dea41cd74 js/src/jit/BytecodeAnalysis.h
+--- a/js/src/jit/BytecodeAnalysis.h	Sat Mar 29 00:39:41 2014 +0800
++++ b/js/src/jit/BytecodeAnalysis.h	Sat Mar 29 22:31:06 2014 +0800
+@@ -71,6 +71,8 @@
+     bool hasSetArg() const {
+         return hasSetArg_;
+     }
++
++    bool isIntervalLoopCompare(jsbytecode *pc);
+ };
+ 
+ 
+diff -r 70b645a5f1ca -r f00dea41cd74 js/src/jit/IonBuilder.cpp
+--- a/js/src/jit/IonBuilder.cpp	Sat Mar 29 00:39:41 2014 +0800
++++ b/js/src/jit/IonBuilder.cpp	Sat Mar 29 22:31:06 2014 +0800
+@@ -4026,6 +4026,7 @@
+         // type information, except for definite properties analysis,
+         // as the caller has not run yet.
+         if (targetScript->getUseCount() < optimizationInfo().usesBeforeInlining() &&
++            script()->predictedHotness < JSScript::HOT_FOR_INLINING &&
+             info().executionMode() != DefinitePropertiesAnalysis)
+         {
+             return DontInline(targetScript, "Vetoed: callee is insufficiently hot.");
+diff -r 70b645a5f1ca -r f00dea41cd74 js/src/jit/IonOptimizationLevels.cpp
+--- a/js/src/jit/IonOptimizationLevels.cpp	Sat Mar 29 00:39:41 2014 +0800
++++ b/js/src/jit/IonOptimizationLevels.cpp	Sat Mar 29 22:31:06 2014 +0800
+@@ -138,7 +138,8 @@
+     while (!isLastLevel(prev)) {
+         OptimizationLevel level = nextLevel(prev);
+         const OptimizationInfo *info = get(level);
+-        if (script->getUseCount() < info->usesBeforeCompile(script, pc))
++        if (script->getUseCount() < info->usesBeforeCompile(script, pc) &&
++                script->predictedHotness < JSScript::HOT_FOR_ION)
+             return prev;
+ 
+         prev = level;
+diff -r 70b645a5f1ca -r f00dea41cd74 js/src/jit/JitOptions.cpp
+--- a/js/src/jit/JitOptions.cpp	Sat Mar 29 00:39:41 2014 +0800
++++ b/js/src/jit/JitOptions.cpp	Sat Mar 29 22:31:06 2014 +0800
+@@ -33,6 +33,8 @@
+     // RangeAnalysis results.
+     checkRangeAnalysis = false;
+ 
++    tcp = false;
++
+     // Whether Ion should compile try-catch statements.
+     compileTryCatch = true;
+ 
+diff -r 70b645a5f1ca -r f00dea41cd74 js/src/jit/JitOptions.h
+--- a/js/src/jit/JitOptions.h	Sat Mar 29 00:39:41 2014 +0800
++++ b/js/src/jit/JitOptions.h	Sat Mar 29 22:31:06 2014 +0800
+@@ -45,6 +45,7 @@
+     bool checkOsiPointRegisters;
+ #endif
+     bool checkRangeAnalysis;
++    bool tcp;
+     bool compileTryCatch;
+     bool disableGvn;
+     bool disableLicm;
+diff -r 70b645a5f1ca -r f00dea41cd74 js/src/jsscript.h
+--- a/js/src/jsscript.h	Sat Mar 29 00:39:41 2014 +0800
++++ b/js/src/jsscript.h	Sat Mar 29 22:31:06 2014 +0800
+@@ -669,6 +669,21 @@
+ 
+     uint16_t        staticLevel_;/* static level for display maintenance */
+ 
++    // 8-bit fields.
++
++  public:
++    // Possible kinds of predicted hotness. If the script is HOT_FOR_A and
++    // HOT_FOR_A > HOT_FOR_B, then the script is also HOT_FOR_B.
++    enum PredictedHotness {
++        UNKNOWN_HOTNESS = 0,
++        HOT_FOR_BASELINE = 1,
++        HOT_FOR_ION = 2,
++        HOT_FOR_INLINING = 3
++    };
++
++    uint8_t predictedHotness; /* Script hotness info predicted in a heuristic fashion */
++    static size_t offsetOfPredictedHotness() { return offsetof(JSScript, predictedHotness); }
++
+     // Bit fields.
+ 
+   public:
+@@ -1225,7 +1240,11 @@
+     uint32_t incUseCount(uint32_t amount = 1) { return useCount += amount; }
+     uint32_t *addressOfUseCount() { return &useCount; }
+     static size_t offsetOfUseCount() { return offsetof(JSScript, useCount); }
+-    void resetUseCount() { useCount = 0; }
++
++    void resetUseCount() {
++        useCount = 0;
++        predictedHotness = UNKNOWN_HOTNESS;
++    }
+ 
+   public:
+     bool initScriptCounts(JSContext *cx);
+diff -r 70b645a5f1ca -r f00dea41cd74 js/src/shell/js.cpp
+--- a/js/src/shell/js.cpp	Sat Mar 29 00:39:41 2014 +0800
++++ b/js/src/shell/js.cpp	Sat Mar 29 22:31:06 2014 +0800
+@@ -5518,6 +5518,15 @@
+     if (op->getBoolOption("ion-check-range-analysis"))
+         jit::js_JitOptions.checkRangeAnalysis = true;
+ 
++    if (const char *str = op->getStringOption("ion-tcp")) {
++        if (strcmp(str, "on") == 0)
++            jit::js_JitOptions.tcp = true;
++        else if (strcmp(str, "off") == 0)
++            jit::js_JitOptions.tcp = false;
++        else
++            return OptionFailure("ion-tcp", str);
++    }
++
+     if (const char *str = op->getStringOption("ion-inlining")) {
+         if (strcmp(str, "on") == 0)
+             jit::js_JitOptions.disableInlining = false;
+@@ -5799,6 +5808,8 @@
+                                "Range analysis (default: on, off to disable)")
+         || !op.addBoolOption('\0', "ion-check-range-analysis",
+                                "Range analysis checking")
++        || !op.addStringOption('\0', "ion-tcp", "on/off",
++                               "Trip count prediction (default: off, on to enable)")
+         || !op.addStringOption('\0', "ion-inlining", "on/off",
+                                "Inline methods where possible (default: on, off to disable)")
+         || !op.addStringOption('\0', "ion-osr", "on/off",
+diff -r 70b645a5f1ca -r f00dea41cd74 js/src/vm/Interpreter.cpp
+--- a/js/src/vm/Interpreter.cpp	Sat Mar 29 00:39:41 2014 +0800
++++ b/js/src/vm/Interpreter.cpp	Sat Mar 29 22:31:06 2014 +0800
+@@ -1885,6 +1885,30 @@
+             goto error;                                                       \
+     JS_END_MACRO
+ 
++/* Try to perform Trip Count Prediction after a loop branch */
++#define TRY_TCP(len, spoffset)                                                \
++    JS_BEGIN_MACRO                                                            \
++        if (jit::js_JitOptions.tcp) {                                         \
++            /* Comparison operands must be still on the stack */              \
++            bool hasIntOperands = (REGS.sp[spoffset - 2].isInt32() && REGS.sp[spoffset - 1].isInt32()); \
++            bool isLoopBr = (len < 0);                                        \
++                                                                              \
++            if (isLoopBr && hasIntOperands) {                                 \
++                int32_t lval = REGS.sp[spoffset - 2].toInt32();               \
++                int32_t rval = REGS.sp[spoffset - 1].toInt32();               \
++                                                                              \
++                if ((lval >= 0) && (rval >= 0)) {                             \
++                    uint64_t range = (rval > lval) ? (rval - lval) : (lval - rval); \
++                                                                              \
++                    /* If the predicted range is large enough, we mark the */ \
++                    /* script to be compiled by the Baseline. */              \
++                    if (range > jit::js_JitOptions.baselineUsesBeforeCompile) \
++                        script->predictedHotness = JSScript::HOT_FOR_BASELINE;\
++                }                                                             \
++            }                                                                 \
++        }                                                                     \
++    JS_END_MACRO
++
+ #define TRY_BRANCH_AFTER_COND(cond,spdec)                                     \
+     JS_BEGIN_MACRO                                                            \
+         JS_ASSERT(js_CodeSpec[*REGS.pc].length == 1);                         \
+@@ -1893,7 +1917,9 @@
+             REGS.sp -= (spdec);                                               \
+             if ((cond) == (diff_ != 0)) {                                     \
+                 ++REGS.pc;                                                    \
+-                BRANCH(GET_JUMP_OFFSET(REGS.pc));                             \
++                int32_t len = GET_JUMP_OFFSET(REGS.pc);                       \
++                TRY_TCP(len, spdec);                                          \
++                BRANCH(len);                                                  \
+             }                                                                 \
+             ADVANCE_AND_DISPATCH(1 + JSOP_IFEQ_LENGTH);                       \
+         }                                                                     \
