@@ -1,0 +1,36 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396812876 -28800
+#      Mon Apr 07 03:34:36 2014 +0800
+# Node ID e148bb1d1b338b7815d7fa56259aa15d47e247d5
+# Parent  e870fa674d705875aaa670a6b5b897792c8aa456
+Remove marionette
+
+diff -r e870fa674d70 -r e148bb1d1b33 browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Mon Apr 07 03:11:03 2014 +0800
++++ b/browser/installer/package-manifest.in	Mon Apr 07 03:34:36 2014 +0800
+@@ -624,11 +624,6 @@
+ @BINPATH@/components/HttpDataUsage.manifest
+ @BINPATH@/components/HttpDataUsage.js
+ 
+-@BINPATH@/chrome/marionette@JAREXT@
+-@BINPATH@/chrome/marionette.manifest
+-@BINPATH@/components/MarionetteComponents.manifest
+-@BINPATH@/components/marionettecomponent.js
+-
+ #ifdef MOZ_WEBSPEECH
+ @BINPATH@/components/dom_webspeechsynth.xpt
+ #endif
+diff -r e870fa674d70 -r e148bb1d1b33 toolkit/toolkit.mozbuild
+--- a/toolkit/toolkit.mozbuild	Mon Apr 07 03:11:03 2014 +0800
++++ b/toolkit/toolkit.mozbuild	Mon Apr 07 03:34:36 2014 +0800
+@@ -187,9 +187,6 @@
+ 
+ add_tier_dir('platform', 'addon-sdk')
+ 
+-if CONFIG['ENABLE_MARIONETTE'] or CONFIG['MOZ_WIDGET_TOOLKIT'] not in ('gonk', 'android'):
+-    add_tier_dir('platform', 'testing/marionette')
+-
+ add_tier_dir('platform', 'tools/quitter')
+ 
+ if CONFIG['ENABLE_TESTS']:

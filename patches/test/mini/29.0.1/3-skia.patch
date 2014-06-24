@@ -1,0 +1,54 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396523901 -28800
+#      Thu Apr 03 19:18:21 2014 +0800
+# Node ID 95e7bceb535aefa31d142266d2cfa29053fa4c26
+# Parent  8272b55884f9ac6fa473c4c49fea3d4233a9341d
+Disable Skia
+
+diff -r 8272b55884f9 -r 95e7bceb535a gfx/2d/Factory.cpp
+--- a/gfx/2d/Factory.cpp	Thu Apr 03 19:15:28 2014 +0800
++++ b/gfx/2d/Factory.cpp	Thu Apr 03 19:18:21 2014 +0800
+@@ -19,7 +19,7 @@
+ #endif
+ #endif
+ 
+-#if defined(WIN32) && defined(USE_SKIA)
++#if defined(WIN32)
+ #include "ScaledFontWin.h"
+ #endif
+ 
+diff -r 8272b55884f9 -r 95e7bceb535a gfx/2d/moz.build
+--- a/gfx/2d/moz.build	Thu Apr 03 19:15:28 2014 +0800
++++ b/gfx/2d/moz.build	Thu Apr 03 19:18:21 2014 +0800
+@@ -48,6 +48,7 @@
+         'DrawTargetD2D.cpp',
+         'PathD2D.cpp',
+         'ScaledFontDWrite.cpp',
++        'ScaledFontWin.cpp',
+         'SourceSurfaceD2D.cpp',
+         'SourceSurfaceD2DTarget.cpp',
+     ]
+@@ -62,10 +63,6 @@
+             'SourceSurfaceD2D1.cpp'
+         ]
+         DEFINES['USE_D2D1_1'] = True
+-    if CONFIG['MOZ_ENABLE_SKIA']:
+-        SOURCES += [
+-            'ScaledFontWin.cpp',
+-        ]
+         DEFINES['SKIA_IMPLEMENTATION'] = 1
+         DEFINES['GR_IMPLEMENTATION'] = 1
+ 
+diff -r 8272b55884f9 -r 95e7bceb535a modules/libpref/src/init/all.js
+--- a/modules/libpref/src/init/all.js	Thu Apr 03 19:15:28 2014 +0800
++++ b/modules/libpref/src/init/all.js	Thu Apr 03 19:18:21 2014 +0800
+@@ -393,7 +393,7 @@
+ #ifdef XP_WIN
+ // comma separated list of backends to use in order of preference
+ // e.g., pref("gfx.canvas.azure.backends", "direct2d,skia,cairo");
+-pref("gfx.canvas.azure.backends", "direct2d,skia,cairo");
++pref("gfx.canvas.azure.backends", "direct2d,cairo");
+ pref("gfx.content.azure.backends", "direct2d,cairo");
+ #else
+ #ifdef XP_MACOSX

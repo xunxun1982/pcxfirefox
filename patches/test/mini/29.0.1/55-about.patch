@@ -1,0 +1,142 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396891892 -28800
+#      Tue Apr 08 01:31:32 2014 +0800
+# Node ID f9a0ecc28682686c9e93ccd9210be05aa3388164
+# Parent  2c323aed8ce9ed0aecea3792eadfb5fca0a03433
+Remove some about
+
+diff -r 2c323aed8ce9 -r f9a0ecc28682 browser/base/jar.mn
+--- a/browser/base/jar.mn	Tue Apr 08 00:38:39 2014 +0800
++++ b/browser/base/jar.mn	Tue Apr 08 01:31:32 2014 +0800
+@@ -17,7 +17,6 @@
+ *       content/browser/aboutDialog.xul               (content/aboutDialog.xul)
+ *       content/browser/aboutDialog.js                (content/aboutDialog.js)
+         content/browser/aboutDialog.css               (content/aboutDialog.css)
+-        content/browser/aboutRobots.xhtml             (content/aboutRobots.xhtml)
+         content/browser/abouthome/aboutHome.xhtml     (content/abouthome/aboutHome.xhtml)
+         content/browser/abouthome/aboutHome.js        (content/abouthome/aboutHome.js)
+ *       content/browser/abouthome/aboutHome.css       (content/abouthome/aboutHome.css)
+@@ -63,8 +62,6 @@
+         content/browser/aboutaccounts/images/graphic_sync_intro.png           (content/aboutaccounts/images/graphic_sync_intro.png)
+         content/browser/aboutaccounts/images/graphic_sync_intro@2x.png        (content/aboutaccounts/images/graphic_sync_intro@2x.png)
+ 
+-        content/browser/aboutRobots-icon.png          (content/aboutRobots-icon.png)
+-        content/browser/aboutRobots-widget-left.png   (content/aboutRobots-widget-left.png)
+ #ifdef MOZ_SOCIAL
+         content/browser/aboutSocialError.xhtml        (content/aboutSocialError.xhtml)
+ #endif
+diff -r 2c323aed8ce9 -r f9a0ecc28682 browser/components/about/AboutRedirector.cpp
+--- a/browser/components/about/AboutRedirector.cpp	Tue Apr 08 00:38:39 2014 +0800
++++ b/browser/components/about/AboutRedirector.cpp	Tue Apr 08 01:31:32 2014 +0800
+@@ -42,9 +42,6 @@
+     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+     nsIAboutModule::ALLOW_SCRIPT |
+     nsIAboutModule::HIDE_FROM_ABOUTABOUT },
+-  { "socialerror", "chrome://browser/content/aboutSocialError.xhtml",
+-    nsIAboutModule::ALLOW_SCRIPT |
+-    nsIAboutModule::HIDE_FROM_ABOUTABOUT },
+   { "tabcrashed", "chrome://browser/content/aboutTabCrashed.xhtml",
+     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+     nsIAboutModule::ALLOW_SCRIPT |
+@@ -55,17 +52,6 @@
+     nsIAboutModule::HIDE_FROM_ABOUTABOUT },
+   { "privatebrowsing", "chrome://browser/content/aboutPrivateBrowsing.xhtml",
+     nsIAboutModule::ALLOW_SCRIPT },
+-  { "rights",
+-#ifdef MOZ_OFFICIAL_BRANDING
+-    "chrome://global/content/aboutRights.xhtml",
+-#else
+-    "chrome://global/content/aboutRights-unbranded.xhtml",
+-#endif
+-    nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+-    nsIAboutModule::ALLOW_SCRIPT },
+-  { "robots", "chrome://browser/content/aboutRobots.xhtml",
+-    nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+-    nsIAboutModule::ALLOW_SCRIPT },
+   { "sessionrestore", "chrome://browser/content/aboutSessionRestore.xhtml",
+     nsIAboutModule::ALLOW_SCRIPT },
+   { "welcomeback", "chrome://browser/content/aboutWelcomeBack.xhtml",
+diff -r 2c323aed8ce9 -r f9a0ecc28682 browser/components/build/nsModule.cpp
+--- a/browser/components/build/nsModule.cpp	Tue Apr 08 00:38:39 2014 +0800
++++ b/browser/components/build/nsModule.cpp	Tue Apr 08 01:31:32 2014 +0800
+@@ -89,12 +89,9 @@
+     { NS_ABOUT_MODULE_CONTRACTID_PREFIX "blocked", &kNS_BROWSER_ABOUT_REDIRECTOR_CID },
+ #endif
+     { NS_ABOUT_MODULE_CONTRACTID_PREFIX "certerror", &kNS_BROWSER_ABOUT_REDIRECTOR_CID },
+-    { NS_ABOUT_MODULE_CONTRACTID_PREFIX "socialerror", &kNS_BROWSER_ABOUT_REDIRECTOR_CID },
+     { NS_ABOUT_MODULE_CONTRACTID_PREFIX "tabcrashed", &kNS_BROWSER_ABOUT_REDIRECTOR_CID },
+     { NS_ABOUT_MODULE_CONTRACTID_PREFIX "feeds", &kNS_BROWSER_ABOUT_REDIRECTOR_CID },
+     { NS_ABOUT_MODULE_CONTRACTID_PREFIX "privatebrowsing", &kNS_BROWSER_ABOUT_REDIRECTOR_CID },
+-    { NS_ABOUT_MODULE_CONTRACTID_PREFIX "rights", &kNS_BROWSER_ABOUT_REDIRECTOR_CID },
+-    { NS_ABOUT_MODULE_CONTRACTID_PREFIX "robots", &kNS_BROWSER_ABOUT_REDIRECTOR_CID },
+     { NS_ABOUT_MODULE_CONTRACTID_PREFIX "sessionrestore", &kNS_BROWSER_ABOUT_REDIRECTOR_CID },
+     { NS_ABOUT_MODULE_CONTRACTID_PREFIX "welcomeback", &kNS_BROWSER_ABOUT_REDIRECTOR_CID },
+ #ifdef MOZ_SERVICES_SYNC
+diff -r 2c323aed8ce9 -r f9a0ecc28682 docshell/base/nsAboutRedirector.cpp
+--- a/docshell/base/nsAboutRedirector.cpp	Tue Apr 08 00:38:39 2014 +0800
++++ b/docshell/base/nsAboutRedirector.cpp	Tue Apr 08 01:31:32 2014 +0800
+@@ -31,10 +31,6 @@
+     { "", "chrome://global/content/about.xhtml",
+       nsIAboutModule::ALLOW_SCRIPT },
+     { "about", "chrome://global/content/aboutAbout.xhtml", 0 },
+-    { "credits", "http://www.mozilla.org/credits/",
+-      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT },
+-    { "mozilla", "chrome://global/content/mozilla.xhtml",
+-      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT },
+     { "plugins", "chrome://global/content/plugins.html", 0 },
+     { "config", "chrome://global/content/config.xul", 0 },
+ #ifdef MOZ_CRASHREPORTER
+@@ -44,8 +40,6 @@
+       nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT},
+     { "buildconfig", "chrome://global/content/buildconfig.html",
+       nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT },
+-    { "license", "chrome://global/content/license.html",
+-      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT },
+     { "neterror", "chrome://global/content/netError.xhtml",
+       nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+       nsIAboutModule::ALLOW_SCRIPT |
+diff -r 2c323aed8ce9 -r f9a0ecc28682 docshell/build/nsDocShellModule.cpp
+--- a/docshell/build/nsDocShellModule.cpp	Tue Apr 08 00:38:39 2014 +0800
++++ b/docshell/build/nsDocShellModule.cpp	Tue Apr 08 01:31:32 2014 +0800
+@@ -168,12 +168,9 @@
+ #ifdef MOZ_CRASHREPORTER
+   { NS_ABOUT_MODULE_CONTRACTID_PREFIX "crashes", &kNS_ABOUT_REDIRECTOR_MODULE_CID },
+ #endif
+-  { NS_ABOUT_MODULE_CONTRACTID_PREFIX "credits", &kNS_ABOUT_REDIRECTOR_MODULE_CID },
+   { NS_ABOUT_MODULE_CONTRACTID_PREFIX "plugins", &kNS_ABOUT_REDIRECTOR_MODULE_CID },
+-  { NS_ABOUT_MODULE_CONTRACTID_PREFIX "mozilla", &kNS_ABOUT_REDIRECTOR_MODULE_CID },
+   { NS_ABOUT_MODULE_CONTRACTID_PREFIX "logo", &kNS_ABOUT_REDIRECTOR_MODULE_CID },
+   { NS_ABOUT_MODULE_CONTRACTID_PREFIX "buildconfig", &kNS_ABOUT_REDIRECTOR_MODULE_CID },
+-  { NS_ABOUT_MODULE_CONTRACTID_PREFIX "license", &kNS_ABOUT_REDIRECTOR_MODULE_CID },
+   { NS_ABOUT_MODULE_CONTRACTID_PREFIX "neterror", &kNS_ABOUT_REDIRECTOR_MODULE_CID },
+   { NS_ABOUT_MODULE_CONTRACTID_PREFIX "compartments", &kNS_ABOUT_REDIRECTOR_MODULE_CID },
+   { NS_ABOUT_MODULE_CONTRACTID_PREFIX "memory", &kNS_ABOUT_REDIRECTOR_MODULE_CID },
+diff -r 2c323aed8ce9 -r f9a0ecc28682 toolkit/content/jar.mn
+--- a/toolkit/content/jar.mn	Tue Apr 08 00:38:39 2014 +0800
++++ b/toolkit/content/jar.mn	Tue Apr 08 01:31:32 2014 +0800
+@@ -5,7 +5,6 @@
+ # provide the nsTransferable in nsDragAndDrop.js to extensions that have to
+ # work with Geckos from before 1.9, when there was a separate file
+ %  override chrome://global/content/nsTransferable.js chrome://global/content/nsDragAndDrop.js
+-*  content/global/license.html                (license.html)
+    content/global/XPCNativeWrapper.js         (XPCNativeWrapper.js)
+ *  content/global/xul.css                     (xul.css)
+    content/global/textbox.css                 (textbox.css)
+@@ -13,8 +12,6 @@
+    content/global/about.js                    (about.js)
+    content/global/about.xhtml                 (about.xhtml)
+    content/global/aboutAbout.xhtml            (aboutAbout.xhtml)
+-   content/global/aboutRights.xhtml           (aboutRights.xhtml)
+-   content/global/aboutRights-unbranded.xhtml (aboutRights-unbranded.xhtml)
+    content/global/aboutNetworking.js
+    content/global/aboutNetworking.xhtml
+ *  content/global/aboutSupport.js
+@@ -40,7 +37,6 @@
+    content/global/findUtils.js                (findUtils.js)
+    content/global/filepicker.properties       (filepicker.properties)
+ *+ content/global/globalOverlay.js            (globalOverlay.js)
+-+  content/global/mozilla.xhtml               (mozilla.xhtml)
+    content/global/nsDragAndDrop.js            (nsDragAndDrop.js)
+    content/global/resetProfile.css            (resetProfile.css)
+    content/global/resetProfile.js             (resetProfile.js)

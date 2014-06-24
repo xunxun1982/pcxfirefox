@@ -1,0 +1,71 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1402019096 -28800
+#      Fri Jun 06 09:44:56 2014 +0800
+# Node ID 4b32af29eb5a9bf60b618e83523b0cf26d3603fd
+# Parent  6c18811bcd1b319801fd97aeb09c41b963863968
+Bug 1001845 - AnimationBenchmark/svg perf regression in Firefox 30 with disable HWA
+
+diff -r 6c18811bcd1b -r 4b32af29eb5a gfx/layers/LayerTreeInvalidation.cpp
+--- a/gfx/layers/LayerTreeInvalidation.cpp	Tue Jun 03 18:10:01 2014 +0200
++++ b/gfx/layers/LayerTreeInvalidation.cpp	Fri Jun 06 09:44:56 2014 +0800
+@@ -59,12 +59,14 @@
+   while ((r = iter.Next())) {
+     aDest.Or(aDest, TransformRect(*r, aTransform));
+   }
++  aDest.SimplifyOutward(20);
+ }
+ 
+ static void
+ AddRegion(nsIntRegion& aDest, const nsIntRegion& aSource)
+ {
+   aDest.Or(aDest, aSource);
++  aDest.SimplifyOutward(20);
+ }
+ 
+ static nsIntRegion
+diff -r 6c18811bcd1b -r 4b32af29eb5a gfx/layers/basic/BasicThebesLayer.h
+--- a/gfx/layers/basic/BasicThebesLayer.h	Tue Jun 03 18:10:01 2014 +0200
++++ b/gfx/layers/basic/BasicThebesLayer.h	Fri Jun 06 09:44:56 2014 +0800
+@@ -53,6 +53,7 @@
+     NS_ASSERTION(BasicManager()->InConstruction(),
+                  "Can only set properties in construction phase");
+     mInvalidRegion.Or(mInvalidRegion, aRegion);
++    mInvalidRegion.SimplifyOutward(20);
+     mValidRegion.Sub(mValidRegion, mInvalidRegion);
+   }
+ 
+diff -r 6c18811bcd1b -r 4b32af29eb5a gfx/layers/client/ClientThebesLayer.h
+--- a/gfx/layers/client/ClientThebesLayer.h	Tue Jun 03 18:10:01 2014 +0200
++++ b/gfx/layers/client/ClientThebesLayer.h	Fri Jun 06 09:44:56 2014 +0800
+@@ -60,6 +60,7 @@
+     NS_ASSERTION(ClientManager()->InConstruction(),
+                  "Can only set properties in construction phase");
+     mInvalidRegion.Or(mInvalidRegion, aRegion);
++    mInvalidRegion.SimplifyOutward(20);
+     mValidRegion.Sub(mValidRegion, mInvalidRegion);
+   }
+ 
+diff -r 6c18811bcd1b -r 4b32af29eb5a gfx/layers/d3d10/ThebesLayerD3D10.cpp
+--- a/gfx/layers/d3d10/ThebesLayerD3D10.cpp	Tue Jun 03 18:10:01 2014 +0200
++++ b/gfx/layers/d3d10/ThebesLayerD3D10.cpp	Fri Jun 06 09:44:56 2014 +0800
+@@ -47,7 +47,7 @@
+ ThebesLayerD3D10::InvalidateRegion(const nsIntRegion &aRegion)
+ {
+   mInvalidRegion.Or(mInvalidRegion, aRegion);
+-  mInvalidRegion.SimplifyOutward(10);
++  mInvalidRegion.SimplifyOutward(20);
+   mValidRegion.Sub(mValidRegion, mInvalidRegion);
+ }
+ 
+diff -r 6c18811bcd1b -r 4b32af29eb5a gfx/layers/d3d9/ThebesLayerD3D9.cpp
+--- a/gfx/layers/d3d9/ThebesLayerD3D9.cpp	Tue Jun 03 18:10:01 2014 +0200
++++ b/gfx/layers/d3d9/ThebesLayerD3D9.cpp	Fri Jun 06 09:44:56 2014 +0800
+@@ -52,6 +52,7 @@
+ ThebesLayerD3D9::InvalidateRegion(const nsIntRegion &aRegion)
+ {
+   mInvalidRegion.Or(mInvalidRegion, aRegion);
++  mInvalidRegion.SimplifyOutward(20);
+   mValidRegion.Sub(mValidRegion, mInvalidRegion);
+ }
+ 

@@ -1,0 +1,48 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396524679 -28800
+#      Thu Apr 03 19:31:19 2014 +0800
+# Node ID 485db31576dfe05ad79118f3100b240823e20523
+# Parent  2509f9150e91c6f3efacb25d32c3982c67e426ed
+Disable WebGL
+
+diff -r 2509f9150e91 -r 485db31576df gfx/moz.build
+--- a/gfx/moz.build	Thu Apr 03 19:29:18 2014 +0800
++++ b/gfx/moz.build	Thu Apr 03 19:31:19 2014 +0800
+@@ -10,7 +10,6 @@
+ DIRS += [
+     '2d',
+     'ycbcr',
+-    'angle',
+     'src',
+     'qcms',
+     'gl',
+@@ -22,6 +21,9 @@
+     'ipc',
+ ]
+ 
++if CONFIG['MOZ_WEBGL']:
++    DIRS += ['angle']
++
+ if CONFIG['MOZ_ENABLE_SKIA']:
+     DIRS += ['skia']
+ 
+diff -r 2509f9150e91 -r 485db31576df layout/media/symbols.def.in
+--- a/layout/media/symbols.def.in	Thu Apr 03 19:29:18 2014 +0800
++++ b/layout/media/symbols.def.in	Thu Apr 03 19:31:19 2014 +0800
+@@ -175,6 +175,7 @@
+ opus_encode
+ opus_encode_float
+ #endif
++#ifdef MOZ_WEBGL
+ ShInitialize
+ ShFinalize
+ ShGetObjectCode
+@@ -185,6 +186,7 @@
+ ShConstructCompiler
+ ShGetActiveAttrib
+ ShGetActiveUniform
++#endif
+ #ifndef MOZ_NATIVE_PNG
+ MOZ_APNG_get_first_frame_is_hidden
+ MOZ_APNG_get_next_frame_blend_op

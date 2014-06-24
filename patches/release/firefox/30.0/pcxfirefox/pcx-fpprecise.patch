@@ -1,0 +1,92 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1402049779 -28800
+#      Fri Jun 06 18:16:19 2014 +0800
+# Node ID e8f0eef203ff5456e407916c7ce0eb8da12b4afc
+# Parent  9209d5ee4dce43312d6ce438fb59ae55c2d86d9e
+pcx fpprecise
+
+diff -r 9209d5ee4dce -r e8f0eef203ff db/sqlite3/src/Makefile.in
+--- a/db/sqlite3/src/Makefile.in	Fri Jun 06 18:12:58 2014 +0800
++++ b/db/sqlite3/src/Makefile.in	Fri Jun 06 18:16:19 2014 +0800
+@@ -45,3 +45,6 @@
+ endif
+ 
+ include $(topsrcdir)/config/rules.mk
++
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff -r 9209d5ee4dce -r e8f0eef203ff ipc/app/Makefile.in
+--- a/ipc/app/Makefile.in	Fri Jun 06 18:12:58 2014 +0800
++++ b/ipc/app/Makefile.in	Fri Jun 06 18:16:19 2014 +0800
+@@ -76,3 +76,6 @@
+ LDFLAGS += $(PROFILE_USE_LDFLAGS)
+ DLLFLAGS += $(PROFILE_USE_LDFLAGS)
+ endif # MOZ_PROFILE_USE
++
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff -r 9209d5ee4dce -r e8f0eef203ff js/src/Makefile.in
+--- a/js/src/Makefile.in	Fri Jun 06 18:12:58 2014 +0800
++++ b/js/src/Makefile.in	Fri Jun 06 18:16:19 2014 +0800
+@@ -232,7 +232,10 @@
+ # Prevent floating point errors caused by VC++ optimizations
+ ifdef _MSC_VER
+ # XXX We should add this to CXXFLAGS, too?
+-CFLAGS += -fp:precise
++CFLAGS += -fp:precise -Qfast_transcendentals
++ifeq (x86_64, $(TARGET_CPU))
++CXXFLAGS += -fp:precise -Qfast_transcendentals
++endif
+ endif # _MSC_VER
+ 
+ ifeq ($(OS_ARCH),FreeBSD)
+diff -r 9209d5ee4dce -r e8f0eef203ff memory/build/Makefile.in
+--- a/memory/build/Makefile.in	Fri Jun 06 18:12:58 2014 +0800
++++ b/memory/build/Makefile.in	Fri Jun 06 18:16:19 2014 +0800
+@@ -15,3 +15,6 @@
+ else
+ SHARED_LIBRARY_LIBS += $(call EXPAND_LIBNAME_PATH,jemalloc,$(DEPTH)/memory/mozjemalloc)
+ endif
++
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff -r 9209d5ee4dce -r e8f0eef203ff memory/jemalloc/Makefile.in
+--- a/memory/jemalloc/Makefile.in	Fri Jun 06 18:12:58 2014 +0800
++++ b/memory/jemalloc/Makefile.in	Fri Jun 06 18:16:19 2014 +0800
+@@ -12,3 +12,6 @@
+ ifdef GNU_CC
+ CFLAGS += -std=gnu99
+ endif
++
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff -r 9209d5ee4dce -r e8f0eef203ff memory/jemalloc/src/Makefile.in
+--- a/memory/jemalloc/src/Makefile.in	Fri Jun 06 18:12:58 2014 +0800
++++ b/memory/jemalloc/src/Makefile.in	Fri Jun 06 18:16:19 2014 +0800
+@@ -321,3 +321,6 @@
+ $(cfgoutputs_out) $(cfghdrs_out) : $(objroot)config.stamp
+ 	@true
+ endif
++
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff -r 9209d5ee4dce -r e8f0eef203ff memory/mozjemalloc/Makefile.in
+--- a/memory/mozjemalloc/Makefile.in	Fri Jun 06 18:12:58 2014 +0800
++++ b/memory/mozjemalloc/Makefile.in	Fri Jun 06 18:16:19 2014 +0800
+@@ -11,3 +11,5 @@
+ endif
+ endif
+ 
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff -r 9209d5ee4dce -r e8f0eef203ff nsprpub/pr/src/misc/Makefile.in
+--- a/nsprpub/pr/src/misc/Makefile.in	Fri Jun 06 18:12:58 2014 +0800
++++ b/nsprpub/pr/src/misc/Makefile.in	Fri Jun 06 18:16:19 2014 +0800
+@@ -79,4 +79,5 @@
+ 
+ export:: $(TARGETS)
+ 
+-
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals

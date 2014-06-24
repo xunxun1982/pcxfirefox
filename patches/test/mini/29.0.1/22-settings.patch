@@ -1,0 +1,170 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396526621 -28800
+#      Thu Apr 03 20:03:41 2014 +0800
+# Node ID 6ad2d7a5a78e59446595d0f6e28a00a9127929c7
+# Parent  06d554301d88f706e9dfe8b04768c9a77dcdb86f
+Disable settings
+
+diff -r 06d554301d88 -r 6ad2d7a5a78e browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Thu Apr 03 20:01:54 2014 +0800
++++ b/browser/installer/package-manifest.in	Thu Apr 03 20:03:41 2014 +0800
+@@ -223,7 +223,9 @@
+ @BINPATH@/components/dom_power.xpt
+ @BINPATH@/components/dom_quota.xpt
+ @BINPATH@/components/dom_range.xpt
++#ifdef MOZ_SETTINGS
+ @BINPATH@/components/dom_settings.xpt
++#endif
+ @BINPATH@/components/dom_permissionsettings.xpt
+ @BINPATH@/components/dom_sidebar.xpt
+ #ifdef MOZ_MOBILEMESSAGE
+@@ -524,8 +526,10 @@
+ @BINPATH@/components/TelemetryStartup.manifest
+ @BINPATH@/components/messageWakeupService.js
+ @BINPATH@/components/messageWakeupService.manifest
++#ifdef MOZ_SETTINGS
+ @BINPATH@/components/SettingsManager.js
+ @BINPATH@/components/SettingsManager.manifest
++#endif
+ @BINPATH@/components/Webapps.js
+ @BINPATH@/components/Webapps.manifest
+ @BINPATH@/components/AppsService.js
+diff -r 06d554301d88 -r 6ad2d7a5a78e configure.in
+--- a/configure.in	Thu Apr 03 20:01:54 2014 +0800
++++ b/configure.in	Thu Apr 03 20:03:41 2014 +0800
+@@ -7533,6 +7533,15 @@
+ fi
+ AC_SUBST(MOZ_PUSH)
+ 
++MOZ_ARG_DISABLE_BOOL(settings,
++[  --disable-settings          Disable settings],
++    MOZ_SETTINGS=,
++    MOZ_SETTINGS=1)
++if test -n "$MOZ_SETTINGS"; then
++    AC_DEFINE(MOZ_SETTINGS)
++fi
++AC_SUBST(MOZ_SETTINGS)
++
+ dnl ========================================================
+ dnl = Enable Support for AudioChannelManager API
+ dnl ========================================================
+diff -r 06d554301d88 -r 6ad2d7a5a78e dom/moz.build
+--- a/dom/moz.build	Thu Apr 03 20:01:54 2014 +0800
++++ b/dom/moz.build	Thu Apr 03 20:03:41 2014 +0800
+@@ -11,7 +11,6 @@
+     'html',
+     'events',
+     'devicestorage',
+-    'settings',
+     'stylesheets',
+     'sidebar',
+     'css',
+@@ -31,6 +30,9 @@
+     'apps',
+ ]
+ 
++if CONFIG['MOZ_SETTINGS']:
++    interfaces += ['settings']
++
+ if CONFIG['MOZ_GAMEPAD']:
+     PARALLEL_DIRS += ['gamepad']
+ 
+@@ -53,7 +55,6 @@
+     'messages',
+     'power',
+     'quota',
+-    'settings',
+     'src',
+     'time',
+     'locales',
+@@ -100,6 +101,9 @@
+ if CONFIG['MOZ_PUSH']:
+     PARALLEL_DIRS += ['push']
+ 
++if CONFIG['MOZ_SETTINGS']:
++    PARALLEL_DIRS += ['settings']
++
+ if CONFIG['OS_ARCH'] == 'WINNT':
+     PARALLEL_DIRS += ['plugins/ipc/hangui']
+ 
+diff -r 06d554301d88 -r 6ad2d7a5a78e dom/src/geolocation/nsGeolocation.cpp
+--- a/dom/src/geolocation/nsGeolocation.cpp	Thu Apr 03 20:01:54 2014 +0800
++++ b/dom/src/geolocation/nsGeolocation.cpp	Thu Apr 03 20:03:41 2014 +0800
+@@ -7,7 +7,9 @@
+ #include "mozilla/dom/ContentChild.h"
+ #include "mozilla/dom/TabChild.h"
+ 
++#ifdef MOZ_SETTINGS
+ #include "nsISettingsService.h"
++#endif
+ 
+ #include "nsGeolocation.h"
+ #include "nsDOMClassInfoID.h"
+@@ -117,6 +119,7 @@
+   return geoOptions.forget();
+ }
+ 
++#ifdef MOZ_SETTINGS
+ class GeolocationSettingsCallback : public nsISettingsServiceCallback
+ {
+ public:
+@@ -163,6 +166,7 @@
+ };
+ 
+ NS_IMPL_ISUPPORTS1(GeolocationSettingsCallback, nsISettingsServiceCallback)
++#endif
+ 
+ class RequestPromptEvent : public nsRunnable
+ {
+@@ -646,6 +650,7 @@
+     return NS_OK;
+   }
+ 
++#ifdef MOZ_SETTINGS
+   // check if the geolocation service is enable from settings
+   nsCOMPtr<nsISettingsService> settings =
+     do_GetService("@mozilla.org/settingsService;1");
+@@ -672,6 +677,7 @@
+ 
+   obs->AddObserver(this, "quit-application", false);
+   obs->AddObserver(this, "mozsettings-changed", false);
++#endif
+ 
+ #ifdef MOZ_ENABLE_QTMOBILITY
+   mProvider = new QTMLocationProvider();
+diff -r 06d554301d88 -r 6ad2d7a5a78e dom/webidl/moz.build
+--- a/dom/webidl/moz.build	Thu Apr 03 20:01:54 2014 +0800
++++ b/dom/webidl/moz.build	Thu Apr 03 20:03:41 2014 +0800
+@@ -512,7 +512,6 @@
+     'ElementReplaceEvent.webidl',
+     'HashChangeEvent.webidl',
+     'MozApplicationEvent.webidl',
+-    'MozSettingsEvent.webidl',
+     'PageTransitionEvent.webidl',
+     'PopStateEvent.webidl',
+     'PopupBlockedEvent.webidl',
+@@ -533,6 +532,12 @@
+         'MozSmsEvent.webidl',
+     ]
+ 
++if CONFIG['MOZ_SETTINGS']:
++    WEBIDL_FILES += [
++        'SettingsManager.webidl',
++        'MozSettingsEvent.webidl',
++    ]
++
+ if CONFIG['MOZ_B2G_BT']:
+     WEBIDL_FILES += [
+         'BluetoothAdapter.webidl',
+diff -r 06d554301d88 -r 6ad2d7a5a78e js/xpconnect/src/event_impl_gen.conf.in
+--- a/js/xpconnect/src/event_impl_gen.conf.in	Thu Apr 03 20:01:54 2014 +0800
++++ b/js/xpconnect/src/event_impl_gen.conf.in	Thu Apr 03 20:03:41 2014 +0800
+@@ -10,7 +10,6 @@
+ simple_events = [
+     'ProgressEvent',
+     'StorageEvent',
+-    'MozSettingsEvent',
+     'CustomEvent',
+     'PageTransitionEvent',
+     'DOMTransactionEvent',

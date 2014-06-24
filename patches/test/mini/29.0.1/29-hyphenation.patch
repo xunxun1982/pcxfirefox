@@ -1,0 +1,61 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396548831 -28800
+#      Fri Apr 04 02:13:51 2014 +0800
+# Node ID 87086168f735a0fdbcbd238043b31f995b3ea46f
+# Parent  ed75268eeabe1590cdb489ec64bc160d1b037322
+Disable hyphenation
+
+diff -r ed75268eeabe -r 87086168f735 browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Fri Apr 04 02:11:55 2014 +0800
++++ b/browser/installer/package-manifest.in	Fri Apr 04 02:13:51 2014 +0800
+@@ -39,7 +39,9 @@
+ @BINPATH@/browser/defaults/profile/localstore.rdf
+ @BINPATH@/browser/defaults/profile/mimeTypes.rdf
+ @BINPATH@/dictionaries/*
++#ifdef MOZ_HYPHENATION
+ @BINPATH@/hyphenation/*
++#endif
+ @BINPATH@/browser/@PREF_DIR@/firefox-l10n.js
+ @BINPATH@/browser/searchplugins/*
+ #ifdef XP_WIN32
+diff -r ed75268eeabe -r 87086168f735 configure.in
+--- a/configure.in	Fri Apr 04 02:11:55 2014 +0800
++++ b/configure.in	Fri Apr 04 02:13:51 2014 +0800
+@@ -7551,6 +7551,15 @@
+ fi
+ AC_SUBST(MOZ_CAMERA)
+ 
++MOZ_ARG_DISABLE_BOOL(hyphenation,
++[  --disable-hyphenation          Disable hyphenation],
++    MOZ_HYPHENATION=,
++    MOZ_HYPHENATION=1)
++if test -n "$MOZ_HYPHENATION"; then
++    AC_DEFINE(MOZ_HYPHENATION)
++fi
++AC_SUBST(MOZ_HYPHENATION)
++
+ dnl ========================================================
+ dnl = Enable Support for AudioChannelManager API
+ dnl ========================================================
+diff -r ed75268eeabe -r 87086168f735 intl/moz.build
+--- a/intl/moz.build	Fri Apr 04 02:11:55 2014 +0800
++++ b/intl/moz.build	Fri Apr 04 02:13:51 2014 +0800
+@@ -7,12 +7,16 @@
+ PARALLEL_DIRS += [
+     'hyphenation',
+     'locale',
+-    'locales',
+     'lwbrk',
+     'strres',
+     'unicharutil',
+ ]
+ 
++if CONFIG['MOZ_HYPHENATION']:
++    PARALLEL_DIRS += [
++        'locales',
++        ]
++
+ DIRS += [
+     'uconv',
+     'build',

@@ -1,0 +1,220 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396551333 -28800
+#      Fri Apr 04 02:55:33 2014 +0800
+# Node ID 05069ce89e34b0cc1a68b7dcca8d8eccb32af5d0
+# Parent  0c2f64be8137ba30c11fd0186fdc6b68979e47c6
+Disable time
+
+diff -r 0c2f64be8137 -r 05069ce89e34 configure.in
+--- a/configure.in	Fri Apr 04 02:53:20 2014 +0800
++++ b/configure.in	Fri Apr 04 02:55:33 2014 +0800
+@@ -7648,6 +7648,15 @@
+ fi
+ AC_SUBST(MOZ_ALARM)
+ 
++MOZ_ARG_DISABLE_BOOL(time,
++[  --disable-time          Disable time],
++    MOZ_TIME=,
++    MOZ_TIME=1)
++if test -n "$MOZ_TIME"; then
++    AC_DEFINE(MOZ_TIME)
++fi
++AC_SUBST(MOZ_TIME)
++
+ dnl ========================================================
+ dnl = Support for gcc stack unwinding (from gcc 3.3)
+ dnl ========================================================
+diff -r 0c2f64be8137 -r 05069ce89e34 dom/base/nsGlobalWindow.cpp
+--- a/dom/base/nsGlobalWindow.cpp	Fri Apr 04 02:53:20 2014 +0800
++++ b/dom/base/nsGlobalWindow.cpp	Fri Apr 04 02:55:33 2014 +0800
+@@ -1489,7 +1489,9 @@
+     mIdleTimer = nullptr;
+   }
+ 
++#ifdef MOZ_TIME
+   DisableTimeChangeNotifications();
++#endif
+ }
+ 
+ void
+@@ -12713,6 +12715,7 @@
+   }
+ }
+ 
++#ifdef MOZ_TIME
+ void
+ nsGlobalWindow::EnableTimeChangeNotifications()
+ {
+@@ -12724,6 +12727,7 @@
+ {
+   mozilla::time::RemoveWindowListener(this);
+ }
++#endif
+ 
+ static PLDHashOperator
+ CollectSizeAndListenerCount(
+diff -r 0c2f64be8137 -r 05069ce89e34 dom/base/nsGlobalWindow.h
+--- a/dom/base/nsGlobalWindow.h	Fri Apr 04 02:53:20 2014 +0800
++++ b/dom/base/nsGlobalWindow.h	Fri Apr 04 02:55:33 2014 +0800
+@@ -619,9 +619,11 @@
+   virtual void EnableDeviceSensor(uint32_t aType);
+   virtual void DisableDeviceSensor(uint32_t aType);
+ 
++#ifdef MOZ_TIME
+   virtual void EnableTimeChangeNotifications();
+   virtual void DisableTimeChangeNotifications();
+-
++#endif
++  
+ #ifdef MOZ_B2G
+   // Inner windows only.
+   virtual void EnableNetworkEvent(uint32_t aType);
+diff -r 0c2f64be8137 -r 05069ce89e34 dom/base/nsPIDOMWindow.h
+--- a/dom/base/nsPIDOMWindow.h	Fri Apr 04 02:53:20 2014 +0800
++++ b/dom/base/nsPIDOMWindow.h	Fri Apr 04 02:55:33 2014 +0800
+@@ -580,9 +580,11 @@
+    */
+   virtual void DisableDeviceSensor(uint32_t aType) = 0;
+ 
++#ifdef MOZ_TIME
+   virtual void EnableTimeChangeNotifications() = 0;
+   virtual void DisableTimeChangeNotifications() = 0;
+-
++#endif
++  
+ #ifdef MOZ_B2G
+   /**
+    * Tell the window that it should start to listen to the network event of the
+diff -r 0c2f64be8137 -r 05069ce89e34 dom/moz.build
+--- a/dom/moz.build	Fri Apr 04 02:53:20 2014 +0800
++++ b/dom/moz.build	Fri Apr 04 02:55:33 2014 +0800
+@@ -55,7 +55,6 @@
+     'power',
+     'quota',
+     'src',
+-    'time',
+     'locales',
+     'network',
+     'permission',
+@@ -110,6 +109,9 @@
+ if CONFIG['MOZ_INPUTMETHOD']:
+     PARALLEL_DIRS += ['inputmethod']
+ 
++if CONFIG['MOZ_TIME']:
++    PARALLEL_DIRS += ['time']
++
+ if CONFIG['OS_ARCH'] == 'WINNT':
+     PARALLEL_DIRS += ['plugins/ipc/hangui']
+ 
+diff -r 0c2f64be8137 -r 05069ce89e34 dom/webidl/moz.build
+--- a/dom/webidl/moz.build	Fri Apr 04 02:53:20 2014 +0800
++++ b/dom/webidl/moz.build	Fri Apr 04 02:55:33 2014 +0800
+@@ -226,7 +226,6 @@
+     'MozConnection.webidl',
+     'MozNamedAttrMap.webidl',
+     'MozPowerManager.webidl',
+-    'MozTimeManager.webidl',
+     'MozWakeLock.webidl',
+     'MutationEvent.webidl',
+     'MutationObserver.webidl',
+@@ -467,6 +466,12 @@
+         'CameraManager.webidl',
+     ]
+ 
++if CONFIG['MOZ_TIME']:
++    WEBIDL_FILES += [
++        'MozTimeManager.webidl',
++    ]
++
++
+ if CONFIG['MOZ_AUDIO_CHANNEL_MANAGER']:
+     WEBIDL_FILES += [
+         'AudioChannelManager.webidl',
+diff -r 0c2f64be8137 -r 05069ce89e34 layout/build/nsLayoutModule.cpp
+--- a/layout/build/nsLayoutModule.cpp	Fri Apr 04 02:53:20 2014 +0800
++++ b/layout/build/nsLayoutModule.cpp	Fri Apr 04 02:55:33 2014 +0800
+@@ -234,7 +234,9 @@
+ #ifdef MOZ_ALARM
+ #include "mozilla/dom/alarm/AlarmHalService.h"
+ #endif
++#ifdef MOZ_TIME
+ #include "mozilla/dom/time/TimeService.h"
++#endif
+ #include "StreamingProtocolService.h"
+ 
+ #ifdef MOZ_TELEPHONY
+@@ -265,7 +267,9 @@
+ using mozilla::dom::TCPSocketParent;
+ using mozilla::dom::TCPServerSocketChild;
+ using mozilla::dom::UDPSocketChild;
++#ifdef MOZ_TIME
+ using mozilla::dom::time::TimeService;
++#endif
+ using mozilla::net::StreamingProtocolControllerService;
+ 
+ // Transformiix
+@@ -344,8 +348,10 @@
+ NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIAlarmHalService,
+                                          AlarmHalService::GetInstance)
+ #endif
++#ifdef MOZ_TIME
+ NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsITimeService,
+                                          TimeService::GetInstance)
++#endif
+ NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIStreamingProtocolControllerService,
+                                          StreamingProtocolControllerService::GetInstance)
+ 
+@@ -835,7 +841,9 @@
+ NS_DEFINE_NAMED_CID(TCPSOCKETPARENT_CID);
+ NS_DEFINE_NAMED_CID(TCPSERVERSOCKETCHILD_CID);
+ NS_DEFINE_NAMED_CID(UDPSOCKETCHILD_CID);
++#ifdef MOZ_TIME
+ NS_DEFINE_NAMED_CID(NS_TIMESERVICE_CID);
++#endif
+ NS_DEFINE_NAMED_CID(NS_MEDIASTREAMCONTROLLERSERVICE_CID);
+ #ifdef MOZ_WIDGET_GONK
+ NS_DEFINE_NAMED_CID(GONK_GPS_GEOLOCATION_PROVIDER_CID);
+@@ -1130,7 +1138,9 @@
+   { &kTCPSOCKETPARENT_CID, false, nullptr, TCPSocketParentConstructor },
+   { &kTCPSERVERSOCKETCHILD_CID, false, nullptr, TCPServerSocketChildConstructor },
+   { &kUDPSOCKETCHILD_CID, false, nullptr, UDPSocketChildConstructor },
++#ifdef MOZ_TIME
+   { &kNS_TIMESERVICE_CID, false, nullptr, nsITimeServiceConstructor },
++#endif
+   { &kNS_MEDIASTREAMCONTROLLERSERVICE_CID, false, nullptr, nsIStreamingProtocolControllerServiceConstructor },
+ #ifdef MOZ_WIDGET_GONK
+   { &kGONK_GPS_GEOLOCATION_PROVIDER_CID, false, nullptr, nsIGeolocationProviderConstructor },
+@@ -1291,7 +1301,9 @@
+   { "@mozilla.org/tcp-socket-parent;1", &kTCPSOCKETPARENT_CID },
+   { "@mozilla.org/tcp-server-socket-child;1", &kTCPSERVERSOCKETCHILD_CID },
+   { "@mozilla.org/udp-socket-child;1", &kUDPSOCKETCHILD_CID },
++#ifdef MOZ_TIME
+   { TIMESERVICE_CONTRACTID, &kNS_TIMESERVICE_CID },
++#endif
+   { MEDIASTREAMCONTROLLERSERVICE_CONTRACTID, &kNS_MEDIASTREAMCONTROLLERSERVICE_CID },
+ #ifdef MOZ_WIDGET_GONK
+   { GONK_GPS_GEOLOCATION_PROVIDER_CONTRACTID, &kGONK_GPS_GEOLOCATION_PROVIDER_CID },
+diff -r 0c2f64be8137 -r 05069ce89e34 layout/build/nsLayoutStatics.cpp
+--- a/layout/build/nsLayoutStatics.cpp	Fri Apr 04 02:53:20 2014 +0800
++++ b/layout/build/nsLayoutStatics.cpp	Fri Apr 04 02:55:33 2014 +0800
+@@ -121,7 +121,9 @@
+ #include "nsPermissionManager.h"
+ #include "nsCookieService.h"
+ #include "nsApplicationCacheService.h"
++#ifdef MOZ_TIME
+ #include "mozilla/dom/time/DateCacheCleaner.h"
++#endif
+ #include "nsIMEStateManager.h"
+ #include "nsDocument.h"
+ #include "mozilla/dom/HTMLVideoElement.h"
+@@ -282,7 +284,9 @@
+   nsCookieService::AppClearDataObserverInit();
+   nsApplicationCacheService::AppClearDataObserverInit();
+ 
++#ifdef MOZ_TIME
+   InitializeDateCacheCleaner();
++#endif
+ 
+   HTMLVideoElement::Init();
+ 

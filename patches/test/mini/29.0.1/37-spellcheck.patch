@@ -1,0 +1,40 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396549929 -28800
+#      Fri Apr 04 02:32:09 2014 +0800
+# Node ID eb7428e324f73545ff0bfed13c8c341c5b46ce04
+# Parent  9199c9faabad5e1cbc490860ee67f8dc15472a18
+Disable ship spellcheck
+
+diff -r 9199c9faabad -r eb7428e324f7 browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Fri Apr 04 02:30:25 2014 +0800
++++ b/browser/installer/package-manifest.in	Fri Apr 04 02:32:09 2014 +0800
+@@ -38,7 +38,9 @@
+ @BINPATH@/browser/defaults/profile/chrome/*
+ @BINPATH@/browser/defaults/profile/localstore.rdf
+ @BINPATH@/browser/defaults/profile/mimeTypes.rdf
++#ifdef MOZ_SHIP_SPELLCHECK
+ @BINPATH@/dictionaries/*
++#endif
+ #ifdef MOZ_HYPHENATION
+ @BINPATH@/hyphenation/*
+ #endif
+diff -r 9199c9faabad -r eb7428e324f7 configure.in
+--- a/configure.in	Fri Apr 04 02:30:25 2014 +0800
++++ b/configure.in	Fri Apr 04 02:32:09 2014 +0800
+@@ -7586,6 +7586,15 @@
+ fi
+ AC_SUBST(MOZ_JUMPLIST)
+ 
++MOZ_ARG_DISABLE_BOOL(ship-spellcheck,
++[  --disable-ship-spellcheck          Disable ship spellcheck],
++    MOZ_SHIP_SPELLCHECK=,
++    MOZ_SHIP_SPELLCHECK=1)
++if test -n "$MOZ_SHIP_SPELLCHECK"; then
++    AC_DEFINE(MOZ_SHIP_SPELLCHECK)
++fi
++AC_SUBST(MOZ_SHIP_SPELLCHECK)
++
+ dnl ========================================================
+ dnl = Enable Support for AudioChannelManager API
+ dnl ========================================================

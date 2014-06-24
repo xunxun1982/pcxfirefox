@@ -1,0 +1,20 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396549216 -28800
+#      Fri Apr 04 02:20:16 2014 +0800
+# Node ID d460827c6097d7a6a0ce00a3a374866c6c98a56f
+# Parent  6f28bfed76a9bd0cd4cdd8a76e4fa1defcf3cc8a
+Disable startup.homepage_welcome_url
+
+diff -r 6f28bfed76a9 -r d460827c6097 browser/branding/official/pref/firefox-branding.js
+--- a/browser/branding/official/pref/firefox-branding.js	Fri Apr 04 02:18:56 2014 +0800
++++ b/browser/branding/official/pref/firefox-branding.js	Fri Apr 04 02:20:16 2014 +0800
+@@ -3,7 +3,7 @@
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+ pref("startup.homepage_override_url","");
+-pref("startup.homepage_welcome_url","https://www.mozilla.org/%LOCALE%/firefox/%VERSION%/firstrun/");
++pref("startup.homepage_welcome_url","");
+ // Interval: Time between checks for a new version (in seconds)
+ pref("app.update.interval", 43200); // 12 hours
+ // The time interval between the downloading of mar file chunks in the

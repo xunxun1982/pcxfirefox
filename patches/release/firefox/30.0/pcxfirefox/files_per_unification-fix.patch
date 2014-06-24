@@ -1,0 +1,31 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1402217373 -28800
+#      Sun Jun 08 16:49:33 2014 +0800
+# Node ID b85e719fffc261e0080ba807c6fafd870b232c51
+# Parent  82af3fe9e2eb0eeec81f6341eff52256330be780
+files_per_unification fix
+
+diff -r 82af3fe9e2eb -r b85e719fffc2 ipc/chromium/moz.build
+--- a/ipc/chromium/moz.build	Sun Jun 08 14:08:16 2014 +0800
++++ b/ipc/chromium/moz.build	Sun Jun 08 16:49:33 2014 +0800
+@@ -4,6 +4,8 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
++FILES_PER_UNIFIED_FILE = 16
++
+ os_win = 0
+ os_posix = 0
+ os_macosx = 0
+diff -r 82af3fe9e2eb -r b85e719fffc2 media/webrtc/moz.build
+--- a/media/webrtc/moz.build	Sun Jun 08 14:08:16 2014 +0800
++++ b/media/webrtc/moz.build	Sun Jun 08 16:49:33 2014 +0800
+@@ -7,7 +7,6 @@
+ include('/build/gyp.mozbuild')
+ 
+ webrtc_non_unified_sources = [
+-    'trunk/third_party/libyuv/source/scale_argb.cc',
+     'trunk/webrtc/common_audio/vad/vad_core.c',                                  # Because of name clash in the kInitCheck variable
+     'trunk/webrtc/common_audio/vad/webrtc_vad.c',                                # Because of name clash in the kInitCheck variable
+     'trunk/webrtc/modules/audio_coding/codecs/g722/g722_decode.c',               # Because of name clash in the saturate function

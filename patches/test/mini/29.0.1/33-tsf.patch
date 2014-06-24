@@ -1,0 +1,50 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396549305 -28800
+#      Fri Apr 04 02:21:45 2014 +0800
+# Node ID 671b4365fd3133dd8a0b4002c42bd62249b33003
+# Parent  d460827c6097d7a6a0ce00a3a374866c6c98a56f
+Disable TSF
+
+diff -r d460827c6097 -r 671b4365fd31 configure.in
+--- a/configure.in	Fri Apr 04 02:20:16 2014 +0800
++++ b/configure.in	Fri Apr 04 02:21:45 2014 +0800
+@@ -4044,8 +4044,7 @@
+ 
+ case "$target_os" in
+     mingw*)
+-        NS_ENABLE_TSF=1
+-        AC_DEFINE(NS_ENABLE_TSF)
++        NS_ENABLE_TSF=
+         ;;
+ esac
+ 
+diff -r d460827c6097 -r 671b4365fd31 widget/windows/WinIMEHandler.cpp
+--- a/widget/windows/WinIMEHandler.cpp	Fri Apr 04 02:20:16 2014 +0800
++++ b/widget/windows/WinIMEHandler.cpp	Fri Apr 04 02:21:45 2014 +0800
+@@ -282,7 +282,9 @@
+   const InputContext& oldInputContext = aWindow->GetInputContext();
+ 
+   // Assume that SetInputContext() is called only when aWindow has focus.
++#ifdef NS_ENABLE_TSF
+   sPluginHasFocus = (aInputContext.mIMEState.mEnabled == IMEState::PLUGIN);
++#endif
+ 
+   bool enable = WinUtils::IsIMEEnabled(aInputContext);
+   bool adjustOpenState = (enable &&
+@@ -398,6 +400,7 @@
+ }
+ #endif // #ifdef DEBUG
+ 
++#ifdef NS_ENABLE_TSF
+ // static
+ void
+ IMEHandler::SetInputScopeForIMM32(nsWindow* aWindow,
+@@ -460,6 +463,7 @@
+                     nullptr, nullptr);
+   }
+ }
++#endif
+ 
+ } // namespace widget
+ } // namespace mozilla

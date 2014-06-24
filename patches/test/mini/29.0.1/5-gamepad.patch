@@ -1,0 +1,99 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396524055 -28800
+#      Thu Apr 03 19:20:55 2014 +0800
+# Node ID 36eb68a4b8333246f82c6d8e3881c214e8dbbd07
+# Parent  3125cfebd31b0cdaf965dd00a5be91e4632e5de9
+Disable Gamepad
+
+diff -r 3125cfebd31b -r 36eb68a4b833 dom/moz.build
+--- a/dom/moz.build	Thu Apr 03 19:19:39 2014 +0800
++++ b/dom/moz.build	Thu Apr 03 19:20:55 2014 +0800
+@@ -29,9 +29,11 @@
+     'svg',
+     'smil',
+     'apps',
+-    'gamepad',
+ ]
+ 
++if CONFIG['MOZ_GAMEPAD']:
++    PARALLEL_DIRS += ['gamepad']
++
+ PARALLEL_DIRS += ['interfaces/' + i for i in interfaces]
+ 
+ PARALLEL_DIRS += [
+diff -r 3125cfebd31b -r 36eb68a4b833 hal/Hal.cpp
+--- a/hal/Hal.cpp	Thu Apr 03 19:19:39 2014 +0800
++++ b/hal/Hal.cpp	Thu Apr 03 19:20:55 2014 +0800
+@@ -635,6 +635,7 @@
+   PROXY_IF_SANDBOXED(StartForceQuitWatchdog(aMode, aTimeoutSecs));
+ }
+ 
++#ifdef MOZ_GAMEPAD
+ void StartMonitoringGamepadStatus()
+ {
+   PROXY_IF_SANDBOXED(StartMonitoringGamepadStatus());
+@@ -644,6 +645,7 @@
+ {
+   PROXY_IF_SANDBOXED(StopMonitoringGamepadStatus());
+ }
++#endif
+ 
+ void
+ RegisterWakeLockObserver(WakeLockObserver* aObserver)
+diff -r 3125cfebd31b -r 36eb68a4b833 hal/Hal.h
+--- a/hal/Hal.h	Thu Apr 03 19:19:39 2014 +0800
++++ b/hal/Hal.h	Thu Apr 03 19:20:55 2014 +0800
+@@ -577,6 +577,7 @@
+  */
+ void FactoryReset();
+ 
++#ifdef MOZ_GAMEPAD
+ /**
+  * Start monitoring the status of gamepads attached to the system.
+  */
+@@ -586,6 +587,7 @@
+  * Stop monitoring the status of gamepads attached to the system.
+  */
+ void StopMonitoringGamepadStatus();
++#endif
+ 
+ /**
+  * Start monitoring disk space for low space situations.
+diff -r 3125cfebd31b -r 36eb68a4b833 hal/sandbox/SandboxHal.cpp
+--- a/hal/sandbox/SandboxHal.cpp	Thu Apr 03 19:19:39 2014 +0800
++++ b/hal/sandbox/SandboxHal.cpp	Thu Apr 03 19:20:55 2014 +0800
+@@ -272,12 +272,14 @@
+   Hal()->SendDisableSensorNotifications(aSensor);
+ }
+ 
++#ifdef MOZ_GAMEPAD
+ //TODO: bug 852944 - IPC implementations of these
+ void StartMonitoringGamepadStatus()
+ {}
+ 
+ void StopMonitoringGamepadStatus()
+ {}
++#endif
+ 
+ void
+ EnableWakeLockNotifications()
+diff -r 3125cfebd31b -r 36eb68a4b833 modules/libpref/src/init/all.js
+--- a/modules/libpref/src/init/all.js	Thu Apr 03 19:19:39 2014 +0800
++++ b/modules/libpref/src/init/all.js	Thu Apr 03 19:20:55 2014 +0800
+@@ -105,6 +105,7 @@
+ // Whether nonzero values can be returned from performance.timing.*
+ pref("dom.enable_performance", true);
+ 
++#ifdef MOZ_GAMEPAD
+ // Whether the Gamepad API is enabled
+ pref("dom.gamepad.enabled", true);
+ #ifdef RELEASE_BUILD
+@@ -112,6 +113,7 @@
+ #else
+ pref("dom.gamepad.non_standard_events.enabled", true);
+ #endif
++#endif
+ 
+ // Fastback caching - if this pref is negative, then we calculate the number
+ // of content viewers to cache based on the amount of available memory.

@@ -1,0 +1,38 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1402049578 -28800
+#      Fri Jun 06 18:12:58 2014 +0800
+# Node ID 9209d5ee4dce43312d6ce438fb59ae55c2d86d9e
+# Parent  385769dab5474efd3c48f42794d13c7eeb5b86ba
+Bug 985526 - Use notifyOne instead of notifyAll in StartOffThreadIonCompile
+
+diff -r 385769dab547 -r 9209d5ee4dce js/src/jsworkers.cpp
+--- a/js/src/jsworkers.cpp	Fri Jun 06 18:09:38 2014 +0800
++++ b/js/src/jsworkers.cpp	Fri Jun 06 18:12:58 2014 +0800
+@@ -93,7 +93,7 @@
+     if (!WorkerThreadState().ionWorklist().append(builder))
+         return false;
+ 
+-    WorkerThreadState().notifyAll(GlobalWorkerThreadState::PRODUCER);
++    WorkerThreadState().notifyOne(GlobalWorkerThreadState::PRODUCER);
+     return true;
+ }
+ 
+@@ -367,7 +367,7 @@
+         if (!WorkerThreadState().parseWorklist().append(task.get()))
+             return false;
+ 
+-        WorkerThreadState().notifyAll(GlobalWorkerThreadState::PRODUCER);
++        WorkerThreadState().notifyOne(GlobalWorkerThreadState::PRODUCER);
+     }
+ 
+     task.forget();
+@@ -902,7 +902,7 @@
+     if (!WorkerThreadState().compressionWorklist().append(task))
+         return false;
+ 
+-    WorkerThreadState().notifyAll(GlobalWorkerThreadState::PRODUCER);
++    WorkerThreadState().notifyOne(GlobalWorkerThreadState::PRODUCER);
+     return true;
+ }
+ 
