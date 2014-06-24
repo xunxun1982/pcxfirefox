@@ -1,0 +1,26 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396772395 -28800
+#      Sun Apr 06 16:19:55 2014 +0800
+# Node ID 923378bff4b1848cd1bbb4923d71ab496a0a2353
+# Parent  eed7edbc3e429272e853dabc98835149b15b9ba8
+pcxFirefoxMini
+
+diff -r eed7edbc3e42 -r 923378bff4b1 browser/confvars.sh
+--- a/browser/confvars.sh	Fri Apr 04 23:58:27 2014 +0800
++++ b/browser/confvars.sh	Sun Apr 06 16:19:55 2014 +0800
+@@ -3,8 +3,12 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+-MOZ_APP_BASENAME=Firefox
+-MOZ_APP_VENDOR=Mozilla
++MOZ_APP_NAME=pcxFirefoxMini
++MOZ_APP_BASENAME=pcxFirefoxMini
++MOZ_APP_DISPLAYNAME=pcxFirefoxMini
++MOZ_APP_NAME=firefox
++MOZ_APP_VENDOR=pcx
++
+ MOZ_UPDATER=1
+ MOZ_PHOENIX=1
+ 

@@ -1,0 +1,20 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396538487 -28800
+#      Thu Apr 03 23:21:27 2014 +0800
+# Node ID e058a1710f5479e46eac5fcd97a162138d0eab68
+# Parent  a2c9535443c514d237beacdb92433b865f53b889
+Disable WebM
+
+diff -r a2c9535443c5 -r e058a1710f54 browser/confvars.sh
+--- a/browser/confvars.sh	Thu Apr 03 20:24:20 2014 +0800
++++ b/browser/confvars.sh	Thu Apr 03 23:21:27 2014 +0800
+@@ -64,7 +64,7 @@
+ # Enable activities. These are used for FxOS developers currently.
+ MOZ_ACTIVITIES=1
+ MOZ_JSDOWNLOADS=1
+-MOZ_WEBM_ENCODER=1
++MOZ_WEBM_ENCODER=
+ # Enable exact rooting on desktop.
+ JSGC_USE_EXACT_ROOTING=1
+ 

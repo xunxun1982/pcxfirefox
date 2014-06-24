@@ -1,0 +1,139 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396551050 -28800
+#      Fri Apr 04 02:50:50 2014 +0800
+# Node ID d7499874ceae5c502c6fab1bde96fdd3e7bce10f
+# Parent  a06cd1ecf2449eadb372a3c6010a0cafa7a3705a
+Disable newtab
+
+diff -r a06cd1ecf244 -r d7499874ceae browser/app/profile/firefox.js
+--- a/browser/app/profile/firefox.js	Fri Apr 04 02:48:06 2014 +0800
++++ b/browser/app/profile/firefox.js	Fri Apr 04 02:50:50 2014 +0800
+@@ -1270,12 +1270,12 @@
+ pref("browser.panorama.animate_zoom", true);
+ 
+ // Defines the url to be used for new tabs.
+-pref("browser.newtab.url", "about:newtab");
++pref("browser.newtab.url", "about:blank");
+ // Activates preloading of the new tab url.
+-pref("browser.newtab.preload", true);
++pref("browser.newtab.preload", false);
+ 
+ // Toggles the content of 'about:newtab'. Shows the grid when enabled.
+-pref("browser.newtabpage.enabled", true);
++pref("browser.newtabpage.enabled", false);
+ 
+ // number of rows of newtab grid
+ pref("browser.newtabpage.rows", 3);
+diff -r a06cd1ecf244 -r d7499874ceae browser/base/content/browser.js
+--- a/browser/base/content/browser.js	Fri Apr 04 02:48:06 2014 +0800
++++ b/browser/base/content/browser.js	Fri Apr 04 02:50:50 2014 +0800
+@@ -138,8 +138,10 @@
+   "resource://gre/modules/SafeBrowsing.jsm");
+ #endif
+ 
++#ifdef MOZ_NEWTAB
+ XPCOMUtils.defineLazyModuleGetter(this, "gBrowserNewTabPreloader",
+   "resource:///modules/BrowserNewTabPreloader.jsm", "BrowserNewTabPreloader");
++#endif
+ 
+ XPCOMUtils.defineLazyModuleGetter(this, "gCustomizationTabPreloader",
+   "resource:///modules/CustomizationTabPreloader.jsm", "CustomizationTabPreloader");
+diff -r a06cd1ecf244 -r d7499874ceae browser/base/content/tabbrowser.xml
+--- a/browser/base/content/tabbrowser.xml	Fri Apr 04 02:48:06 2014 +0800
++++ b/browser/base/content/tabbrowser.xml	Fri Apr 04 02:50:50 2014 +0800
+@@ -4346,7 +4346,6 @@
+         canvas.mozOpaque = true;
+         canvas.width = 160 * scale;
+         canvas.height = 90 * scale;
+-        PageThumbs.captureToCanvas(browser.contentWindow, canvas);
+         dt.setDragImage(canvas, -16 * scale, -16 * scale);
+ 
+         // _dragData.offsetX/Y give the coordinates that the mouse should be
+diff -r a06cd1ecf244 -r d7499874ceae browser/base/jar.mn
+--- a/browser/base/jar.mn	Fri Apr 04 02:48:06 2014 +0800
++++ b/browser/base/jar.mn	Fri Apr 04 02:50:50 2014 +0800
+@@ -74,10 +74,12 @@
+ *       content/browser/browser-tabPreviews.xml       (content/browser-tabPreviews.xml)
+ *       content/browser/chatWindow.xul                (content/chatWindow.xul)
+         content/browser/content.js                    (content/content.js)
++#ifdef MOZ_NEWTAB
+         content/browser/newtab/newTab.xul             (content/newtab/newTab.xul)
+ *       content/browser/newtab/newTab.js              (content/newtab/newTab.js)
+         content/browser/newtab/newTab.css             (content/newtab/newTab.css)
+         content/browser/newtab/preloaderContent.js    (content/newtab/preloaderContent.js)
++#endif
+ *       content/browser/pageinfo/pageInfo.xul         (content/pageinfo/pageInfo.xul)
+         content/browser/pageinfo/pageInfo.js          (content/pageinfo/pageInfo.js)
+         content/browser/pageinfo/pageInfo.css         (content/pageinfo/pageInfo.css)
+diff -r a06cd1ecf244 -r d7499874ceae browser/components/about/AboutRedirector.cpp
+--- a/browser/components/about/AboutRedirector.cpp	Fri Apr 04 02:48:06 2014 +0800
++++ b/browser/components/about/AboutRedirector.cpp	Fri Apr 04 02:50:50 2014 +0800
+@@ -79,8 +79,10 @@
+   { "home", "chrome://browser/content/abouthome/aboutHome.xhtml",
+     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+     nsIAboutModule::ALLOW_SCRIPT },
++#ifdef MOZ_NEWTAB
+   { "newtab", "chrome://browser/content/newtab/newTab.xul",
+     nsIAboutModule::ALLOW_SCRIPT },
++#endif
+   { "permissions", "chrome://browser/content/preferences/aboutPermissions.xul",
+     nsIAboutModule::ALLOW_SCRIPT },
+   { "preferences", "chrome://browser/content/preferences/in-content/preferences.xul",
+diff -r a06cd1ecf244 -r d7499874ceae browser/components/nsBrowserGlue.js
+--- a/browser/components/nsBrowserGlue.js	Fri Apr 04 02:48:06 2014 +0800
++++ b/browser/components/nsBrowserGlue.js	Fri Apr 04 02:50:50 2014 +0800
+@@ -49,8 +49,10 @@
+ XPCOMUtils.defineLazyModuleGetter(this, "NewTabUtils",
+                                   "resource://gre/modules/NewTabUtils.jsm");
+ 
++#ifdef MOZ_NEWTAB
+ XPCOMUtils.defineLazyModuleGetter(this, "BrowserNewTabPreloader",
+                                   "resource:///modules/BrowserNewTabPreloader.jsm");
++#endif
+ 
+ XPCOMUtils.defineLazyModuleGetter(this, "CustomizationTabPreloader",
+                                   "resource:///modules/CustomizationTabPreloader.jsm");
+@@ -483,7 +485,9 @@
+     PageThumbs.init();
+ #endif
+     NewTabUtils.init();
++#ifdef MOZ_NEWTAB
+     BrowserNewTabPreloader.init();
++#endif
+     SignInToWebsiteUX.init();
+ #ifdef MOZ_PDFJS
+     PdfJs.init();
+@@ -658,7 +662,9 @@
+    * _onPlacesShutdown() and not here.
+    */
+   _onProfileShutdown: function BG__onProfileShutdown() {
++#ifdef MOZ_NEWTAB
+     BrowserNewTabPreloader.uninit();
++#endif
+     webappsUI.uninit();
+     SignInToWebsiteUX.uninit();
+     webrtcUI.uninit();
+diff -r a06cd1ecf244 -r d7499874ceae browser/modules/moz.build
+--- a/browser/modules/moz.build	Fri Apr 04 02:48:06 2014 +0800
++++ b/browser/modules/moz.build	Fri Apr 04 02:50:50 2014 +0800
+@@ -7,7 +7,6 @@
+ TEST_DIRS += ['test']
+ 
+ EXTRA_JS_MODULES += [
+-    'BrowserNewTabPreloader.jsm',
+     'BrowserUITelemetry.jsm',
+     'ContentClick.jsm',
+     'CustomizationTabPreloader.jsm',
+@@ -22,6 +21,11 @@
+     'webrtcUI.jsm',
+ ]
+ 
++if CONFIG['MOZ_NEWTAB'] :
++    EXTRA_JS_MODULES += [
++        'BrowserNewTabPreloader.jsm',
++    ]
++
+ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
+     EXTRA_JS_MODULES += [
+         'Windows8WindowFrameColor.jsm',

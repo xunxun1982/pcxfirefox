@@ -1,0 +1,23 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1398251689 -28800
+#      Wed Apr 23 19:14:49 2014 +0800
+# Node ID 43ce40fd28ef656364165d0c10161fd81eaad800
+# Parent  583cc62fee984b0673cdf9412118efe9f98682fc
+Bug 978077 - IonMonkey: Set returntype of MMinMax to double if one of its arguments is
+
+diff -r 583cc62fee98 -r 43ce40fd28ef js/src/jit/MCallOptimize.cpp
+--- a/js/src/jit/MCallOptimize.cpp	Wed Apr 23 19:09:58 2014 +0800
++++ b/js/src/jit/MCallOptimize.cpp	Wed Apr 23 19:14:49 2014 +0800
+@@ -964,9 +964,9 @@
+         if (!IsNumberType(argType))
+             return InliningStatus_NotInlined;
+ 
+-        // We would need to inform TI if we happen to return a double.
++        // When one of the arguments is double, do a double MMinMax.
+         if (returnType == MIRType_Int32 && IsFloatingPointType(argType))
+-            return InliningStatus_NotInlined;
++            returnType = MIRType_Double;
+     }
+ 
+     callInfo.setImplicitlyUsedUnchecked();

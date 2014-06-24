@@ -1,0 +1,32 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1402050027 -28800
+#      Fri Jun 06 18:20:27 2014 +0800
+# Node ID ad64815ad6e8cae8a9557fd78c9c6afe499b7b84
+# Parent  5facf8c1f80aeebb8b91c7a216dc2fe4a5201834
+trim mini
+
+diff -r 5facf8c1f80a -r ad64815ad6e8 widget/windows/nsWindow.cpp
+--- a/widget/windows/nsWindow.cpp	Fri Jun 06 18:19:44 2014 +0800
++++ b/widget/windows/nsWindow.cpp	Fri Jun 06 18:20:27 2014 +0800
+@@ -620,7 +620,7 @@
+     // bugs over the years, disable it (sTrimOnMinimize=1) on Vista and up.
+     sTrimOnMinimize =
+       Preferences::GetBool("config.trim_on_minimize",
+-        IsVistaOrLater() ? 1 : 0);
++        false);
+     sSwitchKeyboardLayout =
+       Preferences::GetBool("intl.keyboard.per_window_layout", false);
+   }
+@@ -1644,6 +1644,11 @@
+         // If sTrimOnMinimize is set, we let windows handle minimization normally
+         // using SW_MINIMIZE.
+         mode = sTrimOnMinimize ? SW_MINIMIZE : SW_SHOWMINIMIZED;
++		if (sTrimOnMinimize) {
++			HANDLE hProcess = GetCurrentProcess();
++			if(hProcess != NULL)
++				SetProcessWorkingSetSize(hProcess, -1, -1);
++		}
+         break;
+ 
+       default :

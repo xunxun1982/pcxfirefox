@@ -1,0 +1,28 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396523728 -28800
+#      Thu Apr 03 19:15:28 2014 +0800
+# Node ID 8272b55884f9ac6fa473c4c49fea3d4233a9341d
+# Parent  84f669eeafb06e0f9bced8801bdecbf2e92e3879
+Disable JS shell
+
+diff -r 84f669eeafb0 -r 8272b55884f9 js/src/configure.in
+--- a/js/src/configure.in	Thu Apr 03 19:13:46 2014 +0800
++++ b/js/src/configure.in	Thu Apr 03 19:15:28 2014 +0800
+@@ -3905,7 +3905,7 @@
+ 
+ JS_NATIVE_EDITLINE=
+ EDITLINE_LIBS=
+-JS_DISABLE_SHELL=
++JS_DISABLE_SHELL=1
+ 
+ case "$target" in
+ *-mingw*)
+@@ -3929,6 +3929,7 @@
+   dnl Either way, we want to build with line editing support.
+   AC_DEFINE(EDITLINE)
+ fi
++AC_DEFINE(JS_DISABLE_SHELL)
+ AC_SUBST(JS_NATIVE_EDITLINE)
+ AC_SUBST(JS_DISABLE_SHELL)
+ AC_SUBST(EDITLINE_LIBS)

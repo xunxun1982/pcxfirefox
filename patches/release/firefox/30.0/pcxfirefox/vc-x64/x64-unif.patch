@@ -1,0 +1,21 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1398404753 -28800
+#      Fri Apr 25 13:45:53 2014 +0800
+# Branch GECKO290b1_2014042307_RELBRANCH
+# Node ID 8db15fe18f9b0ed49d0b76b09ce5c97049ebb468
+# Parent  d0e77a776a272d30204941dbfb39f138818d0db4
+vc x64 unified build patch
+
+diff -r d0e77a776a27 -r 8db15fe18f9b parser/htmlparser/src/moz.build
+--- a/parser/htmlparser/src/moz.build	Wed Apr 23 07:06:30 2014 -0400
++++ b/parser/htmlparser/src/moz.build	Fri Apr 25 13:45:53 2014 +0800
+@@ -4,7 +4,7 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+-UNIFIED_SOURCES += [
++SOURCES += [
+     'CNavDTD.cpp',
+     'CParserContext.cpp',
+     'nsElementTable.cpp',

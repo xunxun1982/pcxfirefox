@@ -1,0 +1,231 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396525151 -28800
+#      Thu Apr 03 19:39:11 2014 +0800
+# Node ID 41430b538f8f183ff113cb559513b88859ebbd0b
+# Parent  08e7fb457abca37f8019286f76a649c55b344049
+Disable bluetooth
+
+diff -r 08e7fb457abc -r 41430b538f8f configure.in
+--- a/configure.in	Thu Apr 03 19:36:31 2014 +0800
++++ b/configure.in	Thu Apr 03 19:39:11 2014 +0800
+@@ -7470,6 +7470,15 @@
+ fi
+ AC_SUBST(MOZ_DISKSPACEWATCHER)
+ 
++MOZ_ARG_DISABLE_BOOL(bluetooth,
++[  --disable-bluetooth           Disable bluetooth],
++    MOZ_BLUETOOTH=,
++    MOZ_BLUETOOTH=1)
++if test -n "$MOZ_BLUETOOTH"; then
++    AC_DEFINE(MOZ_BLUETOOTH)
++fi
++AC_SUBST(MOZ_BLUETOOTH)
++
+ dnl ========================================================
+ dnl = Enable Support for AudioChannelManager API
+ dnl ========================================================
+diff -r 08e7fb457abc -r 41430b538f8f dom/base/moz.build
+--- a/dom/base/moz.build	Thu Apr 03 19:36:31 2014 +0800
++++ b/dom/base/moz.build	Thu Apr 03 19:39:11 2014 +0800
+@@ -135,7 +135,6 @@
+ MSVC_ENABLE_PGO = True
+ 
+ LOCAL_INCLUDES += [
+-    '../bluetooth',
+     '../events',
+     '../media',
+     '../network/src',
+@@ -157,6 +156,11 @@
+         '../battery',
+     ]
+ 
++if CONFIG['MOZ_BLUETOOTH'] :
++    LOCAL_INCLUDES += [
++        '../bluetooth',
++    ]
++
+ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
+     LOCAL_INCLUDES += [
+         '../fmradio',
+diff -r 08e7fb457abc -r 41430b538f8f dom/bindings/Bindings.conf
+--- a/dom/bindings/Bindings.conf	Thu Apr 03 19:36:31 2014 +0800
++++ b/dom/bindings/Bindings.conf	Thu Apr 03 19:39:11 2014 +0800
+@@ -160,21 +160,6 @@
+     'workers': True,
+ }],
+ 
+-'BluetoothAdapter': {
+-    'nativeType': 'mozilla::dom::bluetooth::BluetoothAdapter',
+-    'headerFile': 'BluetoothAdapter.h'
+-},
+-
+-'BluetoothDevice': {
+-    'nativeType': 'mozilla::dom::bluetooth::BluetoothDevice',
+-    'headerFile': 'BluetoothDevice.h'
+-},
+-
+-'BluetoothManager': {
+-    'nativeType': 'mozilla::dom::bluetooth::BluetoothManager',
+-    'headerFile': 'BluetoothManager.h'
+-},
+-
+ 'CameraControl': {
+     'nativeType': 'mozilla::nsDOMCameraControl',
+     'headerFile': 'DOMCameraControl.h',
+diff -r 08e7fb457abc -r 41430b538f8f dom/ipc/ContentChild.cpp
+--- a/dom/ipc/ContentChild.cpp	Thu Apr 03 19:36:31 2014 +0800
++++ b/dom/ipc/ContentChild.cpp	Thu Apr 03 19:39:11 2014 +0800
+@@ -104,7 +104,9 @@
+ #include "mozilla/dom/indexedDB/PIndexedDBChild.h"
+ #include "mozilla/dom/mobilemessage/SmsChild.h"
+ #include "mozilla/dom/devicestorage/DeviceStorageRequestChild.h"
++#ifdef MOZ_BLUETOOTH
+ #include "mozilla/dom/bluetooth/PBluetoothChild.h"
++#endif
+ #include "mozilla/dom/PFMRadioChild.h"
+ #include "mozilla/ipc/InputStreamUtils.h"
+ 
+@@ -128,7 +130,9 @@
+ using namespace base;
+ using namespace mozilla;
+ using namespace mozilla::docshell;
++#ifdef MOZ_BLUETOOTH
+ using namespace mozilla::dom::bluetooth;
++#endif
+ using namespace mozilla::dom::devicestorage;
+ using namespace mozilla::dom::ipc;
+ using namespace mozilla::dom::mobilemessage;
+@@ -1007,6 +1011,7 @@
+     return true;
+ }
+ 
++#ifdef MOZ_BLUETOOTH
+ PBluetoothChild*
+ ContentChild::AllocPBluetoothChild()
+ {
+@@ -1027,6 +1032,7 @@
+     MOZ_CRASH("No support for bluetooth on this platform!");
+ #endif
+ }
++#endif
+ 
+ PFMRadioChild*
+ ContentChild::AllocPFMRadioChild()
+diff -r 08e7fb457abc -r 41430b538f8f dom/ipc/ContentChild.h
+--- a/dom/ipc/ContentChild.h	Thu Apr 03 19:36:31 2014 +0800
++++ b/dom/ipc/ContentChild.h	Thu Apr 03 19:39:11 2014 +0800
+@@ -159,8 +159,10 @@
+     virtual PStorageChild* AllocPStorageChild() MOZ_OVERRIDE;
+     virtual bool DeallocPStorageChild(PStorageChild* aActor) MOZ_OVERRIDE;
+ 
++#ifdef MOZ_BLUETOOTH
+     virtual PBluetoothChild* AllocPBluetoothChild() MOZ_OVERRIDE;
+     virtual bool DeallocPBluetoothChild(PBluetoothChild* aActor) MOZ_OVERRIDE;
++#endif
+ 
+     virtual PFMRadioChild* AllocPFMRadioChild() MOZ_OVERRIDE;
+     virtual bool DeallocPFMRadioChild(PFMRadioChild* aActor) MOZ_OVERRIDE;
+diff -r 08e7fb457abc -r 41430b538f8f dom/ipc/ContentParent.cpp
+--- a/dom/ipc/ContentParent.cpp	Thu Apr 03 19:36:31 2014 +0800
++++ b/dom/ipc/ContentParent.cpp	Thu Apr 03 19:39:11 2014 +0800
+@@ -32,7 +32,9 @@
+ #include "mozilla/dom/PMemoryReportRequestParent.h"
+ #include "mozilla/dom/power/PowerManagerService.h"
+ #include "mozilla/dom/DOMStorageIPC.h"
++#ifdef MOZ_BLUETOOTH
+ #include "mozilla/dom/bluetooth/PBluetoothParent.h"
++#endif
+ #include "mozilla/dom/PFMRadioParent.h"
+ #include "mozilla/dom/devicestorage/DeviceStorageRequestParent.h"
+ #include "mozilla/dom/GeolocationBinding.h"
+@@ -144,7 +146,9 @@
+ 
+ using base::ChildPrivileges;
+ using base::KillProcess;
++#ifdef MOZ_BLUETOOTH
+ using namespace mozilla::dom::bluetooth;
++#endif
+ using namespace mozilla::dom::devicestorage;
+ using namespace mozilla::dom::indexedDB;
+ using namespace mozilla::dom::power;
+@@ -2461,6 +2465,7 @@
+     return true;
+ }
+ 
++#ifdef MOZ_BLUETOOTH
+ PBluetoothParent*
+ ContentParent::AllocPBluetoothParent()
+ {
+@@ -2497,6 +2502,7 @@
+     MOZ_CRASH("No support for bluetooth on this platform!");
+ #endif
+ }
++#endif
+ 
+ PFMRadioParent*
+ ContentParent::AllocPFMRadioParent()
+diff -r 08e7fb457abc -r 41430b538f8f dom/ipc/ContentParent.h
+--- a/dom/ipc/ContentParent.h	Thu Apr 03 19:36:31 2014 +0800
++++ b/dom/ipc/ContentParent.h	Thu Apr 03 19:39:11 2014 +0800
+@@ -380,9 +380,11 @@
+ 
+     virtual bool DeallocPStorageParent(PStorageParent* aActor) MOZ_OVERRIDE;
+ 
++#ifdef MOZ_BLUETOOTH
+     virtual PBluetoothParent* AllocPBluetoothParent() MOZ_OVERRIDE;
+     virtual bool DeallocPBluetoothParent(PBluetoothParent* aActor) MOZ_OVERRIDE;
+     virtual bool RecvPBluetoothConstructor(PBluetoothParent* aActor) MOZ_OVERRIDE;
++#endif
+ 
+     virtual PFMRadioParent* AllocPFMRadioParent() MOZ_OVERRIDE;
+     virtual bool DeallocPFMRadioParent(PFMRadioParent* aActor) MOZ_OVERRIDE;
+diff -r 08e7fb457abc -r 41430b538f8f dom/ipc/PContent.ipdl
+--- a/dom/ipc/PContent.ipdl	Thu Apr 03 19:36:31 2014 +0800
++++ b/dom/ipc/PContent.ipdl	Thu Apr 03 19:39:11 2014 +0800
+@@ -6,7 +6,6 @@
+ 
+ include protocol PAsmJSCacheEntry;
+ include protocol PBlob;
+-include protocol PBluetooth;
+ include protocol PBrowser;
+ include protocol PCompositor;
+ include protocol PCrashReporter;
+@@ -195,7 +194,6 @@
+ 
+     manages PAsmJSCacheEntry;
+     manages PBlob;
+-    manages PBluetooth;
+     manages PBrowser;
+     manages PCrashReporter;
+     manages PDeviceStorageRequest;
+@@ -377,8 +375,6 @@
+ 
+     PTelephony();
+ 
+-    PBluetooth();
+-
+     PFMRadio();
+ 
+     PAsmJSCacheEntry(OpenMode openMode, WriteParams write, Principal principal);
+diff -r 08e7fb457abc -r 41430b538f8f dom/moz.build
+--- a/dom/moz.build	Thu Apr 03 19:36:31 2014 +0800
++++ b/dom/moz.build	Thu Apr 03 19:39:11 2014 +0800
+@@ -41,7 +41,6 @@
+     'base',
+     'activities',
+     'bindings',
+-    'bluetooth',
+     'browser-element',
+     'contacts',
+     'phonenumberutils',
+@@ -86,6 +85,9 @@
+ if CONFIG['MOZ_BATTERY']:
+     PARALLEL_DIRS += ['battery']
+ 
++if CONFIG['MOZ_BLUETOOTH']:
++    PARALLEL_DIRS += ['bluetooth']
++
+ if CONFIG['OS_ARCH'] == 'WINNT':
+     PARALLEL_DIRS += ['plugins/ipc/hangui']
+ 

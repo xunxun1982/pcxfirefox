@@ -1,0 +1,101 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396775326 -28800
+#      Sun Apr 06 17:08:46 2014 +0800
+# Node ID 8471b5db2e5dbad427bc69ff6fa870713fc722d3
+# Parent  b6e6ee090501aac9548c25e31f0556a32c096389
+Remove UITelemetry
+
+diff -r b6e6ee090501 -r 8471b5db2e5d browser/components/customizableui/src/CustomizeMode.jsm
+--- a/browser/components/customizableui/src/CustomizeMode.jsm	Sun Apr 06 16:41:16 2014 +0800
++++ b/browser/components/customizableui/src/CustomizeMode.jsm	Sun Apr 06 17:08:46 2014 +0800
+@@ -30,8 +30,6 @@
+ 
+ XPCOMUtils.defineLazyModuleGetter(this, "DragPositionManager",
+                                   "resource:///modules/DragPositionManager.jsm");
+-XPCOMUtils.defineLazyModuleGetter(this, "BrowserUITelemetry",
+-                                  "resource:///modules/BrowserUITelemetry.jsm");
+ 
+ let gModuleName = "[CustomizeMode]";
+ #include logging.js
+@@ -975,7 +973,6 @@
+     this.resetting = true;
+     // Disable the reset button temporarily while resetting:
+     let btn = this.document.getElementById("customization-reset-button");
+-    BrowserUITelemetry.countCustomizationEvent("reset");
+     btn.disabled = true;
+     return Task.spawn(function() {
+       this._removePanelCustomizationPlaceholders();
+@@ -1446,7 +1443,6 @@
+         }
+ 
+         CustomizableUI.removeWidgetFromArea(aDraggedItemId);
+-        BrowserUITelemetry.countCustomizationEvent("remove");
+         // Special widgets are removed outright, we can return here:
+         if (CustomizableUI.isSpecialWidget(aDraggedItemId)) {
+           return;
+@@ -1488,7 +1484,6 @@
+         this.wrapToolbarItem(aTargetNode, place);
+       }
+       this.wrapToolbarItem(draggedItem, place);
+-      BrowserUITelemetry.countCustomizationEvent("move");
+       return;
+     }
+ 
+@@ -1501,7 +1496,6 @@
+       // as a "move". An "add" is only when we move an item from the palette into
+       // an area.
+       let custEventType = aOriginArea.id == kPaletteId ? "add" : "move";
+-      BrowserUITelemetry.countCustomizationEvent(custEventType);
+       this._onDragEnd(aEvent);
+       return;
+     }
+@@ -1544,7 +1538,6 @@
+     // For BrowserUITelemetry, an "add" is only when we move an item from the palette
+     // into an area. Otherwise, it's a move.
+     let custEventType = aOriginArea.id == kPaletteId ? "add" : "move";
+-    BrowserUITelemetry.countCustomizationEvent(custEventType);
+ 
+     // If we dropped onto a skipintoolbarset item, manually correct the drop location:
+     if (aTargetNode != itemForPlacement) {
+diff -r b6e6ee090501 -r 8471b5db2e5d toolkit/components/telemetry/TelemetryPing.jsm
+--- a/toolkit/components/telemetry/TelemetryPing.jsm	Sun Apr 06 16:41:16 2014 +0800
++++ b/toolkit/components/telemetry/TelemetryPing.jsm	Sun Apr 06 17:08:46 2014 +0800
+@@ -71,8 +71,6 @@
+                                   "resource://gre/modules/AddonManager.jsm");
+ XPCOMUtils.defineLazyModuleGetter(this, "TelemetryFile",
+                                   "resource://gre/modules/TelemetryFile.jsm");
+-XPCOMUtils.defineLazyModuleGetter(this, "UITelemetry",
+-                                  "resource://gre/modules/UITelemetry.jsm");
+ 
+ function generateUUID() {
+   let str = Cc["@mozilla.org/uuid-generator;1"].getService(Ci.nsIUUIDGenerator).generateUUID().toString();
+@@ -274,9 +272,6 @@
+     try {
+       ret.addonManager = AddonManagerPrivate.getSimpleMeasures();
+     } catch (ex) {}
+-    try {
+-      ret.UITelemetry = UITelemetry.getSimpleMeasures();
+-    } catch (ex) {}
+ 
+     if (si.process) {
+       for each (let field in Object.keys(si)) {
+@@ -679,7 +674,6 @@
+       lateWrites: Telemetry.lateWrites,
+       addonHistograms: this.getAddonHistograms(),
+       addonDetails: AddonManagerPrivate.getTelemetryDetails(),
+-      UIMeasurements: UITelemetry.getUIMeasurements(),
+       info: info
+     };
+ 
+diff -r b6e6ee090501 -r 8471b5db2e5d toolkit/components/telemetry/moz.build
+--- a/toolkit/components/telemetry/moz.build	Sun Apr 06 16:41:16 2014 +0800
++++ b/toolkit/components/telemetry/moz.build	Sun Apr 06 17:08:46 2014 +0800
+@@ -35,7 +35,6 @@
+ 
+ EXTRA_PP_JS_MODULES += [
+     'TelemetryPing.jsm',
+-    'UITelemetry.jsm',
+ ]
+ 
+ FAIL_ON_WARNINGS = True

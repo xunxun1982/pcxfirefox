@@ -1,0 +1,50 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1398250836 -28800
+#      Wed Apr 23 19:00:36 2014 +0800
+# Node ID 1a91010b327901f622400c2ffadfab8d8e954721
+# Parent  aa70a6ce178a6839cd9e55761c4ac31d43ee7bd9
+Bug 909589 - image.animation_mode=once does not work sometimes
+
+diff -r aa70a6ce178a -r 1a91010b3279 image/src/FrameAnimator.cpp
+--- a/image/src/FrameAnimator.cpp	Mon Apr 21 19:47:37 2014 -0400
++++ b/image/src/FrameAnimator.cpp	Wed Apr 23 19:00:36 2014 +0800
+@@ -11,11 +11,12 @@
+ using namespace mozilla::image;
+ using namespace mozilla;
+ 
+-FrameAnimator::FrameAnimator(FrameBlender& aFrameBlender)
++FrameAnimator::FrameAnimator(FrameBlender& aFrameBlender,
++                             uint16_t aAnimationMode)
+   : mCurrentAnimationFrameIndex(0)
+   , mLoopCounter(-1)
+   , mFrameBlender(aFrameBlender)
+-  , mAnimationMode(imgIContainer::kNormalAnimMode)
++  , mAnimationMode(aAnimationMode)
+   , mDoneDecoding(false)
+ {
+ }
+diff -r aa70a6ce178a -r 1a91010b3279 image/src/FrameAnimator.h
+--- a/image/src/FrameAnimator.h	Mon Apr 21 19:47:37 2014 -0400
++++ b/image/src/FrameAnimator.h	Wed Apr 23 19:00:36 2014 +0800
+@@ -18,7 +18,7 @@
+ class FrameAnimator
+ {
+ public:
+-  FrameAnimator(FrameBlender& aBlender);
++  FrameAnimator(FrameBlender& aBlender, uint16_t aAnimationMode);
+ 
+   /**
+    * Return value from RequestRefresh. Tells callers what happened in that call
+diff -r aa70a6ce178a -r 1a91010b3279 image/src/RasterImage.cpp
+--- a/image/src/RasterImage.cpp	Mon Apr 21 19:47:37 2014 -0400
++++ b/image/src/RasterImage.cpp	Wed Apr 23 19:00:36 2014 +0800
+@@ -1068,7 +1068,7 @@
+   if (!mAnim) {
+ 
+     // Create the animation context
+-    mAnim = new FrameAnimator(mFrameBlender);
++    mAnim = new FrameAnimator(mFrameBlender, mAnimationMode);
+ 
+     // We don't support discarding animated images (See bug 414259).
+     // Lock the image and throw away the key.
