@@ -1,0 +1,30 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1402048870 -28800
+#      Fri Jun 06 18:01:10 2014 +0800
+# Node ID 74b942ddcca55a1da8a7238b60105aadca19b23f
+# Parent  a2f7c9257a4144d7af9f5b20b3e3a3b18b15f5c7
+autopgo
+
+diff -r a2f7c9257a41 -r 74b942ddcca5 Makefile.in
+--- a/Makefile.in	Fri Jun 06 17:59:49 2014 +0800
++++ b/Makefile.in	Fri Jun 06 18:01:10 2014 +0800
+@@ -299,3 +299,6 @@
+ js/src/export config/export: build/clang-plugin/export
+ endif
+ endif
++
++pgo-profile-run:
++	$(PYTHON) $(topsrcdir)/build/pgo/profileserver.py $(EXTRA_TEST_ARGS)
+diff -r a2f7c9257a41 -r 74b942ddcca5 build/pgo/profileserver.py
+--- a/build/pgo/profileserver.py	Fri Jun 06 17:59:49 2014 +0800
++++ b/build/pgo/profileserver.py	Fri Jun 06 18:01:10 2014 +0800
+@@ -68,7 +68,7 @@
+       env["MOZ_JAR_LOG_FILE"] = os.path.abspath(jarlog)
+       print "jarlog: %s" % env["MOZ_JAR_LOG_FILE"]
+ 
+-    cmdargs = ["http://localhost:%d/index.html" % PORT]
++    cmdargs = ["http://127.0.0.1:%d/index.html" % PORT]
+     runner = FirefoxRunner(profile=profile,
+                            binary=build.get_binary_path(where="staged-package"),
+                            cmdargs=cmdargs,

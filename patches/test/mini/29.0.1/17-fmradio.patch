@@ -1,0 +1,203 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396525507 -28800
+#      Thu Apr 03 19:45:07 2014 +0800
+# Node ID 36eb7a82d0c3edc01768a2f8e62139c4fa766495
+# Parent  1c40e3300b9b62819693565f8b2264ef6e690fa3
+Disable fmradio
+
+diff -r 1c40e3300b9b -r 36eb7a82d0c3 configure.in
+--- a/configure.in	Thu Apr 03 19:42:24 2014 +0800
++++ b/configure.in	Thu Apr 03 19:45:07 2014 +0800
+@@ -7488,6 +7488,15 @@
+ fi
+ AC_SUBST(MOZ_CONTACTS)
+ 
++MOZ_ARG_DISABLE_BOOL(fmradio,
++[  --disable-fmradio           Disable fmradio],
++    MOZ_FMRADIO=,
++    MOZ_FMRADIO=1)
++if test -n "$MOZ_FMRADIO"; then
++    AC_DEFINE(MOZ_FMRADIO)
++fi
++AC_SUBST(MOZ_FMRADIO)
++
+ dnl ========================================================
+ dnl = Enable Support for AudioChannelManager API
+ dnl ========================================================
+diff -r 1c40e3300b9b -r 36eb7a82d0c3 dom/ipc/ContentChild.cpp
+--- a/dom/ipc/ContentChild.cpp	Thu Apr 03 19:42:24 2014 +0800
++++ b/dom/ipc/ContentChild.cpp	Thu Apr 03 19:45:07 2014 +0800
+@@ -107,7 +107,9 @@
+ #ifdef MOZ_BLUETOOTH
+ #include "mozilla/dom/bluetooth/PBluetoothChild.h"
+ #endif
++#ifdef MOZ_FMRADIO
+ #include "mozilla/dom/PFMRadioChild.h"
++#endif
+ #include "mozilla/ipc/InputStreamUtils.h"
+ 
+ #ifdef MOZ_WEBSPEECH
+@@ -1034,6 +1036,7 @@
+ }
+ #endif
+ 
++#ifdef MOZ_FMRADIO
+ PFMRadioChild*
+ ContentChild::AllocPFMRadioChild()
+ {
+@@ -1057,6 +1060,7 @@
+     return false;
+ #endif
+ }
++#endif
+ 
+ PSpeechSynthesisChild*
+ ContentChild::AllocPSpeechSynthesisChild()
+diff -r 1c40e3300b9b -r 36eb7a82d0c3 dom/ipc/ContentChild.h
+--- a/dom/ipc/ContentChild.h	Thu Apr 03 19:42:24 2014 +0800
++++ b/dom/ipc/ContentChild.h	Thu Apr 03 19:45:07 2014 +0800
+@@ -164,8 +164,10 @@
+     virtual bool DeallocPBluetoothChild(PBluetoothChild* aActor) MOZ_OVERRIDE;
+ #endif
+ 
++#ifdef MOZ_FMRADIO
+     virtual PFMRadioChild* AllocPFMRadioChild() MOZ_OVERRIDE;
+     virtual bool DeallocPFMRadioChild(PFMRadioChild* aActor) MOZ_OVERRIDE;
++#endif
+ 
+     virtual PAsmJSCacheEntryChild* AllocPAsmJSCacheEntryChild(
+                                  const asmjscache::OpenMode& aOpenMode,
+diff -r 1c40e3300b9b -r 36eb7a82d0c3 dom/ipc/ContentParent.cpp
+--- a/dom/ipc/ContentParent.cpp	Thu Apr 03 19:42:24 2014 +0800
++++ b/dom/ipc/ContentParent.cpp	Thu Apr 03 19:45:07 2014 +0800
+@@ -35,7 +35,9 @@
+ #ifdef MOZ_BLUETOOTH
+ #include "mozilla/dom/bluetooth/PBluetoothParent.h"
+ #endif
++#ifdef MOZ_FMRADIO
+ #include "mozilla/dom/PFMRadioParent.h"
++#endif
+ #include "mozilla/dom/devicestorage/DeviceStorageRequestParent.h"
+ #include "mozilla/dom/GeolocationBinding.h"
+ #include "mozilla/dom/telephony/TelephonyParent.h"
+@@ -2504,6 +2506,7 @@
+ }
+ #endif
+ 
++#ifdef MOZ_FMRADIO
+ PFMRadioParent*
+ ContentParent::AllocPFMRadioParent()
+ {
+@@ -2529,6 +2532,7 @@
+     return false;
+ #endif
+ }
++#endif
+ 
+ asmjscache::PAsmJSCacheEntryParent*
+ ContentParent::AllocPAsmJSCacheEntryParent(
+diff -r 1c40e3300b9b -r 36eb7a82d0c3 dom/ipc/ContentParent.h
+--- a/dom/ipc/ContentParent.h	Thu Apr 03 19:42:24 2014 +0800
++++ b/dom/ipc/ContentParent.h	Thu Apr 03 19:45:07 2014 +0800
+@@ -386,8 +386,10 @@
+     virtual bool RecvPBluetoothConstructor(PBluetoothParent* aActor) MOZ_OVERRIDE;
+ #endif
+ 
++#ifdef MOZ_FMRADIO
+     virtual PFMRadioParent* AllocPFMRadioParent() MOZ_OVERRIDE;
+     virtual bool DeallocPFMRadioParent(PFMRadioParent* aActor) MOZ_OVERRIDE;
++#endif
+ 
+     virtual PAsmJSCacheEntryParent* AllocPAsmJSCacheEntryParent(
+                                  const asmjscache::OpenMode& aOpenMode,
+diff -r 1c40e3300b9b -r 36eb7a82d0c3 dom/ipc/PContent.ipdl
+--- a/dom/ipc/PContent.ipdl	Thu Apr 03 19:42:24 2014 +0800
++++ b/dom/ipc/PContent.ipdl	Thu Apr 03 19:45:07 2014 +0800
+@@ -11,7 +11,6 @@
+ include protocol PCrashReporter;
+ include protocol PExternalHelperApp;
+ include protocol PDeviceStorageRequest;
+-include protocol PFMRadio;
+ include protocol PHal;
+ include protocol PImageBridge;
+ include protocol PIndexedDB;
+@@ -136,40 +135,6 @@
+   DeviceStorageFormatParams;
+ };
+ 
+-struct FMRadioRequestEnableParams
+-{
+-  double frequency;
+-};
+-
+-struct FMRadioRequestDisableParams
+-{
+-
+-};
+-
+-struct FMRadioRequestSetFrequencyParams
+-{
+-  double frequency;
+-};
+-
+-struct FMRadioRequestSeekParams
+-{
+-  bool upward;
+-};
+-
+-struct FMRadioRequestCancelSeekParams
+-{
+-
+-};
+-
+-union FMRadioRequestParams
+-{
+-  FMRadioRequestEnableParams;
+-  FMRadioRequestDisableParams;
+-  FMRadioRequestSetFrequencyParams;
+-  FMRadioRequestSeekParams;
+-  FMRadioRequestCancelSeekParams;
+-};
+-
+ union PrefValue {
+   nsCString;
+   int32_t;
+@@ -198,7 +163,6 @@
+     manages PCrashReporter;
+     manages PDeviceStorageRequest;
+     manages PExternalHelperApp;
+-    manages PFMRadio;
+     manages PHal;
+     manages PIndexedDB;
+     manages PMemoryReportRequest;
+@@ -375,8 +339,6 @@
+ 
+     PTelephony();
+ 
+-    PFMRadio();
+-
+     PAsmJSCacheEntry(OpenMode openMode, WriteParams write, Principal principal);
+ 
+     // Services remoting
+diff -r 1c40e3300b9b -r 36eb7a82d0c3 dom/moz.build
+--- a/dom/moz.build	Thu Apr 03 19:42:24 2014 +0800
++++ b/dom/moz.build	Thu Apr 03 19:45:07 2014 +0800
+@@ -49,7 +49,6 @@
+     'encoding',
+     'events',
+     'file',
+-    'fmradio',
+     'asmjscache',
+     'media',
+     'messages',
+@@ -90,6 +89,9 @@
+ if CONFIG['MOZ_CONTACTS']:
+     PARALLEL_DIRS += ['contacts']
+ 
++if CONFIG['MOZ_FMRADIO']:
++    PARALLEL_DIRS += ['fmradio']
++
+ if CONFIG['OS_ARCH'] == 'WINNT':
+     PARALLEL_DIRS += ['plugins/ipc/hangui']
+ 

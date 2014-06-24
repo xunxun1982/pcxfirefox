@@ -1,0 +1,30 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396545165 -28800
+#      Fri Apr 04 01:12:45 2014 +0800
+# Node ID 0bd6fda11f26cae182de7b2cc326875724c8ebfc
+# Parent  e058a1710f5479e46eac5fcd97a162138d0eab68
+Bug 978776 - Stop exporting moz2d symbols from xul.dll
+
+diff -r e058a1710f54 -r 0bd6fda11f26 gfx/2d/moz.build
+--- a/gfx/2d/moz.build	Thu Apr 03 23:21:27 2014 +0800
++++ b/gfx/2d/moz.build	Fri Apr 04 01:12:45 2014 +0800
+@@ -127,7 +127,7 @@
+ 
+ FINAL_LIBRARY = 'gkmedias'
+ 
+-for var in ('MOZ_GFX', 'USE_CAIRO', 'GFX2D_INTERNAL', 'MOZ2D_HAS_MOZ_CAIRO'):
++for var in ('USE_CAIRO', 'MOZ2D_HAS_MOZ_CAIRO'):
+     DEFINES[var] = True
+ 
+ if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('android', 'gtk2', 'gtk3', 'gonk', 'qt'):
+diff -r e058a1710f54 -r 0bd6fda11f26 gfx/ots/src/moz.build
+--- a/gfx/ots/src/moz.build	Thu Apr 03 23:21:27 2014 +0800
++++ b/gfx/ots/src/moz.build	Fri Apr 04 01:12:45 2014 +0800
+@@ -57,6 +57,3 @@
+ DEFINES['PACKAGE_BUGREPORT'] = '"http://bugzilla.mozilla.org/"'
+ DEFINES['NOMINMAX'] = True
+ 
+-if CONFIG['OS_TARGET'] == 'WINNT':
+-    DEFINES['OTS_DLL'] = True
+-    DEFINES['OTS_DLL_EXPORTS'] = True

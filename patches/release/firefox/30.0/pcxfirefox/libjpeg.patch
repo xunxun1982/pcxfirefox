@@ -1,0 +1,598 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1402049325 -28800
+#      Fri Jun 06 18:08:45 2014 +0800
+# Node ID 8ee06aa66da312c1c54e9d75cbcaf3847f18fcc7
+# Parent  bfd5fb364dcd51f673fabf6d5e5db2486d6c8d62
+libjpeg
+
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/MOZCHANGES
+--- a/media/libjpeg/MOZCHANGES	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/MOZCHANGES	Fri Jun 06 18:08:45 2014 +0800
+@@ -58,6 +58,14 @@
+ 
+     $ hg addremove
+ 
++== March 24, 2014 (libjpeg-turbo v1.3.1 r1205 2014-03-22) ==
++
++* Updated to v1.3.1 release.
++
++== November 25, 2013 ==
++
++* Fix bug 891693.
++
+ == June 4, 2013 (libjpeg-turbo v1.3.0 r988 2013-05-25) ==
+ 
+ * Updated to v1.3.0 release.
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/config.h
+--- a/media/libjpeg/config.h	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/config.h	Fri Jun 06 18:08:45 2014 +0800
+@@ -1,5 +1,5 @@
+-#define VERSION "1.3.0"
+-#define BUILD "2013-05-25"
++#define VERSION "1.3.1"
++#define BUILD "2014-03-22"
+ #define PACKAGE_NAME "libjpeg-turbo"
+ 
+ /* Need to use Mozilla-specific function inlining. */
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jccolext.c
+--- a/media/libjpeg/jccolext.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jccolext.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -3,7 +3,7 @@
+  *
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1991-1996, Thomas G. Lane.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright (C) 2009-2012, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+  *
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jccolor.c
+--- a/media/libjpeg/jccolor.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jccolor.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -3,7 +3,7 @@
+  *
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1991-1996, Thomas G. Lane.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright 2009 Pierre Ossman <ossman@cendio.se> for Cendio AB
+  * Copyright (C) 2009-2012, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jcdctmgr.c
+--- a/media/libjpeg/jcdctmgr.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jcdctmgr.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -3,7 +3,7 @@
+  *
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1994-1996, Thomas G. Lane.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright (C) 1999-2006, MIYASAKA Masaru.
+  * Copyright 2009 Pierre Ossman <ossman@cendio.se> for Cendio AB
+  * Copyright (C) 2011 D. R. Commander
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jchuff.c
+--- a/media/libjpeg/jchuff.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jchuff.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -3,7 +3,7 @@
+  *
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1991-1997, Thomas G. Lane.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright (C) 2009-2011, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+  *
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jcmarker.c
+--- a/media/libjpeg/jcmarker.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jcmarker.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -3,7 +3,8 @@
+  *
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1991-1998, Thomas G. Lane.
+- * Modifications:
++ * Modified 2003-2010 by Guido Vollbeding.
++ * libjpeg-turbo Modifications:
+  * Copyright (C) 2010, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+  *
+@@ -21,24 +22,24 @@
+   M_SOF1  = 0xc1,
+   M_SOF2  = 0xc2,
+   M_SOF3  = 0xc3,
+-  
++
+   M_SOF5  = 0xc5,
+   M_SOF6  = 0xc6,
+   M_SOF7  = 0xc7,
+-  
++
+   M_JPG   = 0xc8,
+   M_SOF9  = 0xc9,
+   M_SOF10 = 0xca,
+   M_SOF11 = 0xcb,
+-  
++
+   M_SOF13 = 0xcd,
+   M_SOF14 = 0xce,
+   M_SOF15 = 0xcf,
+-  
++
+   M_DHT   = 0xc4,
+-  
++
+   M_DAC   = 0xcc,
+-  
++
+   M_RST0  = 0xd0,
+   M_RST1  = 0xd1,
+   M_RST2  = 0xd2,
+@@ -47,7 +48,7 @@
+   M_RST5  = 0xd5,
+   M_RST6  = 0xd6,
+   M_RST7  = 0xd7,
+-  
++
+   M_SOI   = 0xd8,
+   M_EOI   = 0xd9,
+   M_SOS   = 0xda,
+@@ -56,7 +57,7 @@
+   M_DRI   = 0xdd,
+   M_DHP   = 0xde,
+   M_EXP   = 0xdf,
+-  
++
+   M_APP0  = 0xe0,
+   M_APP1  = 0xe1,
+   M_APP2  = 0xe2,
+@@ -73,13 +74,13 @@
+   M_APP13 = 0xed,
+   M_APP14 = 0xee,
+   M_APP15 = 0xef,
+-  
++
+   M_JPG0  = 0xf0,
+   M_JPG13 = 0xfd,
+   M_COM   = 0xfe,
+-  
++
+   M_TEM   = 0x01,
+-  
++
+   M_ERROR = 0x100
+ } JPEG_MARKER;
+ 
+@@ -232,32 +233,38 @@
+   char ac_in_use[NUM_ARITH_TBLS];
+   int length, i;
+   jpeg_component_info *compptr;
+-  
++
+   for (i = 0; i < NUM_ARITH_TBLS; i++)
+     dc_in_use[i] = ac_in_use[i] = 0;
+-  
++
+   for (i = 0; i < cinfo->comps_in_scan; i++) {
+     compptr = cinfo->cur_comp_info[i];
+-    dc_in_use[compptr->dc_tbl_no] = 1;
+-    ac_in_use[compptr->ac_tbl_no] = 1;
++    /* DC needs no table for refinement scan */
++    if (cinfo->Ss == 0 && cinfo->Ah == 0)
++      dc_in_use[compptr->dc_tbl_no] = 1;
++    /* AC needs no table when not present */
++    if (cinfo->Se)
++      ac_in_use[compptr->ac_tbl_no] = 1;
+   }
+-  
++
+   length = 0;
+   for (i = 0; i < NUM_ARITH_TBLS; i++)
+     length += dc_in_use[i] + ac_in_use[i];
+-  
+-  emit_marker(cinfo, M_DAC);
+-  
+-  emit_2bytes(cinfo, length*2 + 2);
+-  
+-  for (i = 0; i < NUM_ARITH_TBLS; i++) {
+-    if (dc_in_use[i]) {
+-      emit_byte(cinfo, i);
+-      emit_byte(cinfo, cinfo->arith_dc_L[i] + (cinfo->arith_dc_U[i]<<4));
+-    }
+-    if (ac_in_use[i]) {
+-      emit_byte(cinfo, i + 0x10);
+-      emit_byte(cinfo, cinfo->arith_ac_K[i]);
++
++  if (length) {
++    emit_marker(cinfo, M_DAC);
++
++    emit_2bytes(cinfo, length*2 + 2);
++
++    for (i = 0; i < NUM_ARITH_TBLS; i++) {
++      if (dc_in_use[i]) {
++	emit_byte(cinfo, i);
++	emit_byte(cinfo, cinfo->arith_dc_L[i] + (cinfo->arith_dc_U[i]<<4));
++      }
++      if (ac_in_use[i]) {
++	emit_byte(cinfo, i + 0x10);
++	emit_byte(cinfo, cinfo->arith_ac_K[i]);
++      }
+     }
+   }
+ #endif /* C_ARITH_CODING_SUPPORTED */
+@@ -323,22 +330,16 @@
+   for (i = 0; i < cinfo->comps_in_scan; i++) {
+     compptr = cinfo->cur_comp_info[i];
+     emit_byte(cinfo, compptr->component_id);
+-    td = compptr->dc_tbl_no;
+-    ta = compptr->ac_tbl_no;
+-    if (cinfo->progressive_mode) {
+-      /* Progressive mode: only DC or only AC tables are used in one scan;
+-       * furthermore, Huffman coding of DC refinement uses no table at all.
+-       * We emit 0 for unused field(s); this is recommended by the P&M text
+-       * but does not seem to be specified in the standard.
+-       */
+-      if (cinfo->Ss == 0) {
+-	ta = 0;			/* DC scan */
+-	if (cinfo->Ah != 0 && !cinfo->arith_code)
+-	  td = 0;		/* no DC table either */
+-      } else {
+-	td = 0;			/* AC scan */
+-      }
+-    }
++
++    /* We emit 0 for unused field(s); this is recommended by the P&M text
++     * but does not seem to be specified in the standard.
++     */
++
++    /* DC needs no table for refinement scan */
++    td = cinfo->Ss == 0 && cinfo->Ah == 0 ? compptr->dc_tbl_no : 0;
++    /* AC needs no table when not present */
++    ta = cinfo->Se ? compptr->ac_tbl_no : 0;
++
+     emit_byte(cinfo, (td << 4) + ta);
+   }
+ 
+@@ -532,7 +533,10 @@
+ 
+   /* Emit the proper SOF marker */
+   if (cinfo->arith_code) {
+-    emit_sof(cinfo, M_SOF9);	/* SOF code for arithmetic coding */
++    if (cinfo->progressive_mode)
++      emit_sof(cinfo, M_SOF10); /* SOF code for progressive arithmetic */
++    else
++      emit_sof(cinfo, M_SOF9);  /* SOF code for sequential arithmetic */
+   } else {
+     if (cinfo->progressive_mode)
+       emit_sof(cinfo, M_SOF2);	/* SOF code for progressive Huffman */
+@@ -569,19 +573,12 @@
+      */
+     for (i = 0; i < cinfo->comps_in_scan; i++) {
+       compptr = cinfo->cur_comp_info[i];
+-      if (cinfo->progressive_mode) {
+-	/* Progressive mode: only DC or only AC tables are used in one scan */
+-	if (cinfo->Ss == 0) {
+-	  if (cinfo->Ah == 0)	/* DC needs no table for refinement scan */
+-	    emit_dht(cinfo, compptr->dc_tbl_no, FALSE);
+-	} else {
+-	  emit_dht(cinfo, compptr->ac_tbl_no, TRUE);
+-	}
+-      } else {
+-	/* Sequential mode: need both DC and AC tables */
++      /* DC needs no table for refinement scan */
++      if (cinfo->Ss == 0 && cinfo->Ah == 0)
+ 	emit_dht(cinfo, compptr->dc_tbl_no, FALSE);
++      /* AC needs no table when not present */
++      if (cinfo->Se)
+ 	emit_dht(cinfo, compptr->ac_tbl_no, TRUE);
+-      }
+     }
+   }
+ 
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jcmaster.c
+--- a/media/libjpeg/jcmaster.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jcmaster.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -4,7 +4,7 @@
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1991-1997, Thomas G. Lane.
+  * Modified 2003-2010 by Guido Vollbeding.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright (C) 2010, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+  *
+@@ -602,7 +602,7 @@
+     cinfo->num_scans = 1;
+   }
+ 
+-  if (cinfo->progressive_mode)	/*  TEMPORARY HACK ??? */
++  if (cinfo->progressive_mode && !cinfo->arith_code)	/*  TEMPORARY HACK ??? */
+     cinfo->optimize_coding = TRUE; /* assume default tables no good for progressive mode */
+ 
+   /* Initialize my private state */
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jconfig.h
+--- a/media/libjpeg/jconfig.h	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jconfig.h	Fri Jun 06 18:08:45 2014 +0800
+@@ -5,7 +5,7 @@
+ #define JPEG_LIB_VERSION 62
+ 
+ /* libjpeg-turbo version */
+-#define LIBJPEG_TURBO_VERSION 1.3.0
++#define LIBJPEG_TURBO_VERSION 1.3.1
+ 
+ /* Support in-memory source/destination managers */
+ /* #undef MEM_SRCDST_SUPPORTED */
+@@ -40,6 +40,9 @@
+ /* Broken compiler shifts signed values as an unsigned shift. */
+ /* #undef RIGHT_SHIFT_IS_UNSIGNED */
+ 
++/* The size of a `long', as computed by sizeof. */
++#undef SIZEOF_LONG
++
+ /* Use accelerated SIMD routines. */
+ #define WITH_SIMD 1
+ 
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jcparam.c
+--- a/media/libjpeg/jcparam.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jcparam.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -4,7 +4,7 @@
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1991-1998, Thomas G. Lane.
+  * Modified 2003-2008 by Guido Vollbeding.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright (C) 2009-2011, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+  *
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jdapistd.c
+--- a/media/libjpeg/jdapistd.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jdapistd.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -3,7 +3,7 @@
+  *
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1994-1996, Thomas G. Lane.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright (C) 2010, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+  *
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jdatadst.c
+--- a/media/libjpeg/jdatadst.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jdatadst.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -4,7 +4,7 @@
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1994-1996, Thomas G. Lane.
+  * Modified 2009-2012 by Guido Vollbeding.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright (C) 2013, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+  *
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jdatasrc.c
+--- a/media/libjpeg/jdatasrc.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jdatasrc.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -4,7 +4,7 @@
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1994-1996, Thomas G. Lane.
+  * Modified 2009-2011 by Guido Vollbeding.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright (C) 2013, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+  *
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jdcoefct.c
+--- a/media/libjpeg/jdcoefct.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jdcoefct.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -3,7 +3,7 @@
+  *
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1994-1997, Thomas G. Lane.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright (C) 2010, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+  *
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jdcolext.c
+--- a/media/libjpeg/jdcolext.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jdcolext.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -3,7 +3,7 @@
+  *
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1991-1997, Thomas G. Lane.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright (C) 2009, 2011, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+  *
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jdcolor.c
+--- a/media/libjpeg/jdcolor.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jdcolor.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -4,7 +4,7 @@
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1991-1997, Thomas G. Lane.
+  * Modified 2011 by Guido Vollbeding.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright 2009 Pierre Ossman <ossman@cendio.se> for Cendio AB
+  * Copyright (C) 2009, 2011-2012, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jddctmgr.c
+--- a/media/libjpeg/jddctmgr.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jddctmgr.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -4,7 +4,7 @@
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1994-1996, Thomas G. Lane.
+  * Modified 2002-2010 by Guido Vollbeding.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright 2009 Pierre Ossman <ossman@cendio.se> for Cendio AB
+  * Copyright (C) 2010, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jdhuff.c
+--- a/media/libjpeg/jdhuff.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jdhuff.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -3,7 +3,7 @@
+  *
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1991-1997, Thomas G. Lane.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright (C) 2009-2011, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+  *
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jdinput.c
+--- a/media/libjpeg/jdinput.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jdinput.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -3,7 +3,7 @@
+  *
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1991-1997, Thomas G. Lane.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright (C) 2010, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+  *
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jdmainct.c
+--- a/media/libjpeg/jdmainct.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jdmainct.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -3,7 +3,7 @@
+  *
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1994-1996, Thomas G. Lane.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright (C) 2010, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+  *
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jdmarker.c
+--- a/media/libjpeg/jdmarker.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jdmarker.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -3,7 +3,7 @@
+  *
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1991-1998, Thomas G. Lane.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright (C) 2012, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+  *
+@@ -478,14 +478,15 @@
+ 
+     if (index & 0x10) {		/* AC table definition */
+       index -= 0x10;
++      if (index < 0 || index >= NUM_HUFF_TBLS)
++        ERREXIT1(cinfo, JERR_DHT_INDEX, index);
+       htblptr = &cinfo->ac_huff_tbl_ptrs[index];
+     } else {			/* DC table definition */
++      if (index < 0 || index >= NUM_HUFF_TBLS)
++        ERREXIT1(cinfo, JERR_DHT_INDEX, index);
+       htblptr = &cinfo->dc_huff_tbl_ptrs[index];
+     }
+ 
+-    if (index < 0 || index >= NUM_HUFF_TBLS)
+-      ERREXIT1(cinfo, JERR_DHT_INDEX, index);
+-
+     if (*htblptr == NULL)
+       *htblptr = jpeg_alloc_huff_table((j_common_ptr) cinfo);
+   
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jdmaster.c
+--- a/media/libjpeg/jdmaster.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jdmaster.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -4,7 +4,7 @@
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1991-1997, Thomas G. Lane.
+  * Modified 2002-2009 by Guido Vollbeding.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright (C) 2009-2011, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+  *
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jdmerge.c
+--- a/media/libjpeg/jdmerge.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jdmerge.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -4,7 +4,7 @@
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1994-1996, Thomas G. Lane.
+  * Copyright 2009 Pierre Ossman <ossman@cendio.se> for Cendio AB
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright (C) 2009, 2011, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+  *
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jdmrgext.c
+--- a/media/libjpeg/jdmrgext.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jdmrgext.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -3,7 +3,7 @@
+  *
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1994-1996, Thomas G. Lane.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright (C) 2011, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+  *
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jdphuff.c
+--- a/media/libjpeg/jdphuff.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jdphuff.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -198,6 +198,7 @@
+  * On some machines, a shift and add will be faster than a table lookup.
+  */
+ 
++#define AVOID_TABLES
+ #ifdef AVOID_TABLES
+ 
+ #define HUFF_EXTEND(x,s)  ((x) < (1<<((s)-1)) ? (x) + (((-1)<<(s)) + 1) : (x))
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jdsample.c
+--- a/media/libjpeg/jdsample.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jdsample.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -3,7 +3,7 @@
+  *
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1991-1996, Thomas G. Lane.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright 2009 Pierre Ossman <ossman@cendio.se> for Cendio AB
+  * Copyright (C) 2010, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jquant1.c
+--- a/media/libjpeg/jquant1.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jquant1.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -3,7 +3,7 @@
+  *
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1991-1996, Thomas G. Lane.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright (C) 2009, D. R. Commander
+  * For conditions of distribution and use, see the accompanying README file.
+  *
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jquant2.c
+--- a/media/libjpeg/jquant2.c	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jquant2.c	Fri Jun 06 18:08:45 2014 +0800
+@@ -3,7 +3,7 @@
+  *
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1991-1996, Thomas G. Lane.
+- * Modifications:
++ * libjpeg-turbo Modifications:
+  * Copyright (C) 2009, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+  *
+diff -r bfd5fb364dcd -r 8ee06aa66da3 media/libjpeg/jversion.h
+--- a/media/libjpeg/jversion.h	Fri Jun 06 18:08:05 2014 +0800
++++ b/media/libjpeg/jversion.h	Fri Jun 06 18:08:45 2014 +0800
+@@ -4,7 +4,7 @@
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1991-2012, Thomas G. Lane, Guido Vollbeding.
+  * Modifications:
+- * Copyright (C) 2010, 2012-2013, D. R. Commander.
++ * Copyright (C) 2010, 2012-2014, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README file.
+  *
+  * This file contains software version identification.
+@@ -28,5 +28,5 @@
+ #define JCOPYRIGHT	"Copyright (C) 1991-2012 Thomas G. Lane, Guido Vollbeding\n" \
+ 			"Copyright (C) 1999-2006 MIYASAKA Masaru\n" \
+ 			"Copyright (C) 2009 Pierre Ossman for Cendio AB\n" \
+-			"Copyright (C) 2009-2013 D. R. Commander\n" \
++			"Copyright (C) 2009-2014 D. R. Commander\n" \
+ 			"Copyright (C) 2009-2011 Nokia Corporation and/or its subsidiary(-ies)"

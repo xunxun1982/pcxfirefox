@@ -1,0 +1,113 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1402048789 -28800
+#      Fri Jun 06 17:59:49 2014 +0800
+# Node ID a2f7c9257a4144d7af9f5b20b3e3a3b18b15f5c7
+# Parent  08d5c60f1be67e53b9a23af47605317830340bc8
+Bug 986947 - mp3 will not play if mp3 is in mp4 container format
+
+diff -r 08d5c60f1be6 -r a2f7c9257a41 content/media/DecoderTraits.cpp
+--- a/content/media/DecoderTraits.cpp	Fri Jun 06 17:51:23 2014 +0800
++++ b/content/media/DecoderTraits.cpp	Fri Jun 06 17:59:49 2014 +0800
+@@ -404,6 +404,13 @@
+     }
+   }
+ #endif
++#ifdef MOZ_DIRECTSHOW
++  // Note: DirectShow should come before WMF, so that we prefer DirectShow's
++  // MP3 support over WMF's.
++  if (DirectShowDecoder::GetSupportedCodecs(nsDependentCString(aMIMEType), &codecList)) {
++    result = CANPLAY_MAYBE;
++  }
++#endif
+ #ifdef MOZ_WMF
+   if (IsWMFSupportedType(nsDependentCString(aMIMEType))) {
+     if (!aHaveRequestedCodecs) {
+@@ -414,11 +421,6 @@
+            ? CANPLAY_YES : CANPLAY_NO;
+   }
+ #endif
+-#ifdef MOZ_DIRECTSHOW
+-  if (DirectShowDecoder::GetSupportedCodecs(nsDependentCString(aMIMEType), &codecList)) {
+-    result = CANPLAY_MAYBE;
+-  }
+-#endif
+ #ifdef MOZ_APPLEMEDIA
+   if (IsAppleMediaSupportedType(nsDependentCString(aMIMEType), &codecList)) {
+     result = CANPLAY_MAYBE;
+@@ -523,8 +525,8 @@
+   }
+ #endif
+ #ifdef MOZ_DIRECTSHOW
+-  // Note: DirectShow decoder must come before WMFDecoder, else the pref
+-  // "media.directshow.preferred" won't be honored.
++  // Note: DirectShow should come before WMF, so that we prefer DirectShow's
++  // MP3 support over WMF's.
+   if (IsDirectShowSupportedType(aType)) {
+     decoder = new DirectShowDecoder();
+     return decoder.forget();
+diff -r 08d5c60f1be6 -r a2f7c9257a41 content/media/wmf/WMFDecoder.cpp
+--- a/content/media/wmf/WMFDecoder.cpp	Fri Jun 06 17:51:23 2014 +0800
++++ b/content/media/wmf/WMFDecoder.cpp	Fri Jun 06 17:59:49 2014 +0800
+@@ -29,21 +29,18 @@
+ WMFDecoder::IsMP3Supported()
+ {
+   MOZ_ASSERT(NS_IsMainThread(), "Must be on main thread.");
+-#ifdef MOZ_DIRECTSHOW
+-  if (DirectShowDecoder::IsEnabled()) {
+-    // DirectShowDecoder is enabled, we use that in preference to the WMF
+-    // backend.
+-    return false;
+-  }
+-#endif
+   if (!MediaDecoder::IsWMFEnabled()) {
+     return false;
+   }
++  // MP3 works fine in WMF on Windows Vista and Windows 8.
+   if (!IsWin7OrLater()) {
+     return true;
+   }
+-  // MP3 support is disabled if we're on Windows 7 and no service pack
+-  // is installed, as it's crashy on Win7 SP0.
++  // MP3 support is disabled if we're on Windows 7 and no service packs are
++  // installed, since it's crashy. Win7 with service packs is not so crashy,
++  // so we enable it there. Note we prefer DirectShow for MP3 playback, but
++  // we still support MP3 in MP4 via WMF, or MP3 in WMF if DirectShow is
++  // disabled.
+   return IsWin7SP1OrLater();
+ }
+ 
+@@ -109,9 +106,11 @@
+     return !aCodecs.Length() || aCodecs.EqualsASCII("mp3");
+   }
+ 
+-  // AAC-LC in M4A.
++  // AAC-LC or MP3 in M4A.
+   if (aType.EqualsASCII("audio/mp4") || aType.EqualsASCII("audio/x-m4a")) {
+-    return !aCodecs.Length() || aCodecs.EqualsASCII("mp4a.40.2");
++    return !aCodecs.Length() ||
++           aCodecs.EqualsASCII("mp4a.40.2") ||
++           aCodecs.EqualsASCII("mp3");
+   }
+ 
+   if (!aType.EqualsASCII("video/mp4")) {
+@@ -126,6 +125,7 @@
+     const nsSubstring& token = tokenizer.nextToken();
+     expectMoreTokens = tokenizer.separatorAfterCurrentToken();
+     if (token.EqualsASCII("mp4a.40.2") || // AAC-LC
++        token.EqualsASCII("mp3") ||
+         IsSupportedH264Codec(token)) {
+       continue;
+     }
+diff -r 08d5c60f1be6 -r a2f7c9257a41 content/media/wmf/WMFReader.cpp
+--- a/content/media/wmf/WMFReader.cpp	Fri Jun 06 17:51:23 2014 +0800
++++ b/content/media/wmf/WMFReader.cpp	Fri Jun 06 17:59:49 2014 +0800
+@@ -514,7 +514,7 @@
+   hr = GetSourceReaderDuration(mSourceReader, duration);
+   if (SUCCEEDED(hr)) {
+     ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
+-    mDecoder->SetMediaDuration(duration);
++    mDecoder->SetMediaEndTime(duration);
+   }
+   // We can seek if we get a duration *and* the reader reports that it's
+   // seekable.

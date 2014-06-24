@@ -1,0 +1,39 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1392967707 -28800
+#      Fri Feb 21 15:28:27 2014 +0800
+# Node ID f008057ad5777eeec67a979ae0286ecbd154fb60
+# Parent  5a66f7f3bcaa0c455dc8440f762d3c30801f51ed
+Mini PGO
+
+diff -r 5a66f7f3bcaa -r f008057ad577 browser/locales/Makefile.in
+--- a/browser/locales/Makefile.in	Fri Feb 21 15:24:42 2014 +0800
++++ b/browser/locales/Makefile.in	Fri Feb 21 15:28:27 2014 +0800
+@@ -126,12 +126,16 @@
+ libs-%:
+ 	$(NSINSTALL) -D $(DIST)/install
+ 	@$(MAKE) -C ../../toolkit/locales libs-$*
++ifdef MOZ_SERVICES_SYNC
+ 	@$(MAKE) -C ../../services/sync/locales AB_CD=$* XPI_NAME=locale-$*
++endif
+ ifdef MOZ_WEBAPP_RUNTIME
+ 	@$(MAKE) -C ../../webapprt/locales AB_CD=$* XPI_NAME=locale-$*
+ endif
+ 	@$(MAKE) -C ../../extensions/spellcheck/locales AB_CD=$* XPI_NAME=locale-$*
++ifdef MOZ_HYPHENATION
+ 	@$(MAKE) -C ../../intl/locales AB_CD=$* XPI_NAME=locale-$*
++endif
+ 	@$(MAKE) libs AB_CD=$* XPI_NAME=locale-$* PREF_DIR=$(PREF_DIR)
+ ifdef MOZ_METRO
+ 	@$(MAKE) -C ../metro/locales AB_CD=$* XPI_NAME=locale-$*
+diff -r 5a66f7f3bcaa -r f008057ad577 js/src/Makefile.in
+--- a/js/src/Makefile.in	Fri Feb 21 15:24:42 2014 +0800
++++ b/js/src/Makefile.in	Fri Feb 21 15:28:27 2014 +0800
+@@ -395,6 +395,7 @@
+   $(NULL)
+ # Ditto (Bug 772303)
+ NO_PROFILE_GUIDED_OPTIMIZE += RegExp.cpp
++NO_PROFILE_GUIDED_OPTIMIZE += Interpreter.cpp
+ endif
+ # Ditto (Bug 810661)
+ ifeq ($(CPU_ARCH),x86_64)

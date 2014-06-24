@@ -1,0 +1,431 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396526415 -28800
+#      Thu Apr 03 20:00:15 2014 +0800
+# Node ID f937925debc7a5804567999a8aa262dd0ce568f3
+# Parent  c85b1ab257eaa7dd57ef6a28dcfe1433b9d587ac
+Disable telephony
+
+diff -r c85b1ab257ea -r f937925debc7 browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Thu Apr 03 19:55:49 2014 +0800
++++ b/browser/installer/package-manifest.in	Thu Apr 03 20:00:15 2014 +0800
+@@ -231,7 +231,9 @@
+ #endif
+ @BINPATH@/components/dom_storage.xpt
+ @BINPATH@/components/dom_stylesheets.xpt
++#ifdef MOZ_TELEPHONY
+ @BINPATH@/components/dom_telephony.xpt
++#endif
+ @BINPATH@/components/dom_traversal.xpt
+ #ifdef MOZ_WEBSPEECH
+ @BINPATH@/components/dom_webspeechrecognition.xpt
+diff -r c85b1ab257ea -r f937925debc7 configure.in
+--- a/configure.in	Thu Apr 03 19:55:49 2014 +0800
++++ b/configure.in	Thu Apr 03 20:00:15 2014 +0800
+@@ -7515,6 +7515,15 @@
+ fi
+ AC_SUBST(MOZ_PHONENUMBERUTILS)
+ 
++MOZ_ARG_DISABLE_BOOL(telephony,
++[  --disable-telephony          Disable telephony],
++    MOZ_TELEPHONY=,
++    MOZ_TELEPHONY=1)
++if test -n "$MOZ_TELEPHONY"; then
++    AC_DEFINE(MOZ_TELEPHONY)
++fi
++AC_SUBST(MOZ_TELEPHONY)
++
+ dnl ========================================================
+ dnl = Enable Support for AudioChannelManager API
+ dnl ========================================================
+diff -r c85b1ab257ea -r f937925debc7 dom/base/Navigator.cpp
+--- a/dom/base/Navigator.cpp	Thu Apr 03 19:55:49 2014 +0800
++++ b/dom/base/Navigator.cpp	Thu Apr 03 20:00:15 2014 +0800
+@@ -33,7 +33,9 @@
+ #ifdef MOZ_MOBILEMESSAGE
+ #include "mozilla/dom/MobileMessageManager.h"
+ #endif
++#ifdef MOZ_TELEPHONY
+ #include "mozilla/dom/Telephony.h"
++#endif
+ #include "mozilla/Hal.h"
+ #include "nsISiteSpecificUserAgent.h"
+ #include "mozilla/ClearOnShutdown.h"
+@@ -148,7 +150,9 @@
+ #ifdef MOZ_MOBILEMESSAGE
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mMobileMessageManager)
+ #endif
++#ifdef MOZ_TELEPHONY
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mTelephony)
++#endif
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mConnection)
+ #ifdef MOZ_B2G_RIL
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mMobileConnections)
+@@ -222,11 +226,13 @@
+     mMobileMessageManager = nullptr;
+   }
+ #endif
+-  
++
++#ifdef MOZ_TELEPHONY  
+   if (mTelephony) {
+     mTelephony = nullptr;
+   }
+-
++#endif
++  
+   if (mConnection) {
+     mConnection->Shutdown();
+     mConnection = nullptr;
+@@ -1198,6 +1204,7 @@
+ }
+ #endif
+ 
++#ifdef MOZ_TELEPHONY
+ Telephony*
+ Navigator::GetMozTelephony(ErrorResult& aRv)
+ {
+@@ -1211,6 +1218,7 @@
+ 
+   return mTelephony;
+ }
++#endif
+ 
+ #ifdef MOZ_B2G_RIL
+ 
+@@ -1739,6 +1747,7 @@
+ }
+ #endif
+ 
++#ifdef MOZ_TELEPHONY
+ /* static */
+ bool
+ Navigator::HasTelephonySupport(JSContext* cx, JSObject* aGlobal)
+@@ -1755,6 +1764,7 @@
+   nsCOMPtr<nsPIDOMWindow> win = GetWindowFromGlobal(global);
+   return win && CheckPermission(win, "telephony");
+ }
++#endif
+ 
+ /* static */
+ bool
+diff -r c85b1ab257ea -r f937925debc7 dom/base/Navigator.h
+--- a/dom/base/Navigator.h	Thu Apr 03 19:55:49 2014 +0800
++++ b/dom/base/Navigator.h	Thu Apr 03 20:00:15 2014 +0800
+@@ -94,7 +94,9 @@
+ #endif
+ 
+ class PowerManager;
++#ifdef MOZ_TELEPHONY
+ class Telephony;
++#endif
+ 
+ namespace time {
+ class TimeManager;
+@@ -203,7 +205,9 @@
+ #ifdef MOZ_MOBILEMESSAGE
+   nsIDOMMozMobileMessageManager* GetMozMobileMessage();
+ #endif
++#ifdef MOZ_TELEPHONY
+   Telephony* GetMozTelephony(ErrorResult& aRv);
++#endif
+   network::Connection* GetMozConnection();
+   nsDOMCameraManager* GetMozCameras(ErrorResult& aRv);
+   void MozSetMessageHandler(const nsAString& aType,
+@@ -267,9 +271,12 @@
+   static bool HasMobileMessageSupport(JSContext* /* unused */,
+                                       JSObject* aGlobal);
+ #endif
+-  
++
++#ifdef MOZ_TELEPHONY  
+   static bool HasTelephonySupport(JSContext* cx,
+                                   JSObject* aGlobal);
++#endif
++  
+   static bool HasCameraSupport(JSContext* /* unused */,
+                                JSObject* aGlobal);
+ #ifdef MOZ_B2G_RIL
+@@ -341,7 +348,9 @@
+ #ifdef MOZ_MOBILEMESSAGE
+   nsRefPtr<MobileMessageManager> mMobileMessageManager;
+ #endif
++#ifdef MOZ_TELEPHONY
+   nsRefPtr<Telephony> mTelephony;
++#endif
+   nsRefPtr<network::Connection> mConnection;
+ #ifdef MOZ_B2G_RIL
+   nsRefPtr<MobileConnectionArray> mMobileConnections;
+diff -r c85b1ab257ea -r f937925debc7 dom/ipc/ContentChild.cpp
+--- a/dom/ipc/ContentChild.cpp	Thu Apr 03 19:55:49 2014 +0800
++++ b/dom/ipc/ContentChild.cpp	Thu Apr 03 20:00:15 2014 +0800
+@@ -128,7 +128,9 @@
+ #include "nsDeviceStorage.h"
+ #include "AudioChannelService.h"
+ #include "JavaScriptChild.h"
++#ifdef MOZ_TELEPHONY
+ #include "mozilla/dom/telephony/PTelephonyChild.h"
++#endif
+ #include "mozilla/net/NeckoMessageUtils.h"
+ 
+ using namespace base;
+@@ -143,7 +145,9 @@
+ using namespace mozilla::dom::mobilemessage;
+ #endif
+ using namespace mozilla::dom::indexedDB;
++#ifdef MOZ_TELEPHONY
+ using namespace mozilla::dom::telephony;
++#endif
+ using namespace mozilla::hal_sandbox;
+ using namespace mozilla::ipc;
+ using namespace mozilla::layers;
+@@ -991,6 +995,7 @@
+ }
+ #endif
+ 
++#ifdef MOZ_TELEPHONY
+ PTelephonyChild*
+ ContentChild::AllocPTelephonyChild()
+ {
+@@ -1003,6 +1008,7 @@
+     delete aActor;
+     return true;
+ }
++#endif
+ 
+ PStorageChild*
+ ContentChild::AllocPStorageChild()
+diff -r c85b1ab257ea -r f937925debc7 dom/ipc/ContentChild.h
+--- a/dom/ipc/ContentChild.h	Thu Apr 03 19:55:49 2014 +0800
++++ b/dom/ipc/ContentChild.h	Thu Apr 03 20:00:15 2014 +0800
+@@ -155,8 +155,10 @@
+     virtual bool DeallocPSmsChild(PSmsChild*) MOZ_OVERRIDE;
+ #endif
+ 
++#ifdef MOZ_TELEPHONY
+     virtual PTelephonyChild* AllocPTelephonyChild() MOZ_OVERRIDE;
+     virtual bool DeallocPTelephonyChild(PTelephonyChild*) MOZ_OVERRIDE;
++#endif
+ 
+     virtual PStorageChild* AllocPStorageChild() MOZ_OVERRIDE;
+     virtual bool DeallocPStorageChild(PStorageChild* aActor) MOZ_OVERRIDE;
+diff -r c85b1ab257ea -r f937925debc7 dom/ipc/ContentParent.cpp
+--- a/dom/ipc/ContentParent.cpp	Thu Apr 03 19:55:49 2014 +0800
++++ b/dom/ipc/ContentParent.cpp	Thu Apr 03 20:00:15 2014 +0800
+@@ -40,7 +40,9 @@
+ #endif
+ #include "mozilla/dom/devicestorage/DeviceStorageRequestParent.h"
+ #include "mozilla/dom/GeolocationBinding.h"
++#ifdef MOZ_TELEPHONY
+ #include "mozilla/dom/telephony/TelephonyParent.h"
++#endif
+ #ifdef MOZ_MOBILEMESSAGE
+ #include "SmsParent.h"
+ #endif
+@@ -159,7 +161,9 @@
+ #ifdef MOZ_MOBILEMESSAGE
+ using namespace mozilla::dom::mobilemessage;
+ #endif
++#ifdef MOZ_TELEPHONY
+ using namespace mozilla::dom::telephony;
++#endif
+ using namespace mozilla::hal;
+ using namespace mozilla::ipc;
+ using namespace mozilla::layers;
+@@ -2440,6 +2444,7 @@
+ }
+ #endif
+ 
++#ifdef MOZ_TELEPHONY
+ PTelephonyParent*
+ ContentParent::AllocPTelephonyParent()
+ {
+@@ -2458,6 +2463,7 @@
+     static_cast<TelephonyParent*>(aActor)->Release();
+     return true;
+ }
++#endif
+ 
+ PStorageParent*
+ ContentParent::AllocPStorageParent()
+diff -r c85b1ab257ea -r f937925debc7 dom/ipc/ContentParent.h
+--- a/dom/ipc/ContentParent.h	Thu Apr 03 19:55:49 2014 +0800
++++ b/dom/ipc/ContentParent.h	Thu Apr 03 20:00:15 2014 +0800
+@@ -377,8 +377,10 @@
+     virtual bool DeallocPSmsParent(PSmsParent*) MOZ_OVERRIDE;
+ #endif
+ 
++#ifdef MOZ_TELEPHONY
+     virtual PTelephonyParent* AllocPTelephonyParent() MOZ_OVERRIDE;
+     virtual bool DeallocPTelephonyParent(PTelephonyParent*) MOZ_OVERRIDE;
++#endif
+ 
+     virtual bool DeallocPStorageParent(PStorageParent* aActor) MOZ_OVERRIDE;
+ 
+diff -r c85b1ab257ea -r f937925debc7 dom/ipc/PContent.ipdl
+--- a/dom/ipc/PContent.ipdl	Thu Apr 03 19:55:49 2014 +0800
++++ b/dom/ipc/PContent.ipdl	Thu Apr 03 20:00:15 2014 +0800
+@@ -18,7 +18,6 @@
+ include protocol PNecko;
+ include protocol PSpeechSynthesis;
+ include protocol PStorage;
+-include protocol PTelephony;
+ include protocol PTestShell;
+ include protocol PJavaScript;
+ include DOMTypes;
+@@ -168,7 +167,6 @@
+     manages PNecko;
+     manages PSpeechSynthesis;
+     manages PStorage;
+-    manages PTelephony;
+     manages PTestShell;
+     manages PJavaScript;
+ 
+@@ -333,8 +331,6 @@
+ 
+     PStorage();
+ 
+-    PTelephony();
+-
+     PAsmJSCacheEntry(OpenMode openMode, WriteParams write, Principal principal);
+ 
+     // Services remoting
+diff -r c85b1ab257ea -r f937925debc7 dom/moz.build
+--- a/dom/moz.build	Thu Apr 03 19:55:49 2014 +0800
++++ b/dom/moz.build	Thu Apr 03 20:00:15 2014 +0800
+@@ -71,7 +71,6 @@
+     'audiochannel',
+     'promise',
+     'smil',
+-    'telephony',
+     'inputmethod',
+     'webidl',
+     'xbl',
+@@ -96,6 +95,9 @@
+ if CONFIG['MOZ_PHONENUMBERUTILS']:
+     PARALLEL_DIRS += ['phonenumberutils']
+ 
++if CONFIG['MOZ_TELEPHONY']:
++    PARALLEL_DIRS += ['telephony']
++
+ if CONFIG['OS_ARCH'] == 'WINNT':
+     PARALLEL_DIRS += ['plugins/ipc/hangui']
+ 
+diff -r c85b1ab257ea -r f937925debc7 dom/webidl/Navigator.webidl
+--- a/dom/webidl/Navigator.webidl	Thu Apr 03 19:55:49 2014 +0800
++++ b/dom/webidl/Navigator.webidl	Thu Apr 03 20:00:15 2014 +0800
+@@ -263,11 +263,6 @@
+ };
+ #endif // MOZ_B2G_RIL
+ 
+-partial interface Navigator {
+-  [Throws, Func="Navigator::HasTelephonySupport"]
+-  readonly attribute Telephony? mozTelephony;
+-};
+-
+ #ifdef MOZ_GAMEPAD
+ // https://dvcs.w3.org/hg/gamepad/raw-file/default/gamepad.html#navigator-interface-extension
+ partial interface Navigator {
+diff -r c85b1ab257ea -r f937925debc7 dom/webidl/moz.build
+--- a/dom/webidl/moz.build	Thu Apr 03 19:55:49 2014 +0800
++++ b/dom/webidl/moz.build	Thu Apr 03 20:00:15 2014 +0800
+@@ -38,8 +38,6 @@
+     'BiquadFilterNode.webidl',
+     'Blob.webidl',
+     'BrowserElementDictionaries.webidl',
+-    'CallEvent.webidl',
+-    'CallsList.webidl',
+     'CameraControl.webidl',
+     'CameraManager.webidl',
+     'CanvasRenderingContext2D.webidl',
+@@ -389,9 +387,6 @@
+     'SVGViewElement.webidl',
+     'SVGZoomAndPan.webidl',
+     'SVGZoomEvent.webidl',
+-    'Telephony.webidl',
+-    'TelephonyCall.webidl',
+-    'TelephonyCallGroup.webidl',
+     'Text.webidl',
+     'TextDecoder.webidl',
+     'TextEncoder.webidl',
+@@ -455,6 +450,15 @@
+         'PhoneNumberService.webidl',
+     ]
+ 
++if CONFIG['MOZ_TELEPHONY']:
++    WEBIDL_FILES += [
++        'CallEvent.webidl',
++        'CallsList.webidl',
++        'Telephony.webidl',
++        'TelephonyCall.webidl',
++        'TelephonyCallGroup.webidl',
++    ]
++
+ if CONFIG['MOZ_AUDIO_CHANNEL_MANAGER']:
+     WEBIDL_FILES += [
+         'AudioChannelManager.webidl',
+diff -r c85b1ab257ea -r f937925debc7 layout/build/nsLayoutModule.cpp
+--- a/layout/build/nsLayoutModule.cpp	Thu Apr 03 19:55:49 2014 +0800
++++ b/layout/build/nsLayoutModule.cpp	Thu Apr 03 20:00:15 2014 +0800
+@@ -233,8 +233,10 @@
+ #include "mozilla/dom/time/TimeService.h"
+ #include "StreamingProtocolService.h"
+ 
++#ifdef MOZ_TELEPHONY
+ #include "mozilla/dom/telephony/TelephonyFactory.h"
+ #include "nsITelephonyProvider.h"
++#endif
+ 
+ #ifdef MOZ_WIDGET_GONK
+ #include "GonkGPSGeolocationProvider.h"
+@@ -246,7 +248,9 @@
+ #ifdef MOZ_MOBILEMESSAGE
+ using namespace mozilla::dom::mobilemessage;
+ #endif
++#ifdef MOZ_TELEPHONY
+ using namespace mozilla::dom::telephony;
++#endif
+ using mozilla::dom::alarm::AlarmHalService;
+ using mozilla::dom::indexedDB::IndexedDatabaseManager;
+ using mozilla::dom::power::PowerManagerService;
+@@ -353,8 +357,10 @@
+ #endif
+ NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIMediaManagerService,
+                                          MediaManager::GetInstance)
++#ifdef MOZ_TELEPHONY
+ NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsITelephonyProvider,
+                                          TelephonyFactory::CreateTelephonyProvider)
++#endif
+ 
+ //-----------------------------------------------------------------------------
+ 
+@@ -836,7 +842,9 @@
+ #ifdef ACCESSIBILITY
+ NS_DEFINE_NAMED_CID(NS_ACCESSIBILITY_SERVICE_CID);
+ #endif
++#ifdef MOZ_TELEPHONY
+ NS_DEFINE_NAMED_CID(TELEPHONY_PROVIDER_CID);
++#endif
+ 
+ static nsresult
+ CreateWindowCommandTableConstructor(nsISupports *aOuter,
+@@ -1122,7 +1130,9 @@
+ #ifdef ACCESSIBILITY
+   { &kNS_ACCESSIBILITY_SERVICE_CID, false, nullptr, CreateA11yService },
+ #endif
++#ifdef MOZ_TELEPHONY
+   { &kTELEPHONY_PROVIDER_CID, false, nullptr, nsITelephonyProviderConstructor },
++#endif
+   { nullptr }
+ };
+ 
+@@ -1280,7 +1290,9 @@
+   { "@mozilla.org/accessibilityService;1", &kNS_ACCESSIBILITY_SERVICE_CID },
+   { "@mozilla.org/accessibleRetrieval;1", &kNS_ACCESSIBILITY_SERVICE_CID },
+ #endif
++#ifdef MOZ_TELEPHONY
+   { TELEPHONY_PROVIDER_CONTRACTID, &kTELEPHONY_PROVIDER_CID },
++#endif
+   { nullptr }
+ };
+ 

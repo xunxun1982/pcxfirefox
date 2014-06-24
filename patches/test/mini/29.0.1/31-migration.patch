@@ -1,0 +1,159 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396549136 -28800
+#      Fri Apr 04 02:18:56 2014 +0800
+# Node ID 6f28bfed76a9bd0cd4cdd8a76e4fa1defcf3cc8a
+# Parent  5d7e6091c92440fd91e9cf8b56b76dac265df10d
+Disable migration
+
+diff -r 5d7e6091c924 -r 6f28bfed76a9 browser/components/build/nsModule.cpp
+--- a/browser/components/build/nsModule.cpp	Fri Apr 04 02:15:28 2014 +0800
++++ b/browser/components/build/nsModule.cpp	Fri Apr 04 02:18:56 2014 +0800
+@@ -16,7 +16,7 @@
+ #include "nsGNOMEShellService.h"
+ #endif
+ 
+-#if defined(XP_WIN)
++#if defined(XP_WIN) && defined(MOZ_MIGRATION)
+ #include "nsIEHistoryEnumerator.h"
+ #endif
+ 
+@@ -40,7 +40,7 @@
+ NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsGNOMEShellService, Init)
+ #endif
+ 
+-#if defined(XP_WIN)
++#if defined(XP_WIN) && defined(MOZ_MIGRATION)
+ NS_GENERIC_FACTORY_CONSTRUCTOR(nsIEHistoryEnumerator)
+ #endif
+ 
+@@ -54,7 +54,7 @@
+ #endif
+ NS_DEFINE_NAMED_CID(NS_FEEDSNIFFER_CID);
+ NS_DEFINE_NAMED_CID(NS_BROWSER_ABOUT_REDIRECTOR_CID);
+-#if defined(XP_WIN)
++#if defined(XP_WIN) && defined(MOZ_MIGRATION)
+ NS_DEFINE_NAMED_CID(NS_WINIEHISTORYENUMERATOR_CID);
+ #elif defined(XP_MACOSX)
+ NS_DEFINE_NAMED_CID(NS_SHELLSERVICE_CID);
+@@ -69,7 +69,7 @@
+ #endif
+     { &kNS_FEEDSNIFFER_CID, false, nullptr, nsFeedSnifferConstructor },
+     { &kNS_BROWSER_ABOUT_REDIRECTOR_CID, false, nullptr, AboutRedirector::Create },
+-#if defined(XP_WIN)
++#if defined(XP_WIN) && defined(MOZ_MIGRATION)
+     { &kNS_WINIEHISTORYENUMERATOR_CID, false, nullptr, nsIEHistoryEnumeratorConstructor },
+ #elif defined(XP_MACOSX)
+     { &kNS_SHELLSERVICE_CID, false, nullptr, nsMacShellServiceConstructor },
+@@ -112,7 +112,7 @@
+ #endif
+     { NS_ABOUT_MODULE_CONTRACTID_PREFIX "app-manager", &kNS_BROWSER_ABOUT_REDIRECTOR_CID },
+     { NS_ABOUT_MODULE_CONTRACTID_PREFIX "customizing", &kNS_BROWSER_ABOUT_REDIRECTOR_CID },
+-#if defined(XP_WIN)
++#if defined(XP_WIN) && defined(MOZ_MIGRATION)
+     { NS_IEHISTORYENUMERATOR_CONTRACTID, &kNS_WINIEHISTORYENUMERATOR_CID },
+ #elif defined(XP_MACOSX)
+     { NS_SHELLSERVICE_CONTRACTID, &kNS_SHELLSERVICE_CID },
+diff -r 5d7e6091c924 -r 6f28bfed76a9 browser/components/moz.build
+--- a/browser/components/moz.build	Fri Apr 04 02:15:28 2014 +0800
++++ b/browser/components/moz.build	Fri Apr 04 02:18:56 2014 +0800
+@@ -19,9 +19,11 @@
+     'shell',
+     'sidebar',
+     'tabview',
+-    'migration',
+ ]
+ 
++if CONFIG['MOZ_MIGRATION']:
++    PARALLEL_DIRS += ['migration']
++
+ DIRS += ['build']
+ 
+ XPIDL_SOURCES += [
+diff -r 5d7e6091c924 -r 6f28bfed76a9 browser/components/places/content/places.xul
+--- a/browser/components/places/content/places.xul	Fri Apr 04 02:15:28 2014 +0800
++++ b/browser/components/places/content/places.xul	Fri Apr 04 02:18:56 2014 +0800
+@@ -67,9 +67,11 @@
+     <command id="OrganizerCommand_export"
+              oncommand="PlacesOrganizer.exportBookmarks();"/>
+     <command id="OrganizerCommand_import"
+-             oncommand="PlacesOrganizer.importFromFile();"/>
++        oncommand="PlacesOrganizer.importFromFile();"/>
++#ifdef MOZ_MIGRATION
+     <command id="OrganizerCommand_browserImport"
+-             oncommand="PlacesOrganizer.importFromBrowser();"/>
++        oncommand="PlacesOrganizer.importFromBrowser();"/>
++#endif
+     <command id="OrganizerCommand_backup"
+              oncommand="PlacesOrganizer.backupBookmarks();"/>
+     <command id="OrganizerCommand_restoreFromFile"
+@@ -313,11 +315,13 @@
+                       command="OrganizerCommand_export"
+                       label="&exportBookmarksToHTML.label;"
+                       accesskey="&exportBookmarksToHTML.accesskey;"/>
++#ifdef MOZ_MIGRATION      
+             <menuseparator/>
+             <menuitem id="browserImport"
+                       command="OrganizerCommand_browserImport"
+                       label="&importOtherBrowser.label;"
+                       accesskey="&importOtherBrowser.accesskey;"/>
++#endif
+           </menupopup>
+ #ifdef XP_MACOSX
+         </toolbarbutton>
+diff -r 5d7e6091c924 -r 6f28bfed76a9 browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Fri Apr 04 02:15:28 2014 +0800
++++ b/browser/installer/package-manifest.in	Fri Apr 04 02:18:56 2014 +0800
+@@ -291,7 +291,9 @@
+ @BINPATH@/components/layout_xul.xpt
+ @BINPATH@/components/locale.xpt
+ @BINPATH@/components/lwbrk.xpt
++#ifdef MOZ_MIGRATION
+ @BINPATH@/browser/components/migration.xpt
++#endif
+ @BINPATH@/components/mimetype.xpt
+ @BINPATH@/components/mozfind.xpt
+ @BINPATH@/components/necko_about.xpt
+@@ -486,6 +488,7 @@
+ @BINPATH@/components/contentSecurityPolicy.js
+ @BINPATH@/components/contentAreaDropListener.manifest
+ @BINPATH@/components/contentAreaDropListener.js
++#ifdef MOZ_MIGRATION
+ @BINPATH@/browser/components/BrowserProfileMigrators.manifest
+ @BINPATH@/browser/components/ProfileMigrator.js
+ @BINPATH@/browser/components/ChromeProfileMigrator.js
+@@ -497,6 +500,7 @@
+ #ifdef XP_MACOSX
+ @BINPATH@/browser/components/SafariProfileMigrator.js
+ #endif
++#endif
+ #ifdef MOZ_ENABLE_DBUS
+ @BINPATH@/components/@DLL_PREFIX@dbusservice@DLL_SUFFIX@
+ #endif
+diff -r 5d7e6091c924 -r 6f28bfed76a9 configure.in
+--- a/configure.in	Fri Apr 04 02:15:28 2014 +0800
++++ b/configure.in	Fri Apr 04 02:18:56 2014 +0800
+@@ -7560,6 +7560,15 @@
+ fi
+ AC_SUBST(MOZ_HYPHENATION)
+ 
++MOZ_ARG_DISABLE_BOOL(migration,
++[  --disable-migration          Disable migration],
++    MOZ_MIGRATION=,
++    MOZ_MIGRATION=1)
++if test -n "$MOZ_MIGRATION"; then
++    AC_DEFINE(MOZ_MIGRATION)
++fi
++AC_SUBST(MOZ_MIGRATION)
++
+ dnl ========================================================
+ dnl = Enable Support for AudioChannelManager API
+ dnl ========================================================
+@@ -9255,7 +9264,6 @@
+     AC_OUTPUT_SUBDIRS(build/clang-plugin)
+ fi
+ 
+-
+ # Run the SpiderMonkey 'configure' script.
+ dist=$MOZ_BUILD_ROOT/dist
+ ac_configure_args="$_SUBDIR_CONFIG_ARGS"

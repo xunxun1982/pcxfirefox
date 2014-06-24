@@ -1,0 +1,82 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396627107 -28800
+#      Fri Apr 04 23:58:27 2014 +0800
+# Node ID eed7edbc3e429272e853dabc98835149b15b9ba8
+# Parent  2a231aef2418a25cd43bc0d2faac964aa166be5a
+Remove dom.mozPermissionSettings support
+
+diff -r 2a231aef2418 -r eed7edbc3e42 browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Fri Apr 04 23:50:49 2014 +0800
++++ b/browser/installer/package-manifest.in	Fri Apr 04 23:58:27 2014 +0800
+@@ -236,7 +236,6 @@
+ #ifdef MOZ_SETTINGS
+ @BINPATH@/components/dom_settings.xpt
+ #endif
+-@BINPATH@/components/dom_permissionsettings.xpt
+ @BINPATH@/components/dom_sidebar.xpt
+ #ifdef MOZ_MOBILEMESSAGE
+ @BINPATH@/components/dom_mobilemessage.xpt
+@@ -566,8 +565,6 @@
+ @BINPATH@/components/recording-cmdline.manifest
+ #endif
+ 
+-@BINPATH@/components/PermissionSettings.js
+-@BINPATH@/components/PermissionSettings.manifest
+ #ifdef MOZ_CONTACTS
+ @BINPATH@/components/ContactManager.js
+ @BINPATH@/components/ContactManager.manifest
+diff -r 2a231aef2418 -r eed7edbc3e42 dom/apps/src/Webapps.jsm
+--- a/dom/apps/src/Webapps.jsm	Fri Apr 04 23:50:49 2014 +0800
++++ b/dom/apps/src/Webapps.jsm	Fri Apr 04 23:58:27 2014 +0800
+@@ -38,7 +38,6 @@
+ Cu.import("resource://gre/modules/FileUtils.jsm");
+ Cu.import('resource://gre/modules/ActivitiesService.jsm');
+ Cu.import("resource://gre/modules/AppsUtils.jsm");
+-Cu.import("resource://gre/modules/PermissionsInstaller.jsm");
+ Cu.import("resource://gre/modules/OfflineCacheInstaller.jsm");
+ Cu.import("resource://gre/modules/SystemMessagePermissionsChecker.jsm");
+ Cu.import("resource://gre/modules/AppDownloadManager.jsm");
+diff -r 2a231aef2418 -r eed7edbc3e42 dom/apps/src/moz.build
+--- a/dom/apps/src/moz.build	Fri Apr 04 23:50:49 2014 +0800
++++ b/dom/apps/src/moz.build	Fri Apr 04 23:58:27 2014 +0800
+@@ -28,7 +28,6 @@
+     'AppsServiceChild.jsm',
+     'FreeSpaceWatcher.jsm',
+     'OfflineCacheInstaller.jsm',
+-    'PermissionsInstaller.jsm',
+     'PermissionsTable.jsm',
+ ]
+ 
+diff -r 2a231aef2418 -r eed7edbc3e42 dom/messages/SystemMessagePermissionsChecker.jsm
+--- a/dom/messages/SystemMessagePermissionsChecker.jsm	Fri Apr 04 23:50:49 2014 +0800
++++ b/dom/messages/SystemMessagePermissionsChecker.jsm	Fri Apr 04 23:58:27 2014 +0800
+@@ -10,9 +10,7 @@
+ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+ Cu.import("resource://gre/modules/Services.jsm");
+ Cu.import("resource://gre/modules/AppsUtils.jsm");
+-Cu.import("resource://gre/modules/PermissionsInstaller.jsm");
+ Cu.import("resource://gre/modules/PermissionsTable.jsm");
+-Cu.import("resource://gre/modules/PermissionSettings.jsm");
+ 
+ this.EXPORTED_SYMBOLS = ["SystemMessagePermissionsChecker",
+                          "SystemMessagePermissionsTable"];
+diff -r 2a231aef2418 -r eed7edbc3e42 dom/moz.build
+--- a/dom/moz.build	Fri Apr 04 23:50:49 2014 +0800
++++ b/dom/moz.build	Fri Apr 04 23:58:27 2014 +0800
+@@ -24,7 +24,6 @@
+     'offline',
+     'geolocation',
+     'notification',
+-    'permission',
+     'svg',
+     'smil',
+     'apps',
+@@ -57,7 +56,6 @@
+     'src',
+     'locales',
+     'network',
+-    'permission',
+     'plugins/base',
+     'plugins/ipc',
+     'indexedDB',

@@ -1,0 +1,20 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396523626 -28800
+#      Thu Apr 03 19:13:46 2014 +0800
+# Node ID 84f669eeafb06e0f9bced8801bdecbf2e92e3879
+# Parent  37ab641216bdc0be3d6b5fdbdc644c940aa740e1
+gkmedias static
+
+diff -r 37ab641216bd -r 84f669eeafb0 configure.in
+--- a/configure.in	Tue Apr 01 21:19:39 2014 +0200
++++ b/configure.in	Thu Apr 03 19:13:46 2014 +0800
+@@ -7804,7 +7804,7 @@
+ XPCOM_LIBS="$LIBXUL_LIBS"
+ 
+ if test "$OS_ARCH" = "WINNT"; then
+-  GKMEDIAS_SHARED_LIBRARY=1
++  GKMEDIAS_SHARED_LIBRARY=
+ fi
+ AC_SUBST(GKMEDIAS_SHARED_LIBRARY)
+ 

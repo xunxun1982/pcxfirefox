@@ -1,0 +1,73 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396549588 -28800
+#      Fri Apr 04 02:26:28 2014 +0800
+# Node ID f85e500374710ccc6f59a92c5a67a156a3b0c39a
+# Parent  05683448ec5b39ffec78ccc0bb5744d515a3c38e
+Disable inputmethod
+
+diff -r 05683448ec5b -r f85e50037471 browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Fri Apr 04 02:24:42 2014 +0800
++++ b/browser/installer/package-manifest.in	Fri Apr 04 02:26:28 2014 +0800
+@@ -223,7 +223,9 @@
+ @BINPATH@/components/dom_notification.xpt
+ @BINPATH@/components/dom_html.xpt
+ @BINPATH@/components/dom_indexeddb.xpt
++#ifdef MOZ_INPUTMETHOD
+ @BINPATH@/components/dom_inputmethod.xpt
++#endif
+ @BINPATH@/components/dom_offline.xpt
+ @BINPATH@/components/dom_json.xpt
+ @BINPATH@/components/dom_power.xpt
+@@ -625,9 +627,11 @@
+ @BINPATH@/components/dom_webspeechsynth.xpt
+ #endif
+ 
++#ifdef MOZ_INPUTMETHOD
+ ; InputMethod API
+ @BINPATH@/components/MozKeyboard.js
+ @BINPATH@/components/InputMethod.manifest
++#endif
+ 
+ ; Modules
+ @BINPATH@/browser/modules/*
+diff -r 05683448ec5b -r f85e50037471 configure.in
+--- a/configure.in	Fri Apr 04 02:24:42 2014 +0800
++++ b/configure.in	Fri Apr 04 02:26:28 2014 +0800
+@@ -7568,6 +7568,15 @@
+ fi
+ AC_SUBST(MOZ_MIGRATION)
+ 
++MOZ_ARG_DISABLE_BOOL(inputmethod,
++[  --disable-inputmethod          Disable inputmethod],
++    MOZ_INPUTMETHOD=,
++    MOZ_INPUTMETHOD=1)
++if test -n "$MOZ_INPUTMETHOD"; then
++    AC_DEFINE(MOZ_INPUTMETHOD)
++fi
++AC_SUBST(MOZ_INPUTMETHOD)
++
+ dnl ========================================================
+ dnl = Enable Support for AudioChannelManager API
+ dnl ========================================================
+diff -r 05683448ec5b -r f85e50037471 dom/moz.build
+--- a/dom/moz.build	Fri Apr 04 02:24:42 2014 +0800
++++ b/dom/moz.build	Fri Apr 04 02:26:28 2014 +0800
+@@ -69,7 +69,6 @@
+     'audiochannel',
+     'promise',
+     'smil',
+-    'inputmethod',
+     'webidl',
+     'xbl',
+     'xslt',
+@@ -108,6 +107,9 @@
+ if CONFIG['MOZ_ALARM']:
+     PARALLEL_DIRS += ['alarm']
+ 
++if CONFIG['MOZ_INPUTMETHOD']:
++    PARALLEL_DIRS += ['inputmethod']
++
+ if CONFIG['OS_ARCH'] == 'WINNT':
+     PARALLEL_DIRS += ['plugins/ipc/hangui']
+ 

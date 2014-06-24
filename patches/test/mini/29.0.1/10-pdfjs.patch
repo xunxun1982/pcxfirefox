@@ -1,0 +1,90 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396524773 -28800
+#      Thu Apr 03 19:32:53 2014 +0800
+# Node ID 22daf53b1d108fd24ee4627cfb1936b841e09a9c
+# Parent  3ab960ea7383088fdb23b9cb8a2f591b3749a5a0
+Disable PDFJs
+
+diff -r 3ab960ea7383 -r 22daf53b1d10 browser/components/nsBrowserGlue.js
+--- a/browser/components/nsBrowserGlue.js	Thu Apr 03 19:32:00 2014 +0800
++++ b/browser/components/nsBrowserGlue.js	Thu Apr 03 19:32:53 2014 +0800
+@@ -53,8 +53,10 @@
+ XPCOMUtils.defineLazyModuleGetter(this, "CustomizationTabPreloader",
+                                   "resource:///modules/CustomizationTabPreloader.jsm");
+ 
++#ifdef MOZ_PDFJS
+ XPCOMUtils.defineLazyModuleGetter(this, "PdfJs",
+                                   "resource://pdf.js/PdfJs.jsm");
++#endif
+ 
+ #ifdef NIGHTLY_BUILD
+ XPCOMUtils.defineLazyModuleGetter(this, "ShumwayUtils",
+@@ -481,7 +483,9 @@
+     NewTabUtils.init();
+     BrowserNewTabPreloader.init();
+     SignInToWebsiteUX.init();
++#ifdef MOZ_PDFJS
+     PdfJs.init();
++#endif
+ #ifdef NIGHTLY_BUILD
+     ShumwayUtils.init();
+ #endif
+diff -r 3ab960ea7383 -r 22daf53b1d10 browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Thu Apr 03 19:32:00 2014 +0800
++++ b/browser/installer/package-manifest.in	Thu Apr 03 19:32:53 2014 +0800
+@@ -619,12 +619,16 @@
+ @BINPATH@/browser/chrome.manifest
+ @BINPATH@/browser/chrome/browser@JAREXT@
+ @BINPATH@/browser/chrome/browser.manifest
++#ifdef MOZ_PDFJS
+ @BINPATH@/browser/chrome/pdfjs.manifest
+ @BINPATH@/browser/chrome/pdfjs/*
++#endif
+ #ifdef NIGHTLY_BUILD
++#ifdef MOZ_PDFJS
+ @BINPATH@/browser/chrome/shumway.manifest
+ @BINPATH@/browser/chrome/shumway/*
+ #endif
++#endif
+ @BINPATH@/browser/extensions/{972ce4c6-7e08-4474-a285-3208198ce6fd}/install.rdf
+ @BINPATH@/browser/extensions/{972ce4c6-7e08-4474-a285-3208198ce6fd}/icon.png
+ @BINPATH@/chrome/toolkit@JAREXT@
+diff -r 3ab960ea7383 -r 22daf53b1d10 browser/moz.build
+--- a/browser/moz.build	Thu Apr 03 19:32:00 2014 +0800
++++ b/browser/moz.build	Thu Apr 03 19:32:53 2014 +0800
+@@ -13,9 +13,13 @@
+     'locales',
+     'modules',
+     'themes',
+-    'extensions',
+ ]
+ 
++if CONFIG['MOZ_PDFJS']:
++    PARALLEL_DIRS += [
++        'extensions',
++    ]
++
+ DIRS += [
+     'devtools',
+     'app',
+diff -r 3ab960ea7383 -r 22daf53b1d10 configure.in
+--- a/configure.in	Thu Apr 03 19:32:00 2014 +0800
++++ b/configure.in	Thu Apr 03 19:32:53 2014 +0800
+@@ -8284,6 +8284,16 @@
+   AC_DEFINE(MOZ_SERVICES_SYNC)
+ fi
+ 
++MOZ_PDFJS=1
++AC_SUBST(MOZ_PDFJS)
++MOZ_ARG_DISABLE_BOOL(pdfjs,
++[  --disable-pdfjs           Disable Pdfjs],
++    MOZ_PDFJS=,
++    MOZ_PDFJS=1)
++if test -n "$MOZ_PDFJS"; then
++    AC_DEFINE(MOZ_PDFJS)
++fi
++
+ dnl Build Captive Portal Detector if required
+ AC_SUBST(MOZ_CAPTIVEDETECT)
+ if test -n "$MOZ_CAPTIVEDETECT"; then

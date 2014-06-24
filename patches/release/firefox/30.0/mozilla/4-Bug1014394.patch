@@ -1,0 +1,157 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1402456146 -28800
+#      Wed Jun 11 11:09:06 2014 +0800
+# Node ID fc6f667109dcb1170fe3f90f8522fbd1fa5145fd
+# Parent  e7fccedf8b990716a406e543950a32622656a580
+Bug 1014394 - Stale cache2.Trash files in local profile dir
+
+diff -r e7fccedf8b99 -r fc6f667109dc netwerk/cache/nsDeleteDir.cpp
+--- a/netwerk/cache/nsDeleteDir.cpp	Sun Jun 08 16:49:57 2014 +0800
++++ b/netwerk/cache/nsDeleteDir.cpp	Wed Jun 11 11:09:06 2014 +0800
+@@ -305,13 +305,6 @@
+ 
+   nsresult rv;
+ 
+-  static bool firstRun = true;
+-
+-  if (!firstRun)
+-    return NS_OK;
+-
+-  firstRun = false;
+-
+   nsCOMPtr<nsIFile> trash;
+   rv = GetTrashDir(cacheDir, &trash);
+   if (NS_FAILED(rv))
+diff -r e7fccedf8b99 -r fc6f667109dc netwerk/cache/nsDiskCacheDevice.cpp
+--- a/netwerk/cache/nsDiskCacheDevice.cpp	Sun Jun 08 16:49:57 2014 +0800
++++ b/netwerk/cache/nsDiskCacheDevice.cpp	Wed Jun 11 11:09:06 2014 +0800
+@@ -394,8 +394,6 @@
+     if (NS_FAILED(rv))
+         return rv;
+ 
+-    nsDeleteDir::RemoveOldTrashes(mCacheDirectory);
+-
+     // Open Disk Cache
+     rv = OpenDiskCache();
+     if (NS_FAILED(rv)) {
+diff -r e7fccedf8b99 -r fc6f667109dc netwerk/cache2/CacheObserver.cpp
+--- a/netwerk/cache2/CacheObserver.cpp	Sun Jun 08 16:49:57 2014 +0800
++++ b/netwerk/cache2/CacheObserver.cpp	Wed Jun 11 11:09:06 2014 +0800
+@@ -170,21 +170,6 @@
+   }
+ }
+ 
+-void CacheObserver::SchduleAutoDelete()
+-{
+-  // Auto-delete not set
+-  if (sAutoDeleteCacheVersion == -1)
+-    return;
+-
+-  // Don't autodelete the same version of the cache user has setup
+-  // to use.
+-  int32_t activeVersion = UseNewCache() ? 1 : 0;
+-  if (sAutoDeleteCacheVersion == activeVersion)
+-    return;
+-
+-  CacheStorageService::WipeCacheDirectory(sAutoDeleteCacheVersion);
+-}
+-
+ // static
+ bool const CacheObserver::UseNewCache()
+ {
+@@ -338,7 +323,8 @@
+   }
+ 
+   if (!strcmp(aTopic, "sessionstore-windows-restored")) {
+-    SchduleAutoDelete();
++    uint32_t activeVersion = UseNewCache() ? 1 : 0;
++    CacheStorageService::CleaupCacheDirectories(sAutoDeleteCacheVersion, activeVersion);
+     return NS_OK;
+   }
+ 
+diff -r e7fccedf8b99 -r fc6f667109dc netwerk/cache2/CacheObserver.h
+--- a/netwerk/cache2/CacheObserver.h	Sun Jun 08 16:49:57 2014 +0800
++++ b/netwerk/cache2/CacheObserver.h	Wed Jun 11 11:09:06 2014 +0800
+@@ -54,7 +54,6 @@
+   static CacheObserver* sSelf;
+ 
+   void AttachToPreferences();
+-  void SchduleAutoDelete();
+ 
+   static uint32_t sUseNewCache;
+   static bool sUseDiskCache;
+diff -r e7fccedf8b99 -r fc6f667109dc netwerk/cache2/CacheStorageService.cpp
+--- a/netwerk/cache2/CacheStorageService.cpp	Sun Jun 08 16:49:57 2014 +0800
++++ b/netwerk/cache2/CacheStorageService.cpp	Wed Jun 11 11:09:06 2014 +0800
+@@ -373,22 +373,47 @@
+ }
+ 
+ // static
+-void CacheStorageService::WipeCacheDirectory(uint32_t aVersion)
++void CacheStorageService::CleaupCacheDirectories(uint32_t aVersion, uint32_t aActive)
+ {
+-  nsCOMPtr<nsIFile> cacheDir;
++  // CleaupCacheDirectories is called regardless what cache version is set up to use.
++  // To obtain the cache1 directory we must unfortunatelly instantiate the old cache
++  // service despite it may not be used at all...  This also initialize nsDeleteDir.
++  nsCOMPtr<nsICacheService> service = do_GetService(NS_CACHESERVICE_CONTRACTID);
++
++  // Schedule delete of both the cache1 and cache2 remaining trashes.
++  nsCOMPtr<nsIFile> cache1Dir, cache2Dir;
++  nsCacheService::GetDiskCacheDirectory(getter_AddRefs(cache1Dir));
++  CacheFileIOManager::GetCacheDirectory(getter_AddRefs(cache2Dir));
++
++  // Make sure we schedule just once in case CleaupCacheDirectories gets called
++  // multiple times from some reason.
++  static bool runOnce = (
++    cache1Dir && NS_SUCCEEDED(nsDeleteDir::RemoveOldTrashes(cache1Dir)),
++    cache2Dir && NS_SUCCEEDED(nsDeleteDir::RemoveOldTrashes(cache2Dir))
++  );
++
++  if (!runOnce) {
++    NS_WARNING("Could not start deletion of some of the old cache trashes");
++  }
++
++  // Delete the non-active version cache data right now
++  if (aVersion == aActive) {
++    return;
++  }
++
+   switch (aVersion) {
+   case 0:
+-    nsCacheService::GetDiskCacheDirectory(getter_AddRefs(cacheDir));
++    if (cache1Dir) {
++      nsDeleteDir::DeleteDir(cache1Dir, true, 30000);
++    }
+     break;
+   case 1:
+-    CacheFileIOManager::GetCacheDirectory(getter_AddRefs(cacheDir));
++    if (cache2Dir) {
++      nsDeleteDir::DeleteDir(cache2Dir, true, 30000);
++    }
+     break;
+   }
+ 
+-  if (!cacheDir)
+-    return;
+-
+-  nsDeleteDir::DeleteDir(cacheDir, true, 30000);
+ }
+ 
+ // Helper methods
+diff -r e7fccedf8b99 -r fc6f667109dc netwerk/cache2/CacheStorageService.h
+--- a/netwerk/cache2/CacheStorageService.h	Sun Jun 08 16:49:57 2014 +0800
++++ b/netwerk/cache2/CacheStorageService.h	Wed Jun 11 11:09:06 2014 +0800
+@@ -56,8 +56,9 @@
+   void Shutdown();
+   void DropPrivateBrowsingEntries();
+ 
+-  // Wipes out the new or the old cache directory completely.
+-  static void WipeCacheDirectory(uint32_t aVersion);
++  // Takes care of deleting any pending trashes for both cache1 and cache2
++  // as well as the cache directory of an inactive cache version when requested.
++  static void CleaupCacheDirectories(uint32_t aVersion, uint32_t aActive);
+ 
+   static CacheStorageService* Self() { return sSelf; }
+   static nsISupports* SelfISupports() { return static_cast<nsICacheStorageService*>(Self()); }

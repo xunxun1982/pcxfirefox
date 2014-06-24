@@ -1,0 +1,20 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396524720 -28800
+#      Thu Apr 03 19:32:00 2014 +0800
+# Node ID 3ab960ea7383088fdb23b9cb8a2f591b3749a5a0
+# Parent  485db31576dfe05ad79118f3100b240823e20523
+Disable SPS
+
+diff -r 485db31576df -r 3ab960ea7383 configure.in
+--- a/configure.in	Thu Apr 03 19:31:19 2014 +0800
++++ b/configure.in	Thu Apr 03 19:32:00 2014 +0800
+@@ -1596,7 +1596,7 @@
+ dnl ========================================================
+ dnl SPS Profiler
+ dnl ========================================================
+-MOZ_ENABLE_PROFILER_SPS=1
++MOZ_ENABLE_PROFILER_SPS=
+ 
+ case "${OS_TARGET}" in
+ Android)

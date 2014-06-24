@@ -1,0 +1,512 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396888719 -28800
+#      Tue Apr 08 00:38:39 2014 +0800
+# Node ID 2c323aed8ce9ed0aecea3792eadfb5fca0a03433
+# Parent  e148bb1d1b338b7815d7fa56259aa15d47e247d5
+Disable Webrtc
+
+diff -r e148bb1d1b33 -r 2c323aed8ce9 browser/base/content/browser.js
+--- a/browser/base/content/browser.js	Mon Apr 07 03:34:36 2014 +0800
++++ b/browser/base/content/browser.js	Tue Apr 08 00:38:39 2014 +0800
+@@ -189,7 +189,9 @@
+ #ifdef MOZ_THUMBNAILS
+ #include browser-thumbnails.js
+ #endif
++#ifdef MOZ_WEBRTC
+ #include browser-webrtcUI.js
++#endif
+ #include browser-gestureSupport.js
+ 
+ #ifdef MOZ_DATA_REPORTING
+@@ -1049,7 +1051,9 @@
+     PanelUI.init();
+     TabstripFogConstrainer.init();
+     LightweightThemeListener.init();
++#ifdef MOZ_WEBRTC
+     WebrtcIndicator.init();
++#endif
+ 
+     // Ensure login manager is up and running.
+     Services.logins;
+diff -r e148bb1d1b33 -r 2c323aed8ce9 browser/base/content/browser.xul
+--- a/browser/base/content/browser.xul	Mon Apr 07 03:34:36 2014 +0800
++++ b/browser/base/content/browser.xul	Tue Apr 08 00:38:39 2014 +0800
+@@ -622,7 +622,7 @@
+              aria-label="&navbarCmd.label;"
+              fullscreentoolbar="true" mode="icons" customizable="true"
+              iconsize="small"
+-             defaultset="urlbar-container,search-container,webrtc-status-button,bookmarks-menu-button,downloads-button,home-button"
++             defaultset="urlbar-container,search-container,bookmarks-menu-button,downloads-button,home-button"
+              customizationtarget="nav-bar-customization-target"
+              overflowable="true"
+              overflowbutton="nav-bar-overflow-button"
+@@ -688,8 +688,10 @@
+                 <image id="web-notifications-notification-icon" class="notification-anchor-icon" role="button"/>
+                 <image id="plugin-install-notification-icon" class="notification-anchor-icon" role="button"/>
+                 <image id="mixed-content-blocked-notification-icon" class="notification-anchor-icon" role="button"/>
++#ifdef MOZ_WEBRTC
+                 <image id="webRTC-shareDevices-notification-icon" class="notification-anchor-icon" role="button"/>
+                 <image id="webRTC-sharingDevices-notification-icon" class="notification-anchor-icon" role="button"/>
++#endif
+                 <image id="pointerLock-notification-icon" class="notification-anchor-icon" role="button"/>
+                 <image id="servicesInstall-notification-icon" class="notification-anchor-icon" role="button"/>
+               </box>
+@@ -743,7 +745,7 @@
+                      flex="100" persist="width" removable="true">
+           <searchbar id="searchbar" flex="1"/>
+         </toolbaritem>
+-
++#ifdef MOZ_WEBRTC
+         <toolbarbutton id="webrtc-status-button"
+                        class="toolbarbutton-1 chromeclass-toolbar-additional"
+                        type="menu"
+@@ -757,7 +759,7 @@
+                      onpopuphiding="WebrtcIndicator.clearPopup(this);"
+                      oncommand="WebrtcIndicator.menuCommand(event.target);"/>
+         </toolbarbutton>
+-
++#endif
+         <toolbarbutton id="bookmarks-menu-button"
+                        class="toolbarbutton-1 chromeclass-toolbar-additional"
+                        persist="class"
+diff -r e148bb1d1b33 -r 2c323aed8ce9 browser/base/content/popup-notifications.inc
+--- a/browser/base/content/popup-notifications.inc	Mon Apr 07 03:34:36 2014 +0800
++++ b/browser/base/content/popup-notifications.inc	Tue Apr 08 00:38:39 2014 +0800
+@@ -7,7 +7,7 @@
+            hidden="true"
+            orient="vertical"
+            role="alert"/>
+-
++#ifdef MOZ_WEBRTC
+     <popupnotification id="webRTC-shareDevices-notification" hidden="true">
+       <popupnotificationcontent id="webRTC-selectCamera" orient="vertical">
+         <separator class="thin"/>
+@@ -28,7 +28,7 @@
+         </menulist>
+       </popupnotificationcontent>
+     </popupnotification>
+-
++#endif
+     <popupnotification id="webapps-install-progress-notification" hidden="true">
+       <popupnotificationcontent id="webapps-install-progress-content" orient="vertical" align="start">
+         <separator class="thin"/>
+diff -r e148bb1d1b33 -r 2c323aed8ce9 browser/components/nsBrowserGlue.js
+--- a/browser/components/nsBrowserGlue.js	Mon Apr 07 03:34:36 2014 +0800
++++ b/browser/components/nsBrowserGlue.js	Tue Apr 08 00:38:39 2014 +0800
+@@ -66,10 +66,10 @@
+ XPCOMUtils.defineLazyModuleGetter(this, "ShumwayUtils",
+                                   "resource://shumway/ShumwayUtils.jsm");
+ #endif
+-
++#ifdef MOZ_WEBRTC
+ XPCOMUtils.defineLazyModuleGetter(this, "webrtcUI",
+                                   "resource:///modules/webrtcUI.jsm");
+-
++#endif
+ XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
+                                   "resource://gre/modules/PrivateBrowsingUtils.jsm");
+ 
+@@ -492,7 +492,9 @@
+ #ifdef NIGHTLY_BUILD
+     ShumwayUtils.init();
+ #endif
++#ifdef MOZ_WEBRTC
+     webrtcUI.init();
++#endif
+     AboutHome.init();
+     SessionStore.init();
+ 
+@@ -663,7 +665,9 @@
+ #endif
+     webappsUI.uninit();
+     SignInToWebsiteUX.uninit();
++#ifdef MOZ_WEBRTC
+     webrtcUI.uninit();
++#endif
+     this._dispose();
+   },
+ 
+diff -r e148bb1d1b33 -r 2c323aed8ce9 browser/modules/BrowserUITelemetry.jsm
+--- a/browser/modules/BrowserUITelemetry.jsm	Mon Apr 07 03:34:36 2014 +0800
++++ b/browser/modules/BrowserUITelemetry.jsm	Tue Apr 08 00:38:39 2014 +0800
+@@ -46,7 +46,6 @@
+     "nav-bar": [
+       "urlbar-container",
+       "search-container",
+-      "webrtc-status-button",
+       "bookmarks-menu-button",
+       "downloads-button",
+       "home-button",
+diff -r e148bb1d1b33 -r 2c323aed8ce9 browser/modules/moz.build
+--- a/browser/modules/moz.build	Mon Apr 07 03:34:36 2014 +0800
++++ b/browser/modules/moz.build	Tue Apr 08 00:38:39 2014 +0800
+@@ -16,9 +16,13 @@
+     'SitePermissions.jsm',
+     'TabCrashReporter.jsm',
+     'webappsUI.jsm',
+-    'webrtcUI.jsm',
+ ]
+ 
++if CONFIG['MOZ_WEBRTC']:
++    EXTRA_JS_MODULES += [
++        'webrtcUI.jsm',
++    ]
++
+ if CONFIG['MOZ_NEWTAB'] :
+     EXTRA_JS_MODULES += [
+         'BrowserNewTabPreloader.jsm',
+diff -r e148bb1d1b33 -r 2c323aed8ce9 browser/themes/shared/browser.inc
+--- a/browser/themes/shared/browser.inc	Mon Apr 07 03:34:36 2014 +0800
++++ b/browser/themes/shared/browser.inc	Tue Apr 08 00:38:39 2014 +0800
+@@ -2,7 +2,7 @@
+ 
+ % Note that zoom-reset-button is a bit different since it doesn't use an image and thus has the image with display: none.
+ %define nestedButtons #zoom-out-button, #zoom-reset-button, #zoom-in-button, #cut-button, #copy-button, #paste-button
+-%define primaryToolbarButtons #back-button, #forward-button, #home-button, #print-button, #downloads-button, #bookmarks-menu-button, #new-tab-button, #new-window-button, #fullscreen-button, #sync-button, #feed-button, #tabview-button, #webrtc-status-button, #social-share-button, #open-file-button, #find-button, #developer-button, #preferences-button, #privatebrowsing-button, #save-page-button, #switch-to-metro-button, #add-ons-button, #history-panelmenu, #nav-bar-overflow-button, #PanelUI-menu-button, #characterencoding-button, #email-link-button, #sidebar-button, @nestedButtons@
++%define primaryToolbarButtons #back-button, #forward-button, #home-button, #print-button, #downloads-button, #bookmarks-menu-button, #new-tab-button, #new-window-button, #fullscreen-button, #sync-button, #feed-button, #tabview-button, #social-share-button, #open-file-button, #find-button, #developer-button, #preferences-button, #privatebrowsing-button, #save-page-button, #switch-to-metro-button, #add-ons-button, #history-panelmenu, #nav-bar-overflow-button, #PanelUI-menu-button, #characterencoding-button, #email-link-button, #sidebar-button, @nestedButtons@
+ 
+ %ifdef XP_MACOSX
+ % Prior to 10.7 there wasn't a native fullscreen button so we use #restore-button to exit fullscreen
+diff -r e148bb1d1b33 -r 2c323aed8ce9 browser/themes/windows/browser.css
+--- a/browser/themes/windows/browser.css	Mon Apr 07 03:34:36 2014 +0800
++++ b/browser/themes/windows/browser.css	Tue Apr 08 00:38:39 2014 +0800
+@@ -2207,12 +2207,12 @@
+ .popup-notification-icon[popupid="mixed-content-blocked"] {
+   list-style-image: url(chrome://browser/skin/mixed-content-blocked-64.png);
+ }
+-
++%ifdef MOZ_WEBRTC
+ .popup-notification-icon[popupid="webRTC-sharingDevices"],
+ .popup-notification-icon[popupid="webRTC-shareDevices"] {
+   list-style-image: url(chrome://browser/skin/webRTC-shareDevice-64.png);
+ }
+-
++%endif
+ .popup-notification-icon[popupid="pointerLock"] {
+   list-style-image: url(chrome://browser/skin/pointerLock-64.png);
+ }
+@@ -2333,7 +2333,7 @@
+ #mixed-content-blocked-notification-icon {
+   list-style-image: url(chrome://browser/skin/mixed-content-blocked-16.png);
+ }
+-
++%ifdef MOZ_WEBRTC
+ .webRTC-shareDevices-notification-icon,
+ #webRTC-shareDevices-notification-icon {
+   list-style-image: url(chrome://browser/skin/webRTC-shareDevice-16.png);
+@@ -2343,7 +2343,7 @@
+ #webRTC-sharingDevices-notification-icon {
+   list-style-image: url(chrome://browser/skin/webRTC-sharingDevice-16.png);
+ }
+-
++%endif
+ .web-notifications-notification-icon,
+ #web-notifications-notification-icon {
+   list-style-image: url(chrome://browser/skin/notification-16.png);
+diff -r e148bb1d1b33 -r 2c323aed8ce9 docshell/base/nsAboutRedirector.cpp
+--- a/docshell/base/nsAboutRedirector.cpp	Mon Apr 07 03:34:36 2014 +0800
++++ b/docshell/base/nsAboutRedirector.cpp	Tue Apr 08 00:38:39 2014 +0800
+@@ -64,8 +64,10 @@
+       nsIAboutModule::ALLOW_SCRIPT },
+     { "networking", "chrome://global/content/aboutNetworking.xhtml",
+        nsIAboutModule::ALLOW_SCRIPT },
++#ifdef MOZ_WEBRTC
+     { "webrtc", "chrome://global/content/aboutWebrtc.xhtml",
+        nsIAboutModule::ALLOW_SCRIPT },
++#endif
+     // about:srcdoc is unresolvable by specification.  It is included here
+     // because the security manager would disallow srcdoc iframes otherwise.
+     { "srcdoc", "about:blank",
+diff -r e148bb1d1b33 -r 2c323aed8ce9 docshell/build/nsDocShellModule.cpp
+--- a/docshell/build/nsDocShellModule.cpp	Mon Apr 07 03:34:36 2014 +0800
++++ b/docshell/build/nsDocShellModule.cpp	Tue Apr 08 00:38:39 2014 +0800
+@@ -181,7 +181,9 @@
+   { NS_ABOUT_MODULE_CONTRACTID_PREFIX "newaddon", &kNS_ABOUT_REDIRECTOR_MODULE_CID },
+   { NS_ABOUT_MODULE_CONTRACTID_PREFIX "support", &kNS_ABOUT_REDIRECTOR_MODULE_CID },
+   { NS_ABOUT_MODULE_CONTRACTID_PREFIX "networking", &kNS_ABOUT_REDIRECTOR_MODULE_CID },
++#ifdef MOZ_WEBRTC
+   { NS_ABOUT_MODULE_CONTRACTID_PREFIX "webrtc", &kNS_ABOUT_REDIRECTOR_MODULE_CID },
++#endif
+   { NS_ABOUT_MODULE_CONTRACTID_PREFIX "srcdoc", &kNS_ABOUT_REDIRECTOR_MODULE_CID },
+   { NS_URI_LOADER_CONTRACTID, &kNS_URI_LOADER_CID },
+   { NS_DOCUMENTLOADER_SERVICE_CONTRACTID, &kNS_DOCUMENTLOADER_SERVICE_CID },
+diff -r e148bb1d1b33 -r 2c323aed8ce9 toolkit/content/aboutWebrtc.xhtml
+--- a/toolkit/content/aboutWebrtc.xhtml	Mon Apr 07 03:34:36 2014 +0800
++++ /dev/null	Thu Jan 01 00:00:00 1970 +0000
+@@ -1,264 +0,0 @@
+-<?xml version="1.0" encoding="UTF-8"?>
+-<!-- This Source Code Form is subject to the terms of the Mozilla Public
+-   - License, v. 2.0. If a copy of the MPL was not distributed with this
+-   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+-
+-
+-<!DOCTYPE html [
+-<!ENTITY % htmlDTD PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "DTD/xhtml1-strict.dtd"> %htmlDTD;
+-]>
+-
+-<html xmlns="http://www.w3.org/1999/xhtml">
+-  <head>
+-    <title>Webrtc Internals</title>
+-  </head>
+-  <script>
+-
+-
+-function getCandPairLogs(id) {
+-  try {
+-    var wg = new WebrtcGlobalInformation();
+-    wg.getCandPairLogs(id, displayLogs, console.log);
+-  } catch (e) {
+-    console.log("Exception while creating WebrtcGlobalInformation" + e.toString());
+-  }
+-}
+-
+-function getAllLogs() {
+-  try {
+-    var wg = new WebrtcGlobalInformation();
+-    wg.getLogs('', displayLogs, console.log);
+-  } catch(e) {
+-    console.log("Exception while creating WebrtcGlobalInformation" + e.toString());
+-  }
+-}
+-
+-function displayLogs(logs) {
+-  var logsDiv = document.getElementById('logs');
+-  while (logsDiv.lastChild) {
+-    logsDiv.removeChild(logsDiv.lastChild);
+-  }
+-  logsDiv.appendChild(document.createElement('h3'))
+-         .appendChild(document.createTextNode('Logging:'));
+-  logs.forEach(function(logLine){
+-    logsDiv.appendChild(document.createElement('div'))
+-           .appendChild(document.createTextNode(logLine));
+-  });
+-}
+-
+-function buildCandPairTableRow(candPair, stats) {
+-  var row = document.createElement('tr');
+-  row.onclick = function() {
+-    getCandPairLogs(candPair.id);
+-  }
+-
+-  if (stats.has(candPair.localCandidateId)) {
+-    // TODO: Might have collisions; we either need to be able to supply
+-    // desired type to get(), or do the ugly business of putting the type
+-    // in the id as well as the type field.
+-    var localCand = stats.get(candPair.localCandidateId);
+-    row.appendChild(document.createElement('td'))
+-       .appendChild(document.createTextNode(localCand.ipAddress + ':' +
+-                                            localCand.portNumber + '/' +
+-                                            localCand.candidateType));
+-  } else {
+-    row.appendChild(document.createElement('td'))
+-       .appendChild(document.createTextNode(candPair.localCandidateId));
+-  }
+-
+-  if (stats.has(candPair.remoteCandidateId)) {
+-    // TODO: Might have collisions; we either need to be able to supply
+-    // desired type to get(), or do the ugly business of putting the type
+-    // in the id as well as the type field.
+-    var remoteCand = stats.get(candPair.remoteCandidateId);
+-    row.appendChild(document.createElement('td'))
+-       .appendChild(document.createTextNode(remoteCand.ipAddress + ':' +
+-                                            remoteCand.portNumber + '/' +
+-                                            remoteCand.candidateType));
+-  } else {
+-    row.appendChild(document.createElement('td'))
+-       .appendChild(document.createTextNode(candPair.remoteCandidateId));
+-  }
+-
+-  row.appendChild(document.createElement('td'))
+-     .appendChild(document.createTextNode(candPair.state));
+-  row.appendChild(document.createElement('td'))
+-     .appendChild(document.createTextNode(candPair.mozPriority));
+-
+-  row.appendChild(document.createElement('td'))
+-     .appendChild(document.createTextNode(candPair.nominated ? '*' : ''));
+-  row.appendChild(document.createElement('td'))
+-     .appendChild(document.createTextNode(candPair.selected ? '*' : ''));
+-  return row;
+-}
+-
+-function buildCandTableRow(cand, stats) {
+-  var row = document.createElement('tr');
+-
+-  row.appendChild(document.createElement('td'))
+-     .appendChild(document.createTextNode(cand.ipAddress + ':' +
+-                                          cand.portNumber));
+-
+-  row.appendChild(document.createElement('td'))
+-     .appendChild(document.createTextNode(cand.candidateType));
+-  return row;
+-}
+-
+-function buildCandPairTableHeader() {
+-  var headerRow = document.createElement('tr');
+-  headerRow.appendChild(document.createElement('th'))
+-           .appendChild(document.createTextNode('Local candidate'));
+-  headerRow.appendChild(document.createElement('th'))
+-           .appendChild(document.createTextNode('Remote candidate'));
+-  headerRow.appendChild(document.createElement('th'))
+-           .appendChild(document.createTextNode('ICE State'));
+-  headerRow.appendChild(document.createElement('th'))
+-           .appendChild(document.createTextNode('Priority'));
+-  headerRow.appendChild(document.createElement('th'))
+-           .appendChild(document.createTextNode('Nominated'));
+-  headerRow.appendChild(document.createElement('th'))
+-           .appendChild(document.createTextNode('Selected'));
+-  return headerRow;
+-}
+-
+-function buildCandTableHeader(isLocal) {
+-  var headerRow = document.createElement('tr');
+-  headerRow.appendChild(document.createElement('th'))
+-           .appendChild(document.createTextNode(isLocal ?
+-                                                'Local candidate addr' :
+-                                                'Remote candidate addr'));
+-  headerRow.appendChild(document.createElement('th'))
+-           .appendChild(document.createTextNode('Type'));
+-  return headerRow;
+-}
+-
+-function buildEmptyCandPairTable() {
+-  var candPairTable = document.createElement('table');
+-  candPairTable.appendChild(buildCandPairTableHeader());
+-  return candPairTable;
+-}
+-
+-function buildEmptyCandTable(local) {
+-  var candTable = document.createElement('table');
+-  candTable.appendChild(buildCandTableHeader(local));
+-  return candTable;
+-}
+-
+-function round00(num) {
+-  return Math.round(num * 100) / 100;
+-}
+-
+-function dumpStat(stat, label) {
+-  var div = document.createElement('div');
+-  var statsString = " " + label + new Date(stat.timestamp).toTimeString() +
+-                    " " + stat.type + " SSRC: " + stat.ssrc;
+-  if (stat.packetsReceived !== undefined) {
+-    statsString += " Received: " + stat.packetsReceived + " packets";
+-    if (stat.bytesReceived !== undefined) {
+-      statsString += " (" + round00(stat.bytesReceived/1024) + " Kb)";
+-    }
+-    statsString += " Jitter: " + stat.jitter;
+-  } else if (stat.packetsSent !== undefined) {
+-    statsString += " Sent: " + stat.packetsSent + " packets";
+-    if (stat.bytesSent !== undefined) {
+-      statsString += " (" + round00(stat.bytesSent/1024) + " Kb)";
+-    }
+-  }
+-  div.appendChild(document.createTextNode(statsString));
+-  return div;
+-}
+-
+-function buildPcDiv(stats, pcDivId) {
+-  var newPcDiv = document.createElement('div');
+-
+-  var heading = document.createElement('h3');
+-  heading.appendChild(document.createTextNode(pcDivId));
+-  newPcDiv.appendChild(heading);
+-
+-  var subDivs = {};
+-
+-  stats.forEach(function(stat) {
+-    if (!stat.componentId) {
+-      if (!stat.isRemote) {
+-        newPcDiv.appendChild(document.createElement('h4'))
+-                .appendChild(document.createTextNode(stat.id));
+-        if (stat.remoteId) {
+-          newPcDiv.appendChild(dumpStat(stat, "Local: "));
+-          newPcDiv.appendChild(dumpStat(stats.get(stat.remoteId), "Remote: "));
+-        } else {
+-          newPcDiv.appendChild(dumpStat(stat, ""));
+-        }
+-      }
+-      return;
+-    }
+-
+-    if (!subDivs[stat.componentId]) {
+-      subDivs[stat.componentId] = {
+-        candPairTable: buildEmptyCandPairTable(),
+-        localCandTable: buildEmptyCandTable(true),
+-        remoteCandTable: buildEmptyCandTable(false)
+-      };
+-    }
+-
+-    var subDiv = subDivs[stat.componentId];
+-
+-    if (stat.type == 'candidatepair') {
+-      subDiv.candPairTable.appendChild(buildCandPairTableRow(stat, stats));
+-    } else if (stat.type == 'localcandidate') {
+-      subDiv.localCandTable.appendChild(buildCandTableRow(stat, stats));
+-    } else if (stat.type == 'remotecandidate') {
+-      subDiv.remoteCandTable.appendChild(buildCandTableRow(stat, stats));
+-    }
+-  });
+-
+-  for (var cid in subDivs) {
+-    if (subDivs.hasOwnProperty(cid)) {
+-      var subDiv = subDivs[cid];
+-      newPcDiv.appendChild(document.createElement('h4'))
+-              .appendChild(document.createTextNode(cid));
+-      newPcDiv.appendChild(subDiv.candPairTable);
+-      newPcDiv.appendChild(subDiv.localCandTable);
+-      newPcDiv.appendChild(subDiv.remoteCandTable);
+-    }
+-  }
+-
+-  return newPcDiv;
+-}
+-
+-function displayStats(obj) {
+-  console.log("Got stats callback.");
+-  var pcid = obj.mozPcid;
+-  var pcDivId = 'PeerConnection:' + pcid;
+-
+-  var pcDiv = document.getElementById(pcDivId);
+-  var newPcDiv = buildPcDiv(obj, pcDivId);
+-  newPcDiv.id = pcDivId;
+-
+-  if (!pcDiv) {
+-    document.getElementById('stats').appendChild(newPcDiv);
+-  } else {
+-    document.getElementById('stats').replaceChild(newPcDiv, pcDiv);
+-  }
+-}
+-
+-function refreshStats() {
+-  try {
+-    var wg = new WebrtcGlobalInformation();
+-    wg.getAllStats(displayStats, console.log);
+-  } catch(e) {
+-    console.log("Exception while creating WebrtcGlobalInformation:" + e.toString());
+-  }
+-}
+-
+-  </script>
+-
+-  <body id="body" onload="refreshStats()">
+-    <div id="stats">
+-    </div>
+-    <button onclick="getAllLogs()">Show/refresh logging</button>
+-    <div id="logs">
+-    </div>
+-  </body>
+-</html>
+-<!-- vim: softtabstop=2:shiftwidth=2:expandtab
+--->
+diff -r e148bb1d1b33 -r 2c323aed8ce9 toolkit/content/jar.mn
+--- a/toolkit/content/jar.mn	Mon Apr 07 03:34:36 2014 +0800
++++ b/toolkit/content/jar.mn	Tue Apr 08 00:38:39 2014 +0800
+@@ -17,7 +17,6 @@
+    content/global/aboutRights-unbranded.xhtml (aboutRights-unbranded.xhtml)
+    content/global/aboutNetworking.js
+    content/global/aboutNetworking.xhtml
+-   content/global/aboutWebrtc.xhtml
+ *  content/global/aboutSupport.js
+ *  content/global/aboutSupport.xhtml
+    content/global/directionDetector.html

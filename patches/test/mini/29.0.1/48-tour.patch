@@ -1,0 +1,73 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396776451 -28800
+#      Sun Apr 06 17:27:31 2014 +0800
+# Node ID 627cc9799277a80144a22240fea1c4be93617816
+# Parent  8471b5db2e5dbad427bc69ff6fa870713fc722d3
+Remove Firefox Tour
+
+diff -r 8471b5db2e5d -r 627cc9799277 browser/base/content/baseMenuOverlay.xul
+--- a/browser/base/content/baseMenuOverlay.xul	Sun Apr 06 17:08:46 2014 +0800
++++ b/browser/base/content/baseMenuOverlay.xul	Sun Apr 06 17:27:31 2014 +0800
+@@ -52,10 +52,6 @@
+ #else
+                   />
+ #endif
+-        <menuitem id="menu_openTour"
+-                  oncommand="openTourPage();"
+-                  label="&helpShowTour.label;"
+-                  accesskey="&helpShowTour.accesskey;"/>
+         <menuitem id="menu_keyboardShortcuts"
+                   oncommand="openHelpLink('keyboard-shortcuts')"
+                   onclick="checkForMiddleClick(this, event);"
+diff -r 8471b5db2e5d -r 627cc9799277 browser/base/content/content.js
+--- a/browser/base/content/content.js	Sun Apr 06 17:08:46 2014 +0800
++++ b/browser/base/content/content.js	Sun Apr 06 17:27:31 2014 +0800
+@@ -15,8 +15,6 @@
+   "InsecurePasswordUtils", "resource://gre/modules/InsecurePasswordUtils.jsm");
+ XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
+   "resource://gre/modules/PrivateBrowsingUtils.jsm");
+-XPCOMUtils.defineLazyModuleGetter(this, "UITour",
+-  "resource:///modules/UITour.jsm");
+ 
+ // Creates a new nsIURI object.
+ function makeURI(uri, originCharset, baseURI) {
+@@ -49,14 +47,6 @@
+     LoginManagerContent.onUsernameInput(event);
+   });
+ 
+-  addEventListener("mozUITour", function(event) {
+-    if (!Services.prefs.getBoolPref("browser.uitour.enabled"))
+-      return;
+-
+-    let handled = UITour.onPageEvent(event);
+-    if (handled)
+-      addEventListener("pagehide", UITour);
+-  }, false, true);
+ }
+ 
+ let AboutHomeListener = {
+diff -r 8471b5db2e5d -r 627cc9799277 browser/base/content/utilityOverlay.js
+--- a/browser/base/content/utilityOverlay.js	Sun Apr 06 17:08:46 2014 +0800
++++ b/browser/base/content/utilityOverlay.js	Sun Apr 06 17:27:31 2014 +0800
+@@ -567,9 +567,6 @@
+ 
+ function openTourPage()
+ {
+-  let scope = {}
+-  Components.utils.import("resource:///modules/UITour.jsm", scope);
+-  openUILinkIn(scope.UITour.url, "tab");
+ }
+ 
+ function buildHelpMenu()
+diff -r 8471b5db2e5d -r 627cc9799277 browser/modules/moz.build
+--- a/browser/modules/moz.build	Sun Apr 06 17:08:46 2014 +0800
++++ b/browser/modules/moz.build	Sun Apr 06 17:27:31 2014 +0800
+@@ -34,7 +34,6 @@
+ EXTRA_PP_JS_MODULES += [
+     'AboutHome.jsm',
+     'RecentWindow.jsm',
+-    'UITour.jsm',
+ ]
+ 
+ if CONFIG['MOZILLA_OFFICIAL']:

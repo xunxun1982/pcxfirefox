@@ -1,0 +1,19 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396553498 -28800
+#      Fri Apr 04 03:31:38 2014 +0800
+# Node ID ca382ebb640117a549317eff2ad2883617eba6e9
+# Parent  05069ce89e34b0cc1a68b7dcca8d8eccb32af5d0
+Disable newtab 2
+
+diff -r 05069ce89e34 -r ca382ebb6401 browser/base/content/tabbrowser.xml
+--- a/browser/base/content/tabbrowser.xml	Fri Apr 04 02:55:33 2014 +0800
++++ b/browser/base/content/tabbrowser.xml	Fri Apr 04 03:31:38 2014 +0800
+@@ -1596,7 +1596,6 @@
+             if (aURI == BROWSER_NEW_TAB_URL &&
+                 !PrivateBrowsingUtils.isWindowPrivate(window) &&
+                 !gMultiProcessBrowser) {
+-              docShellsSwapped = gBrowserNewTabPreloader.newTab(t);
+             } else if (aURI == "about:customizing") {
+               docShellsSwapped = gCustomizationTabPreloader.newTab(t);
+             }

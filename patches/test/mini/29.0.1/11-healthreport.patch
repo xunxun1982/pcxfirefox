@@ -1,0 +1,25 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396524813 -28800
+#      Thu Apr 03 19:33:33 2014 +0800
+# Node ID 438685cc8901902a6a5c57cddf8110eb62c62ac4
+# Parent  22daf53b1d108fd24ee4627cfb1936b841e09a9c
+Disable healthreport
+
+diff -r 22daf53b1d10 -r 438685cc8901 configure.in
+--- a/configure.in	Thu Apr 03 19:32:53 2014 +0800
++++ b/configure.in	Thu Apr 03 19:33:33 2014 +0800
+@@ -8262,8 +8262,12 @@
+ 
+ dnl Build Firefox Health Reporter Service
+ AC_SUBST(MOZ_SERVICES_HEALTHREPORT)
++MOZ_ARG_DISABLE_BOOL(healthreport,
++[  --disable-healthreport           Disable healthreport],
++    MOZ_SERVICES_HEALTHREPORT=,
++    MOZ_SERVICES_HEALTHREPORT=1)
+ if test -n "$MOZ_SERVICES_HEALTHREPORT"; then
+-  AC_DEFINE(MOZ_SERVICES_HEALTHREPORT)
++    AC_DEFINE(MOZ_SERVICES_HEALTHREPORT)
+ fi
+ 
+ dnl Build Services metrics component

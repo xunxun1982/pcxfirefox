@@ -1,0 +1,581 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396547624 -28800
+#      Fri Apr 04 01:53:44 2014 +0800
+# Node ID 8ad062fa5c5d5a3ca14854882cf57ad4f37b280f
+# Parent  b35e59f9bd95d86f2e9e9dc182bfb12bf509907a
+Move freebl and softoken to NSS
+
+diff -r b35e59f9bd95 -r 8ad062fa5c5d browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Fri Apr 04 01:25:27 2014 +0800
++++ b/browser/installer/package-manifest.in	Fri Apr 04 01:53:44 2014 +0800
+@@ -757,7 +757,9 @@
+ ; meaning their .chk files are created there directly.
+ ;
+ #ifndef MOZ_NATIVE_NSS
++#ifdef PCXMINI
+ @BINPATH@/@DLL_PREFIX@freebl3@DLL_SUFFIX@
++#endif
+ @BINPATH@/@DLL_PREFIX@nss3@DLL_SUFFIX@
+ @BINPATH@/@DLL_PREFIX@nssckbi@DLL_SUFFIX@
+ #ifndef NSS_DISABLE_DBM
+@@ -768,8 +770,10 @@
+ @BINPATH@/@DLL_PREFIX@smime3@DLL_SUFFIX@
+ @BINPATH@/@DLL_PREFIX@ssl3@DLL_SUFFIX@
+ #endif
++#ifdef PCXMINI
+ @BINPATH@/@DLL_PREFIX@softokn3@DLL_SUFFIX@
+ #endif
++#endif
+ @BINPATH@/chrome/pippki@JAREXT@
+ @BINPATH@/chrome/pippki.manifest
+ @BINPATH@/components/pipboot.xpt
+diff -r b35e59f9bd95 -r 8ad062fa5c5d security/build/Makefile.in
+--- a/security/build/Makefile.in	Fri Apr 04 01:25:27 2014 +0800
++++ b/security/build/Makefile.in	Fri Apr 04 01:53:44 2014 +0800
+@@ -25,7 +25,6 @@
+ 
+ NSS_EXTRA_DLLS = \
+   nssckbi \
+-  softokn3 \
+   $(NULL)
+ 
+ ifndef NSS_DISABLE_DBM
+@@ -66,9 +65,6 @@
+ endif
+ endif
+ 
+-ifdef HAVE_FREEBL_LIBS
+-NSS_EXTRA_DLLS += freebl3
+-endif
+ ifdef HAVE_FREEBL_LIBS_32INT32
+ NSS_EXTRA_DLLS += freebl_32int_3
+ endif
+@@ -294,7 +290,6 @@
+ endif
+ NSS_DIRS += \
+   nss/cmd/lib \
+-  nss/cmd/shlibsign \
+   $(NULL)
+ 
+ ifdef ENABLE_TESTS
+@@ -423,6 +418,9 @@
+ $(DIST)/lib/$(IMPORT_PREFIX)ssl3$(IMPORT_SUFFIX) \
+ $(DIST)/lib/$(IMPORT_PREFIX)smime3$(IMPORT_SUFFIX): $(DIST)/lib/$(IMPORT_PREFIX)nss3$(IMPORT_SUFFIX)
+ ifeq (WINNT,$(OS_TARGET))
++	cp $< $(SQLITE_IMPORT_LIB)
++	cp $< $(DIST)/lib/$(IMPORT_PREFIX)ssl3$(IMPORT_SUFFIX)
++	cp $< $(DIST)/lib/$(IMPORT_PREFIX)smime3$(IMPORT_SUFFIX)
+ 	cp $< $@
+ else
+ 	ln -sf $< $@
+@@ -513,3 +511,7 @@
+ LDFLAGS += $(PROFILE_USE_LDFLAGS)
+ DLLFLAGS += $(PROFILE_USE_LDFLAGS)
+ endif # MOZ_PROFILE_USE
++
++ifndef NSS_DISABLE_DBM
++LDFLAGS += ../nss/lib/nss/../softoken/legacydb/nssdbm.lib ../nss/lib/nss/../dbm/src/dbm.lib shell32.lib advapi32.lib
++endif
+diff -r b35e59f9bd95 -r 8ad062fa5c5d security/nss/coreconf/config.mk
+--- a/security/nss/coreconf/config.mk	Fri Apr 04 01:25:27 2014 +0800
++++ b/security/nss/coreconf/config.mk	Fri Apr 04 01:53:44 2014 +0800
+@@ -170,6 +170,8 @@
+ DEFINES += -DNSS_PKIX_NO_LDAP
+ endif
+ 
++DEFINES += -DNSS_STATIC_LINK
++
+ # Avoid building object leak test code for optimized library
+ ifndef BUILD_OPT
+ ifdef PKIX_OBJECT_LEAK_TEST
+diff -r b35e59f9bd95 -r 8ad062fa5c5d security/nss/coreconf/rules.mk
+--- a/security/nss/coreconf/rules.mk	Fri Apr 04 01:25:27 2014 +0800
++++ b/security/nss/coreconf/rules.mk	Fri Apr 04 01:53:44 2014 +0800
+@@ -297,7 +297,7 @@
+ ifdef NS_USE_GCC
+ 	$(LINK_DLL) $(OBJS) $(SUB_SHLOBJS) $(EXTRA_LIBS) $(EXTRA_SHARED_LIBS) $(OS_LIBS) $(LD_LIBS) $(RES)
+ else
+-	$(LINK_DLL) -MAP $(DLLBASE) $(subst /,\\,$(OBJS) $(SUB_SHLOBJS) $(EXTRA_LIBS) $(EXTRA_SHARED_LIBS) $(OS_LIBS) $(LD_LIBS) $(RES))
++	$(LINK_DLL) -MAP $(DLLBASE) $(subst /,\\,$(OBJS) $(SUB_SHLOBJS) $(EXTRA_LIBS) $(EXTRA_SHARED_LIBS) $(OS_LIBS) $(LD_LIBS) $(RES)) shell32.lib advapi32.lib
+ ifdef MT
+ 	if test -f $@.manifest; then \
+ 		$(MT) -NOLOGO -MANIFEST $@.manifest -OUTPUTRESOURCE:$@\;2; \
+diff -r b35e59f9bd95 -r 8ad062fa5c5d security/nss/lib/freebl/config.mk
+--- a/security/nss/lib/freebl/config.mk	Fri Apr 04 01:25:27 2014 +0800
++++ b/security/nss/lib/freebl/config.mk	Fri Apr 04 01:53:44 2014 +0800
+@@ -2,44 +2,12 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+-# only do this in the outermost freebl build.
+-ifndef FREEBL_CHILD_BUILD
++# We build the static lib.
+ 
+-# We're going to change this build so that it builds libfreebl.a with
+-# just loader.c.  Then we have to build this directory twice again to 
+-# build the two DSOs.
+-# To build libfreebl.a with just loader.c, we must now override many
+-# of the make variables setup by the prior inclusion of CORECONF's config.mk
+-
+-CSRCS		= loader.c 
+-SIMPLE_OBJS 	= $(CSRCS:.c=$(OBJ_SUFFIX))
+-OBJS 		= $(addprefix $(OBJDIR)/$(PROG_PREFIX), $(SIMPLE_OBJS))
+-ALL_TRASH :=    $(TARGETS) $(OBJS) $(OBJDIR) LOGS TAGS $(GARBAGE) \
+-                $(NOSUCHFILE) so_locations 
+-
+-# this is not a recursive child make.  We make a static lib. (archive)
+-
+-# Override the values defined in coreconf's ruleset.mk.
+-#
+-# - (1) LIBRARY: a static (archival) library
+-# - (2) SHARED_LIBRARY: a shared (dynamic link) library
+-# - (3) IMPORT_LIBRARY: an import library, used only on Windows
+-# - (4) PROGRAM: an executable binary
+-#
+-# override these variables to prevent building a DSO/DLL.
+-  TARGETS        = $(LIBRARY)
+-  SHARED_LIBRARY =
+-  IMPORT_LIBRARY =
+-  PROGRAM        =
+-
+-else
+-
+-# This is a recursive child make. We build the shared lib.
+-
+-TARGETS      = $(SHARED_LIBRARY)
+-LIBRARY      =
++TARGETS        = $(LIBRARY)
++SHARED_LIBRARY =
+ IMPORT_LIBRARY =
+-PROGRAM      =
++PROGRAM        =
+ 
+ ifeq ($(OS_TARGET), SunOS)
+ OS_LIBS += -lkstat
+@@ -47,12 +15,6 @@
+ 
+ ifeq (,$(filter-out WIN%,$(OS_TARGET)))
+ 
+-# don't want the 32 in the shared library name
+-SHARED_LIBRARY = $(OBJDIR)/$(DLL_PREFIX)$(LIBRARY_NAME)$(LIBRARY_VERSION).$(DLL_SUFFIX)
+-
+-RES     = $(OBJDIR)/$(LIBRARY_NAME).res
+-RESNAME = freebl.rc
+-
+ ifdef NS_USE_GCC
+ OS_LIBS += -ladvapi32
+ else
+@@ -93,5 +55,3 @@
+ ifeq ($(OS_ARCH), Darwin)
+ EXTRA_SHARED_LIBS += -dylib_file @executable_path/libplc4.dylib:$(DIST)/lib/libplc4.dylib -dylib_file @executable_path/libplds4.dylib:$(DIST)/lib/libplds4.dylib
+ endif
+-
+-endif
+diff -r b35e59f9bd95 -r 8ad062fa5c5d security/nss/lib/freebl/freebl.def
+--- a/security/nss/lib/freebl/freebl.def	Fri Apr 04 01:25:27 2014 +0800
++++ b/security/nss/lib/freebl/freebl.def	Fri Apr 04 01:53:44 2014 +0800
+@@ -1,26 +1,1 @@
+-;+#
+-;+# This Source Code Form is subject to the terms of the Mozilla Public
+-;+# License, v. 2.0. If a copy of the MPL was not distributed with this
+-;+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+-;+#
+-;+# OK, this file is meant to support SUN, LINUX, AIX and WINDOWS
+-;+#   1. For all unix platforms, the string ";-"  means "remove this line"
+-;+#   2. For all unix platforms, the string " DATA " will be removed from any 
+-;+#	line on which it occurs.
+-;+#   3. Lines containing ";+" will have ";+" removed on SUN and LINUX.
+-;+#      On AIX, lines containing ";+" will be removed.  
+-;+#   4. For all unix platforms, the string ";;" will thave the ";;" removed.
+-;+#   5. For all unix platforms, after the above processing has taken place,
+-;+#    all characters after the first ";" on the line will be removed.  
+-;+#    And for AIX, the first ";" will also be removed.
+-;+#  This file is passed directly to windows. Since ';' is a comment, all UNIX
+-;+#   directives are hidden behind ";", ";+", and ";-"
+-;+
+-;+NSSprivate_3.11 {               # NSS 3.11 release
+-;+    global:
+-LIBRARY freebl3 ;-
+-EXPORTS	;-
+-FREEBL_GetVector;
+-;+    local:
+-;+       *;
+-;+};
++
+diff -r b35e59f9bd95 -r 8ad062fa5c5d security/nss/lib/freebl/rsa.c
+--- a/security/nss/lib/freebl/rsa.c	Fri Apr 04 01:25:27 2014 +0800
++++ b/security/nss/lib/freebl/rsa.c	Fri Apr 04 01:53:44 2014 +0800
+@@ -1559,6 +1559,13 @@
+     RSA_Cleanup();
+ }
+ 
++#ifdef NSS_STATIC_LINK
++void
++BL_Unload(void)
++{
++}
++#endif
++
+ PRBool bl_parentForkedAfterC_Initialize;
+ 
+ /*
+diff -r b35e59f9bd95 -r 8ad062fa5c5d security/nss/lib/freebl/shvfy.c
+--- a/security/nss/lib/freebl/shvfy.c	Fri Apr 04 01:25:27 2014 +0800
++++ b/security/nss/lib/freebl/shvfy.c	Fri Apr 04 01:53:44 2014 +0800
+@@ -273,9 +273,21 @@
+     return SECSuccess;
+ }
+ 
++/*
++ * Define PSEUDO_FIPS if you can't do FIPS software integrity test (e.g.,
++ * if you're using NSS as static libraries), but want to conform to the
++ * rest of the FIPS requirements.
++ */
++#ifdef NSS_STATIC_LINK
++#define PSEUDO_FIPS
++#endif
++
+ PRBool
+ BLAPI_SHVerify(const char *name, PRFuncPtr addr)
+ {
++#ifdef PSEUDO_FIPS
++    return PR_TRUE;  /* a lie, hence *pseudo* FIPS */
++#else
+     PRBool result = PR_FALSE; /* if anything goes wrong,
+ 			       * the signature does not verify */
+     /* find our shared library name */
+@@ -291,11 +303,15 @@
+     }
+ 
+     return result;
++#endif  /* PSEUDO_FIPS */
+ }
+ 
+ PRBool
+ BLAPI_SHVerifyFile(const char *shName)
+ {
++#ifdef PSEUDO_FIPS
++    return PR_TRUE;  /* a lie, hence *pseudo* FIPS */
++#else
+     char *checkName = NULL;
+     PRFileDesc *checkFD = NULL;
+     PRFileDesc *shFD = NULL;
+@@ -492,6 +508,7 @@
+     }
+ 
+     return result;
++#endif  /* PSEUDO_FIPS */
+ }
+ 
+ PRBool
+diff -r b35e59f9bd95 -r 8ad062fa5c5d security/nss/lib/libpkix/pkix_pl_nss/module/pkix_pl_httpcertstore.c
+--- a/security/nss/lib/libpkix/pkix_pl_nss/module/pkix_pl_httpcertstore.c	Fri Apr 04 01:25:27 2014 +0800
++++ b/security/nss/lib/libpkix/pkix_pl_nss/module/pkix_pl_httpcertstore.c	Fri Apr 04 01:53:44 2014 +0800
+@@ -201,7 +201,10 @@
+ 
+ typedef SECStatus (*pkix_DecodeCertsFunc)(char *certbuf, int certlen,
+                                           CERTImportCertificateFunc f, void *arg);
+-
++#ifdef NSS_STATIC_LINK
++extern SECStatus CERT_DecodeCertPackage(char* certbuf, int certlen,
++                                        CERTImportCertificateFunc f, void* arg);
++#endif
+ 
+ struct pkix_DecodeFuncStr {
+     pkix_DecodeCertsFunc func;          /* function pointer to the 
+@@ -223,6 +226,11 @@
+  */
+ static PRStatus PR_CALLBACK pkix_getDecodeFunction(void)
+ {
++#ifdef NSS_STATIC_LINK
++    pkix_decodeFunc.smimeLib = NULL;
++    pkix_decodeFunc.func = CERT_DecodeCertPackage;
++    return PR_SUCCESS;
++#else
+     pkix_decodeFunc.smimeLib = 
+ 		PR_LoadLibrary(SHLIB_PREFIX"smime3."SHLIB_SUFFIX);
+     if (pkix_decodeFunc.smimeLib == NULL) {
+@@ -235,7 +243,7 @@
+ 	return PR_FAILURE;
+     }
+     return PR_SUCCESS;
+-
++#endif
+ }
+ 
+ /*
+diff -r b35e59f9bd95 -r 8ad062fa5c5d security/nss/lib/nss/config.mk
+--- a/security/nss/lib/nss/config.mk	Fri Apr 04 01:25:27 2014 +0800
++++ b/security/nss/lib/nss/config.mk	Fri Apr 04 01:53:44 2014 +0800
+@@ -90,6 +90,8 @@
+ 	../libpkix/pkix_pl_nss/pki \
+ 	../libpkix/pkix_pl_nss/system \
+ 	../libpkix/pkix_pl_nss/module \
++	../freebl \
++	../softoken \
+ 	$(NULL)
+ 
+ ifeq (,$(filter-out WINNT WIN95,$(OS_TARGET)))
+diff -r b35e59f9bd95 -r 8ad062fa5c5d security/nss/lib/pk11wrap/pk11load.c
+--- a/security/nss/lib/pk11wrap/pk11load.c	Fri Apr 04 01:25:27 2014 +0800
++++ b/security/nss/lib/pk11wrap/pk11load.c	Fri Apr 04 01:53:44 2014 +0800
+@@ -318,6 +318,11 @@
+     }
+ }
+ 
++#ifdef NSS_STATIC_LINK
++extern CK_RV NSC_GetFunctionList(CK_FUNCTION_LIST_PTR *pFunctionList);
++extern CK_RV FC_GetFunctionList(CK_FUNCTION_LIST_PTR *pFunctionList);
++extern char **NSC_ModuleDBFunc(unsigned long function,char *parameters, void *args);
++#else
+ static const char* my_shlib_name =
+     SHLIB_PREFIX"nss"SHLIB_VERSION"."SHLIB_SUFFIX;
+ static const char* softoken_shlib_name =
+@@ -326,12 +331,14 @@
+ static PRCallOnceType loadSoftokenOnce;
+ static PRLibrary* softokenLib;
+ static PRInt32 softokenLoadCount;
++#endif  /* NSS_STATIC_LINK */
+ 
+ #include "prio.h"
+ #include "prprf.h"
+ #include <stdio.h>
+ #include "prsystem.h"
+ 
++#ifndef NSS_STATIC_LINK
+ /* This function must be run only once. */
+ /*  determine if hybrid platform, then actually load the DSO. */
+ static PRStatus
+@@ -348,6 +355,7 @@
+   }
+   return PR_FAILURE;
+ }
++#endif  /* !NSS_STATIC_LINK */
+ 
+ /*
+  * load a new module into our address space and initialize it.
+@@ -366,6 +374,16 @@
+ 
+     /* intenal modules get loaded from their internal list */
+     if (mod->internal && (mod->dllName == NULL)) {
++#ifdef NSS_STATIC_LINK
++    if (mod->isFIPS) {
++        entry = FC_GetFunctionList;
++    } else {
++        entry = NSC_GetFunctionList;
++    }
++    if (mod->isModuleDB) {
++        mod->moduleDBFunc = NSC_ModuleDBFunc;
++    }
++#else
+     /*
+      * Loads softoken as a dynamic library,
+      * even though the rest of NSS assumes this as the "internal" module.
+@@ -391,6 +409,7 @@
+         mod->moduleDBFunc = (CK_C_GetFunctionList) 
+                     PR_FindSymbol(softokenLib, "NSC_ModuleDBFunc");
+     }
++#endif
+ 
+     if (mod->moduleDBOnly) {
+         mod->loaded = PR_TRUE;
+@@ -562,6 +581,7 @@
+      * if not, we should change this to SECFailure and move it above the
+      * mod->loaded = PR_FALSE; */
+     if (mod->internal && (mod->dllName == NULL)) {
++#ifndef NSS_STATIC_LINK
+         if (0 == PR_ATOMIC_DECREMENT(&softokenLoadCount)) {
+           if (softokenLib) {
+               disableUnload = PR_GetEnv("NSS_DISABLE_UNLOAD");
+@@ -573,6 +593,7 @@
+           }
+           loadSoftokenOnce = pristineCallOnce;
+         }
++#endif
+ 	return SECSuccess;
+     }
+ 
+diff -r b35e59f9bd95 -r 8ad062fa5c5d security/nss/lib/softoken/config.mk
+--- a/security/nss/lib/softoken/config.mk	Fri Apr 04 01:25:27 2014 +0800
++++ b/security/nss/lib/softoken/config.mk	Fri Apr 04 01:53:44 2014 +0800
+@@ -13,12 +13,11 @@
+ # can't do this in manifest.mn because OS_TARGET isn't defined there.
+ ifeq (,$(filter-out WIN%,$(OS_TARGET)))
+ 
+-# don't want the 32 in the shared library name
+-SHARED_LIBRARY = $(OBJDIR)/$(DLL_PREFIX)$(LIBRARY_NAME)$(LIBRARY_VERSION).$(DLL_SUFFIX)
+-IMPORT_LIBRARY = $(OBJDIR)/$(IMPORT_LIB_PREFIX)$(LIBRARY_NAME)$(LIBRARY_VERSION)$(IMPORT_LIB_SUFFIX)
+-
+-RES = $(OBJDIR)/$(LIBRARY_NAME).res
+-RESNAME = $(LIBRARY_NAME).rc
++# We build the static lib.
++TARGETS        = $(LIBRARY)
++SHARED_LIBRARY =
++IMPORT_LIBRARY =
++PROGRAM        =
+ 
+ ifdef NS_USE_GCC
+ EXTRA_SHARED_LIBS += \
+diff -r b35e59f9bd95 -r 8ad062fa5c5d security/nss/lib/softoken/lgglue.c
+--- a/security/nss/lib/softoken/lgglue.c	Fri Apr 04 01:25:27 2014 +0800
++++ b/security/nss/lib/softoken/lgglue.c	Fri Apr 04 01:53:44 2014 +0800
+@@ -23,6 +23,7 @@
+ static LGAddSecmodFunc legacy_glue_addSecmod = NULL;
+ static LGShutdownFunc legacy_glue_shutdown = NULL;
+ 
++#ifndef NSS_STATIC_LINK
+ /*
+  * The following 3 functions duplicate the work done by bl_LoadLibrary.
+  * We should make bl_LoadLibrary a global and replace the call to
+@@ -160,6 +161,7 @@
+ 
+     return lib;
+ }
++#endif  /* STATIC_LINK */
+ 
+ /*
+  * stub files for legacy db's to be able to encrypt and decrypt
+@@ -272,6 +274,21 @@
+ 	return SECSuccess;
+     }
+ 
++#ifdef NSS_STATIC_LINK
++#ifdef NSS_DISABLE_DBM
++    return SECFailure;
++#else
++    lib = (PRLibrary *) 0x8;
++
++    legacy_glue_open = legacy_Open;
++    legacy_glue_readSecmod = legacy_ReadSecmodDB;
++    legacy_glue_releaseSecmod = legacy_ReleaseSecmodDBData;
++    legacy_glue_deleteSecmod = legacy_DeleteSecmodDB;
++    legacy_glue_addSecmod = legacy_AddSecmodDB;
++    legacy_glue_shutdown = legacy_Shutdown;
++    setCryptFunction = legacy_SetCryptFunctions;
++#endif
++#else
+     lib = sftkdb_LoadLibrary(LEGACY_LIB_NAME);
+     if (lib == NULL) {
+ 	return SECFailure;
+@@ -297,11 +314,14 @@
+ 	PR_UnloadLibrary(lib);
+ 	return SECFailure;
+     }
++#endif  /* NSS_STATIC_LINK */
+ 
+     /* verify the loaded library if we are in FIPS mode */
+     if (isFIPS) {
+ 	if (!BLAPI_SHVerify(LEGACY_LIB_NAME,(PRFuncPtr)legacy_glue_open)) {
++#ifndef NSS_STATIC_LINK
+ 	    PR_UnloadLibrary(lib);
++#endif
+ 	    return SECFailure;
+ 	}
+     	legacy_glue_libCheckSucceeded = PR_TRUE;
+@@ -418,10 +438,12 @@
+ #endif
+ 	crv = (*legacy_glue_shutdown)(parentForkedAfterC_Initialize);
+     }
++#ifndef NSS_STATIC_LINK
+     disableUnload = PR_GetEnv("NSS_DISABLE_UNLOAD");
+     if (!disableUnload) {
+         PR_UnloadLibrary(legacy_glue_lib);
+     }
++#endif
+     legacy_glue_lib = NULL;
+     legacy_glue_open = NULL;
+     legacy_glue_readSecmod = NULL;
+diff -r b35e59f9bd95 -r 8ad062fa5c5d security/nss/lib/softoken/lgglue.h
+--- a/security/nss/lib/softoken/lgglue.h	Fri Apr 04 01:25:27 2014 +0800
++++ b/security/nss/lib/softoken/lgglue.h	Fri Apr 04 01:53:44 2014 +0800
+@@ -38,6 +38,25 @@
+ typedef void (*LGSetForkStateFunc)(PRBool);
+ typedef void (*LGSetCryptFunc)(LGEncryptFunc, LGDecryptFunc);
+ 
++extern CK_RV legacy_Open(const char *dir, const char *certPrefix, 
++		const char *keyPrefix, 
++		int certVersion, int keyVersion, int flags, 
++		SDB **certDB, SDB **keyDB);
++extern char ** legacy_ReadSecmodDB(const char *appName, 
++			const char *filename, 
++			const char *dbname, char *params, PRBool rw);
++extern SECStatus legacy_ReleaseSecmodDBData(const char *appName,
++			const char *filename, 
++			const char *dbname, char **params, PRBool rw);
++extern SECStatus legacy_DeleteSecmodDB(const char *appName,
++			const char *filename, 
++			const char *dbname, char *params, PRBool rw);
++extern SECStatus legacy_AddSecmodDB(const char *appName, 
++			const char *filename, 
++			const char *dbname, char *params, PRBool rw);
++extern SECStatus legacy_Shutdown(PRBool forked);
++extern void legacy_SetCryptFunctions(LGEncryptFunc, LGDecryptFunc);
++
+ /*
+  * Softoken Glue Functions
+  */
+diff -r b35e59f9bd95 -r 8ad062fa5c5d security/nss/lib/softoken/softokn.def
+--- a/security/nss/lib/softoken/softokn.def	Fri Apr 04 01:25:27 2014 +0800
++++ b/security/nss/lib/softoken/softokn.def	Fri Apr 04 01:53:44 2014 +0800
+@@ -1,28 +1,1 @@
+-;+#
+-;+# This Source Code Form is subject to the terms of the Mozilla Public
+-;+# License, v. 2.0. If a copy of the MPL was not distributed with this
+-;+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+-;+#
+-;+# OK, this file is meant to support SUN, LINUX, AIX and WINDOWS
+-;+#   1. For all unix platforms, the string ";-"  means "remove this line"
+-;+#   2. For all unix platforms, the string " DATA " will be removed from any 
+-;+#	line on which it occurs.
+-;+#   3. Lines containing ";+" will have ";+" removed on SUN and LINUX.
+-;+#      On AIX, lines containing ";+" will be removed.  
+-;+#   4. For all unix platforms, the string ";;" will thave the ";;" removed.
+-;+#   5. For all unix platforms, after the above processing has taken place,
+-;+#    all characters after the first ";" on the line will be removed.  
+-;+#    And for AIX, the first ";" will also be removed.
+-;+#  This file is passed directly to windows. Since ';' is a comment, all UNIX
+-;+#   directives are hidden behind ";", ";+", and ";-"
+-;+NSS_3.4 {       # NSS 3.4 release
+-;+    global:
+-LIBRARY softokn3 ;-
+-EXPORTS ;-
+-C_GetFunctionList; Make this function like a real PKCS #11 module as well
+-FC_GetFunctionList;
+-NSC_GetFunctionList;
+-NSC_ModuleDBFunc;
+-;+    local:
+-;+       *;
+-;+};
++
+diff -r b35e59f9bd95 -r 8ad062fa5c5d security/nss/lib/util/secport.h
+--- a/security/nss/lib/util/secport.h	Fri Apr 04 01:25:27 2014 +0800
++++ b/security/nss/lib/util/secport.h	Fri Apr 04 01:53:44 2014 +0800
+@@ -210,6 +210,7 @@
+ 
+ extern int NSS_SecureMemcmp(const void *a, const void *b, size_t n);
+ 
++#ifndef NSS_STATIC_LINK
+ /*
+  * Load a shared library called "newShLibName" in the same directory as
+  * a shared library that is already loaded, called existingShLibName.
+@@ -244,6 +245,7 @@
+ PORT_LoadLibraryFromOrigin(const char* existingShLibName,
+                  PRFuncPtr staticShLibFunc,
+                  const char *newShLibName);
++#endif  /* NSS_STATIC_LINK */
+ 
+ SEC_END_PROTOS
+ 
+diff -r b35e59f9bd95 -r 8ad062fa5c5d toolkit/mozapps/installer/packager.py
+--- a/toolkit/mozapps/installer/packager.py	Fri Apr 04 01:25:27 2014 +0800
++++ b/toolkit/mozapps/installer/packager.py	Fri Apr 04 01:53:44 2014 +0800
+@@ -109,8 +109,6 @@
+                 int(os.path.getmtime(self.path) * 1000) <= \
+                 int(os.path.getmtime(dest) * 1000):
+             return False
+-        if launcher.launch(['shlibsign', '-v', '-o', dest, '-i', self.path]):
+-            errors.fatal('Error while signing %s' % self.path)
+ 
+ 
+ def precompile_cache(formatter, source_path, gre_path, app_path):

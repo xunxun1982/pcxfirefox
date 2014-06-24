@@ -1,0 +1,1178 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396811463 -28800
+#      Mon Apr 07 03:11:03 2014 +0800
+# Node ID e870fa674d705875aaa670a6b5b897792c8aa456
+# Parent  57a35cb986516329c692b245fa6a079cefa3065d
+Remove Power
+
+diff -r 57a35cb98651 -r e870fa674d70 browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Mon Apr 07 00:15:13 2014 +0800
++++ b/browser/installer/package-manifest.in	Mon Apr 07 03:11:03 2014 +0800
+@@ -230,7 +230,6 @@
+ #endif
+ @BINPATH@/components/dom_offline.xpt
+ @BINPATH@/components/dom_json.xpt
+-@BINPATH@/components/dom_power.xpt
+ @BINPATH@/components/dom_quota.xpt
+ @BINPATH@/components/dom_range.xpt
+ #ifdef MOZ_SETTINGS
+diff -r 57a35cb98651 -r e870fa674d70 content/html/content/public/HTMLMediaElement.h
+--- a/content/html/content/public/HTMLMediaElement.h	Mon Apr 07 00:15:13 2014 +0800
++++ b/content/html/content/public/HTMLMediaElement.h	Mon Apr 07 03:11:03 2014 +0800
+@@ -39,7 +39,6 @@
+ namespace dom {
+ class TextTrack;
+ class TimeRanges;
+-class WakeLock;
+ }
+ }
+ 
+@@ -587,7 +586,6 @@
+    */
+   virtual void WakeLockCreate();
+   virtual void WakeLockRelease();
+-  nsRefPtr<WakeLock> mWakeLock;
+ 
+   /**
+    * Logs a warning message to the web console to report various failures.
+diff -r 57a35cb98651 -r e870fa674d70 content/html/content/public/HTMLVideoElement.h
+--- a/content/html/content/public/HTMLVideoElement.h	Mon Apr 07 00:15:13 2014 +0800
++++ b/content/html/content/public/HTMLVideoElement.h	Mon Apr 07 03:11:03 2014 +0800
+@@ -14,7 +14,6 @@
+ namespace mozilla {
+ namespace dom {
+ 
+-class WakeLock;
+ class VideoPlaybackQuality;
+ 
+ class HTMLVideoElement MOZ_FINAL : public HTMLMediaElement,
+@@ -116,8 +115,6 @@
+   virtual void WakeLockRelease();
+   void WakeLockUpdate();
+ 
+-  nsRefPtr<WakeLock> mScreenWakeLock;
+-
+ private:
+   static void MapAttributesIntoRule(const nsMappedAttributes* aAttributes,
+                                     nsRuleData* aData);
+diff -r 57a35cb98651 -r e870fa674d70 content/html/content/src/HTMLMediaElement.cpp
+--- a/content/html/content/src/HTMLMediaElement.cpp	Mon Apr 07 00:15:13 2014 +0800
++++ b/content/html/content/src/HTMLMediaElement.cpp	Mon Apr 07 03:11:03 2014 +0800
+@@ -75,8 +75,6 @@
+ 
+ #include "nsCSSParser.h"
+ #include "nsIMediaList.h"
+-#include "mozilla/dom/power/PowerManagerService.h"
+-#include "mozilla/dom/WakeLock.h"
+ 
+ #include "ImageContainer.h"
+ #include "nsRange.h"
+@@ -2242,27 +2240,11 @@
+ void
+ HTMLMediaElement::WakeLockCreate()
+ {
+-  if (!mWakeLock) {
+-    nsRefPtr<power::PowerManagerService> pmService =
+-      power::PowerManagerService::GetInstance();
+-    NS_ENSURE_TRUE_VOID(pmService);
+-
+-    ErrorResult rv;
+-    mWakeLock = pmService->NewWakeLock(NS_LITERAL_STRING("cpu"),
+-                                       OwnerDoc()->GetInnerWindow(),
+-                                       rv);
+-  }
+ }
+ 
+ void
+ HTMLMediaElement::WakeLockRelease()
+ {
+-  if (mWakeLock) {
+-    ErrorResult rv;
+-    mWakeLock->Unlock(rv);
+-    NS_WARN_IF_FALSE(!rv.Failed(), "Failed to unlock the wakelock.");
+-    mWakeLock = nullptr;
+-  }
+ }
+ 
+ bool HTMLMediaElement::ParseAttribute(int32_t aNamespaceID,
+diff -r 57a35cb98651 -r e870fa674d70 content/html/content/src/HTMLVideoElement.cpp
+--- a/content/html/content/src/HTMLVideoElement.cpp	Mon Apr 07 00:15:13 2014 +0800
++++ b/content/html/content/src/HTMLVideoElement.cpp	Mon Apr 07 03:11:03 2014 +0800
+@@ -30,8 +30,6 @@
+ #include "MediaError.h"
+ #include "MediaDecoder.h"
+ #include "mozilla/Preferences.h"
+-#include "mozilla/dom/WakeLock.h"
+-#include "mozilla/dom/power/PowerManagerService.h"
+ #include "nsPerformance.h"
+ #include "mozilla/dom/VideoPlaybackQuality.h"
+ 
+@@ -299,26 +297,6 @@
+ void
+ HTMLVideoElement::WakeLockUpdate()
+ {
+-  bool hidden = OwnerDoc()->Hidden();
+-
+-  if (mScreenWakeLock && (mPaused || hidden)) {
+-    ErrorResult rv;
+-    mScreenWakeLock->Unlock(rv);
+-    NS_WARN_IF_FALSE(!rv.Failed(), "Failed to unlock the wakelock.");
+-    mScreenWakeLock = nullptr;
+-    return;
+-  }
+-
+-  if (!mScreenWakeLock && !mPaused && !hidden) {
+-    nsRefPtr<power::PowerManagerService> pmService =
+-      power::PowerManagerService::GetInstance();
+-    NS_ENSURE_TRUE_VOID(pmService);
+-
+-    ErrorResult rv;
+-    mScreenWakeLock = pmService->NewWakeLock(NS_LITERAL_STRING("screen"),
+-                                             OwnerDoc()->GetInnerWindow(),
+-                                             rv);
+-  }
+ }
+ 
+ void
+diff -r 57a35cb98651 -r e870fa674d70 dom/base/Navigator.cpp
+--- a/dom/base/Navigator.cpp	Mon Apr 07 00:15:13 2014 +0800
++++ b/dom/base/Navigator.cpp	Mon Apr 07 03:11:03 2014 +0800
+@@ -27,9 +27,6 @@
+ #ifdef MOZ_BATTERY
+ #include "BatteryManager.h"
+ #endif
+-#include "mozilla/dom/PowerManager.h"
+-#include "mozilla/dom/WakeLock.h"
+-#include "mozilla/dom/power/PowerManagerService.h"
+ #ifdef MOZ_MOBILEMESSAGE
+ #include "mozilla/dom/MobileMessageManager.h"
+ #endif
+@@ -148,7 +145,6 @@
+ #ifdef MOZ_BATTERY
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mBatteryManager)
+ #endif
+-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mPowerManager)
+ #ifdef MOZ_MOBILEMESSAGE
+   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mMobileMessageManager)
+ #endif
+@@ -219,11 +215,6 @@
+   }
+ #endif
+ 
+-  if (mPowerManager) {
+-    mPowerManager->Shutdown();
+-    mPowerManager = nullptr;
+-  }
+-
+ #ifdef MOZ_MOBILEMESSAGE
+   if (mMobileMessageManager) {
+     mMobileMessageManager->Shutdown();
+@@ -1155,44 +1146,6 @@
+   return p.forget();
+ }
+ 
+-PowerManager*
+-Navigator::GetMozPower(ErrorResult& aRv)
+-{
+-  if (!mPowerManager) {
+-    if (!mWindow) {
+-      aRv.Throw(NS_ERROR_UNEXPECTED);
+-      return nullptr;
+-    }
+-    mPowerManager = PowerManager::CreateInstance(mWindow);
+-    if (!mPowerManager) {
+-      // We failed to get the power manager service?
+-      aRv.Throw(NS_ERROR_UNEXPECTED);
+-    }
+-  }
+-
+-  return mPowerManager;
+-}
+-
+-already_AddRefed<WakeLock>
+-Navigator::RequestWakeLock(const nsAString &aTopic, ErrorResult& aRv)
+-{
+-  if (!mWindow) {
+-    aRv.Throw(NS_ERROR_UNEXPECTED);
+-    return nullptr;
+-  }
+-
+-  nsRefPtr<power::PowerManagerService> pmService =
+-    power::PowerManagerService::GetInstance();
+-  // Maybe it went away for some reason... Or maybe we're just called
+-  // from our XPCOM method.
+-  if (!pmService) {
+-    aRv.Throw(NS_ERROR_UNEXPECTED);
+-    return nullptr;
+-  }
+-
+-  return pmService->NewWakeLock(aTopic, mWindow, aRv);
+-}
+-
+ #ifdef MOZ_MOBILEMESSAGE
+ nsIDOMMozMobileMessageManager*
+ Navigator::GetMozMobileMessage()
+@@ -1692,14 +1645,6 @@
+ 
+ /* static */
+ bool
+-Navigator::HasPowerSupport(JSContext* /* unused */, JSObject* aGlobal)
+-{
+-  nsCOMPtr<nsPIDOMWindow> win = GetWindowFromGlobal(aGlobal);
+-  return win && PowerManager::CheckPermission(win);
+-}
+-
+-/* static */
+-bool
+ Navigator::HasPhoneNumberSupport(JSContext* /* unused */, JSObject* aGlobal)
+ {
+   nsCOMPtr<nsPIDOMWindow> win = GetWindowFromGlobal(aGlobal);
+@@ -1718,16 +1663,6 @@
+   return CheckPermission(win, "idle");
+ }
+ 
+-/* static */
+-bool
+-Navigator::HasWakeLockSupport(JSContext* /* unused*/, JSObject* /*unused */)
+-{
+-  nsCOMPtr<nsIPowerManagerService> pmService =
+-    do_GetService(POWERMANAGERSERVICE_CONTRACTID);
+-  // No service means no wake lock support
+-  return !!pmService;
+-}
+-
+ #ifdef MOZ_MOBILEMESSAGE
+ /* static */
+ bool
+diff -r 57a35cb98651 -r e870fa674d70 dom/base/Navigator.h
+--- a/dom/base/Navigator.h	Mon Apr 07 00:15:13 2014 +0800
++++ b/dom/base/Navigator.h	Mon Apr 07 03:11:03 2014 +0800
+@@ -35,7 +35,6 @@
+ class systemMessageCallback;
+ class MediaStreamConstraints;
+ class MediaStreamConstraintsInternal;
+-class WakeLock;
+ }
+ }
+ 
+@@ -95,7 +94,6 @@
+ class Voicemail;
+ #endif
+ 
+-class PowerManager;
+ #ifdef MOZ_TELEPHONY
+ class Telephony;
+ #endif
+@@ -186,7 +184,6 @@
+   {
+     aRv = GetBuildID(aBuildID);
+   }
+-  PowerManager* GetMozPower(ErrorResult& aRv);
+   bool JavaEnabled(ErrorResult& aRv);
+   bool TaintEnabled()
+   {
+@@ -194,8 +191,6 @@
+   }
+   void AddIdleObserver(MozIdleObserver& aObserver, ErrorResult& aRv);
+   void RemoveIdleObserver(MozIdleObserver& aObserver, ErrorResult& aRv);
+-  already_AddRefed<WakeLock> RequestWakeLock(const nsAString &aTopic,
+-                                             ErrorResult& aRv);
+   nsDOMDeviceStorage* GetDeviceStorage(const nsAString& aType,
+                                        ErrorResult& aRv);
+   void GetDeviceStorages(const nsAString& aType,
+@@ -261,10 +256,8 @@
+ #ifdef MOZ_BATTERY
+   static bool HasBatterySupport(JSContext* /* unused*/, JSObject* /*unused */);
+ #endif
+-  static bool HasPowerSupport(JSContext* /* unused */, JSObject* aGlobal);
+   static bool HasPhoneNumberSupport(JSContext* /* unused */, JSObject* aGlobal);
+   static bool HasIdleSupport(JSContext* /* unused */, JSObject* aGlobal);
+-  static bool HasWakeLockSupport(JSContext* /* unused*/, JSObject* /*unused */);
+   static bool HasDesktopNotificationSupport(JSContext* /* unused*/,
+                                             JSObject* /*unused */)
+   {
+@@ -351,7 +344,6 @@
+ #ifdef MOZ_B2G_FM
+   nsRefPtr<FMRadio> mFMRadio;
+ #endif
+-  nsRefPtr<PowerManager> mPowerManager;
+ #ifdef MOZ_MOBILEMESSAGE
+   nsRefPtr<MobileMessageManager> mMobileMessageManager;
+ #endif
+diff -r 57a35cb98651 -r e870fa674d70 dom/base/nsGlobalWindow.cpp
+--- a/dom/base/nsGlobalWindow.cpp	Mon Apr 07 00:15:13 2014 +0800
++++ b/dom/base/nsGlobalWindow.cpp	Mon Apr 07 03:11:03 2014 +0800
+@@ -27,8 +27,6 @@
+ #include "nsArrayUtils.h"
+ #include "nsIDOMWindowCollection.h"
+ #include "nsDOMWindowList.h"
+-#include "mozilla/dom/WakeLock.h"
+-#include "mozilla/dom/power/PowerManagerService.h"
+ #include "nsIDocShellTreeOwner.h"
+ #include "nsIPermissionManager.h"
+ #include "nsIScriptContext.h"
+@@ -5743,23 +5741,14 @@
+     nsIDocument::ExitFullscreen(mDoc, /* async */ false);
+   }
+ 
+-  if (!mWakeLock && mFullScreen) {
+-    nsRefPtr<power::PowerManagerService> pmService =
+-      power::PowerManagerService::GetInstance();
+-    NS_ENSURE_TRUE(pmService, NS_OK);
+-
++  if (mFullScreen) {
+     ErrorResult rv;
+-    mWakeLock = pmService->NewWakeLock(NS_LITERAL_STRING("DOM_Fullscreen"),
+-                                       this, rv);
+     if (rv.Failed()) {
+       return rv.ErrorCode();
+     }
+ 
+-  } else if (mWakeLock && !mFullScreen) {
++  } else if (!mFullScreen) {
+     ErrorResult rv;
+-    mWakeLock->Unlock(rv);
+-    NS_WARN_IF_FALSE(!rv.Failed(), "Failed to unlock the wakelock.");
+-    mWakeLock = nullptr;
+   }
+ 
+   return NS_OK;
+diff -r 57a35cb98651 -r e870fa674d70 dom/base/nsGlobalWindow.h
+--- a/dom/base/nsGlobalWindow.h	Mon Apr 07 00:15:13 2014 +0800
++++ b/dom/base/nsGlobalWindow.h	Mon Apr 07 03:11:03 2014 +0800
+@@ -111,7 +111,6 @@
+ class MediaQueryList;
+ class Navigator;
+ class SpeechSynthesis;
+-class WakeLock;
+ namespace indexedDB {
+ class IDBFactory;
+ } // namespace indexedDB
+@@ -974,8 +973,6 @@
+ 
+   nsCOMPtr <nsIIdleService> mIdleService;
+ 
+-  nsRefPtr<mozilla::dom::WakeLock> mWakeLock;
+-
+   static bool sIdleObserversAPIFuzzTimeDisabled;
+ 
+   friend class HashchangeCallback;
+diff -r 57a35cb98651 -r e870fa674d70 dom/bindings/Bindings.conf
+--- a/dom/bindings/Bindings.conf	Mon Apr 07 00:15:13 2014 +0800
++++ b/dom/bindings/Bindings.conf	Mon Apr 07 03:11:03 2014 +0800
+@@ -793,14 +793,6 @@
+     'headerFile': 'SpeakerManager.h'
+ },
+ 
+-'MozPowerManager': {
+-    'nativeType': 'mozilla::dom::PowerManager',
+-},
+-
+-'MozWakeLock': {
+-    'nativeType': 'mozilla::dom::WakeLock',
+-},
+-
+ 'MozTimeManager': {
+     'nativeType': 'mozilla::dom::time::TimeManager',
+ },
+@@ -1882,7 +1874,6 @@
+ addExternalIface('MozTreeColumn', nativeType='nsITreeColumn',
+                  headerFile='nsITreeColumns.h')
+ addExternalIface('MozVoicemailStatus')
+-addExternalIface('MozWakeLockListener', headerFile='nsIDOMWakeLockListener.h')
+ addExternalIface('MozXULTemplateBuilder', nativeType='nsIXULTemplateBuilder')
+ addExternalIface('nsIControllers', nativeType='nsIControllers')
+ addExternalIface('nsIDOMCrypto', nativeType='nsIDOMCrypto',
+diff -r 57a35cb98651 -r e870fa674d70 dom/ipc/ContentParent.cpp
+--- a/dom/ipc/ContentParent.cpp	Mon Apr 07 00:15:13 2014 +0800
++++ b/dom/ipc/ContentParent.cpp	Mon Apr 07 03:11:03 2014 +0800
+@@ -30,7 +30,6 @@
+ #include "mozilla/dom/Element.h"
+ #include "mozilla/dom/ExternalHelperAppParent.h"
+ #include "mozilla/dom/PMemoryReportRequestParent.h"
+-#include "mozilla/dom/power/PowerManagerService.h"
+ #include "mozilla/dom/DOMStorageIPC.h"
+ #ifdef MOZ_BLUETOOTH
+ #include "mozilla/dom/bluetooth/PBluetoothParent.h"
+@@ -72,7 +71,6 @@
+ #include "nsIAppsService.h"
+ #include "nsIClipboard.h"
+ #include "nsIDOMGeoGeolocation.h"
+-#include "mozilla/dom/WakeLock.h"
+ #include "nsIDOMWindow.h"
+ #include "nsIExternalProtocolService.h"
+ #include "nsIFilePicker.h"
+@@ -157,7 +155,6 @@
+ #endif
+ using namespace mozilla::dom::devicestorage;
+ using namespace mozilla::dom::indexedDB;
+-using namespace mozilla::dom::power;
+ #ifdef MOZ_MOBILEMESSAGE
+ using namespace mozilla::dom::mobilemessage;
+ #endif
+@@ -624,8 +621,6 @@
+         aContext.AsIPCTabContext(),
+         chromeFlags);
+ 
+-    p->MaybeTakeCPUWakeLock(aFrameElement);
+-
+     return static_cast<TabParent*>(browser);
+ }
+ 
+@@ -731,30 +726,6 @@
+         listener->ShutDown();
+     }
+ 
+-    void Init(WakeLock* aWakeLock)
+-    {
+-        MOZ_ASSERT(!mWakeLock);
+-        MOZ_ASSERT(!mTimer);
+-
+-        // mTimer keeps a strong reference to |this|.  When this object's
+-        // destructor runs, it will remove itself from the LinkedList.
+-
+-        if (!sListeners) {
+-            sListeners = new LinkedList<SystemMessageHandledListener>();
+-            ClearOnShutdown(&sListeners);
+-        }
+-        sListeners->insertBack(this);
+-
+-        mWakeLock = aWakeLock;
+-
+-        mTimer = do_CreateInstance("@mozilla.org/timer;1");
+-
+-        uint32_t timeoutSec =
+-            Preferences::GetInt("dom.ipc.systemMessageCPULockTimeoutSec", 30);
+-        mTimer->InitWithCallback(this, timeoutSec * 1000,
+-                                 nsITimer::TYPE_ONE_SHOT);
+-    }
+-
+     NS_IMETHOD Notify(nsITimer* aTimer)
+     {
+         // Careful: ShutDown() may delete |this|.
+@@ -770,7 +741,6 @@
+         nsRefPtr<SystemMessageHandledListener> kungFuDeathGrip = this;
+ 
+         ErrorResult rv;
+-        mWakeLock->Unlock(rv);
+ 
+         if (mTimer) {
+             mTimer->Cancel();
+@@ -778,7 +748,6 @@
+         }
+     }
+ 
+-    nsRefPtr<WakeLock> mWakeLock;
+     nsCOMPtr<nsITimer> mTimer;
+ };
+ 
+@@ -790,30 +759,6 @@
+ 
+ } // anonymous namespace
+ 
+-void
+-ContentParent::MaybeTakeCPUWakeLock(Element* aFrameElement)
+-{
+-    // Take the CPU wake lock on behalf of this processs if it's expecting a
+-    // system message.  We'll release the CPU lock once the message is
+-    // delivered, or after some period of time, which ever comes first.
+-
+-    nsCOMPtr<nsIMozBrowserFrame> browserFrame =
+-        do_QueryInterface(aFrameElement);
+-    if (!browserFrame ||
+-        !browserFrame->GetIsExpectingSystemMessage()) {
+-        return;
+-    }
+-
+-    nsRefPtr<PowerManagerService> pms = PowerManagerService::GetInstance();
+-    nsRefPtr<WakeLock> lock =
+-        pms->NewWakeLockOnBehalfOfProcess(NS_LITERAL_STRING("cpu"), this);
+-
+-    // This object's Init() function keeps it alive.
+-    nsRefPtr<SystemMessageHandledListener> listener =
+-        new SystemMessageHandledListener();
+-    listener->Init(lock);
+-}
+-
+ bool
+ ContentParent::SetPriorityAndCheckIsAlive(ProcessPriority aPriority)
+ {
+diff -r 57a35cb98651 -r e870fa674d70 dom/ipc/ContentParent.h
+--- a/dom/ipc/ContentParent.h	Mon Apr 07 00:15:13 2014 +0800
++++ b/dom/ipc/ContentParent.h	Mon Apr 07 03:11:03 2014 +0800
+@@ -286,7 +286,6 @@
+     // has a pending system message, this function acquires the CPU wake lock on
+     // behalf of the child.  We'll release the lock when the system message is
+     // handled or after a timeout, whichever comes first.
+-    void MaybeTakeCPUWakeLock(Element* aFrameElement);
+ 
+     // Set the child process's priority and then check whether the child is
+     // still alive.  Returns true if the process is still alive, and false
+diff -r 57a35cb98651 -r e870fa674d70 dom/ipc/ProcessPriorityManager.cpp
+--- a/dom/ipc/ProcessPriorityManager.cpp	Mon Apr 07 00:15:13 2014 +0800
++++ b/dom/ipc/ProcessPriorityManager.cpp	Mon Apr 07 03:11:03 2014 +0800
+@@ -209,8 +209,7 @@
+  * main-process only.
+  */
+ class ParticularProcessPriorityManager MOZ_FINAL
+-  : public WakeLockObserver
+-  , public nsIObserver
++  : public nsIObserver
+   , public nsITimerCallback
+   , public nsSupportsWeakReference
+ {
+@@ -222,7 +221,6 @@
+   NS_DECL_NSIOBSERVER
+   NS_DECL_NSITIMERCALLBACK
+ 
+-  virtual void Notify(const WakeLockInformation& aInfo) MOZ_OVERRIDE;
+   void Init();
+ 
+   int32_t Pid() const;
+@@ -284,8 +282,6 @@
+   uint64_t mChildID;
+   ProcessPriority mPriority;
+   ProcessCPUPriority mCPUPriority;
+-  bool mHoldsCPUWakeLock;
+-  bool mHoldsHighPriorityWakeLock;
+ 
+   /**
+    * Used to implement NameWithComma().
+@@ -585,8 +581,6 @@
+   , mChildID(aContentParent->ChildID())
+   , mPriority(PROCESS_PRIORITY_UNKNOWN)
+   , mCPUPriority(PROCESS_CPU_PRIORITY_NORMAL)
+-  , mHoldsCPUWakeLock(false)
+-  , mHoldsHighPriorityWakeLock(false)
+ {
+   MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
+   LOGP("Creating ParticularProcessPriorityManager.");
+@@ -595,8 +589,6 @@
+ void
+ ParticularProcessPriorityManager::Init()
+ {
+-  RegisterWakeLockObserver(this);
+-
+   nsCOMPtr<nsIObserverService> os = services::GetObserverService();
+   if (os) {
+     os->AddObserver(this, "audio-channel-process-changed", /* ownsWeak */ true);
+@@ -607,14 +599,6 @@
+ 
+   // This process may already hold the CPU lock; for example, our parent may
+   // have acquired it on our behalf.
+-  WakeLockInformation info1, info2;
+-  GetWakeLockInfo(NS_LITERAL_STRING("cpu"), &info1);
+-  mHoldsCPUWakeLock = info1.lockingProcesses().Contains(ChildID());
+-
+-  GetWakeLockInfo(NS_LITERAL_STRING("high-priority"), &info2);
+-  mHoldsHighPriorityWakeLock = info2.lockingProcesses().Contains(ChildID());
+-  LOGP("Done starting up.  mHoldsCPUWakeLock=%d, mHoldsHighPriorityWakeLock=%d",
+-       mHoldsCPUWakeLock, mHoldsHighPriorityWakeLock);
+ }
+ 
+ ParticularProcessPriorityManager::~ParticularProcessPriorityManager()
+@@ -627,34 +611,6 @@
+   // will print a warning if it's called unnecessarily.
+ 
+   if (mContentParent) {
+-    UnregisterWakeLockObserver(this);
+-  }
+-}
+-
+-/* virtual */ void
+-ParticularProcessPriorityManager::Notify(const WakeLockInformation& aInfo)
+-{
+-  if (!mContentParent) {
+-    // We've been shut down.
+-    return;
+-  }
+-
+-  bool* dest = nullptr;
+-  if (aInfo.topic().EqualsLiteral("cpu")) {
+-    dest = &mHoldsCPUWakeLock;
+-  } else if (aInfo.topic().EqualsLiteral("high-priority")) {
+-    dest = &mHoldsHighPriorityWakeLock;
+-  }
+-
+-  if (dest) {
+-    bool thisProcessLocks = aInfo.lockingProcesses().Contains(ChildID());
+-    if (thisProcessLocks != *dest) {
+-      *dest = thisProcessLocks;
+-      LOGP("Got wake lock changed event. "
+-           "Now mHoldsCPUWakeLock=%d, mHoldsHighPriorityWakeLock=%d",
+-           mHoldsCPUWakeLock, mHoldsHighPriorityWakeLock);
+-      ResetPriority();
+-    }
+   }
+ }
+ 
+@@ -899,7 +855,7 @@
+ ProcessPriority
+ ParticularProcessPriorityManager::ComputePriority()
+ {
+-  if ((mHoldsCPUWakeLock || mHoldsHighPriorityWakeLock) &&
++  if (
+       HasAppType("critical")) {
+     return PROCESS_PRIORITY_FOREGROUND_HIGH;
+   }
+@@ -920,7 +876,7 @@
+       PROCESS_PRIORITY_FOREGROUND;
+   }
+ 
+-  if ((mHoldsCPUWakeLock || mHoldsHighPriorityWakeLock) &&
++  if (
+       IsExpectingSystemMessage()) {
+     return PROCESS_PRIORITY_BACKGROUND_PERCEIVABLE;
+   }
+@@ -1044,8 +1000,6 @@
+ {
+   MOZ_ASSERT(mContentParent);
+ 
+-  UnregisterWakeLockObserver(this);
+-
+   if (mResetPriorityTimer) {
+     mResetPriorityTimer->Cancel();
+     mResetPriorityTimer = nullptr;
+diff -r 57a35cb98651 -r e870fa674d70 dom/moz.build
+--- a/dom/moz.build	Mon Apr 07 00:15:13 2014 +0800
++++ b/dom/moz.build	Mon Apr 07 03:11:03 2014 +0800
+@@ -51,7 +51,6 @@
+     'asmjscache',
+     'media',
+     'messages',
+-    'power',
+     'quota',
+     'src',
+     'locales',
+diff -r 57a35cb98651 -r e870fa674d70 dom/webidl/Navigator.webidl
+--- a/dom/webidl/Navigator.webidl	Mon Apr 07 00:15:13 2014 +0800
++++ b/dom/webidl/Navigator.webidl	Mon Apr 07 03:11:03 2014 +0800
+@@ -146,8 +146,6 @@
+   readonly attribute boolean cookieEnabled;
+   [Throws]
+   readonly attribute DOMString buildID;
+-  [Throws, Func="Navigator::HasPowerSupport"]
+-  readonly attribute MozPowerManager mozPower;
+ 
+   // WebKit/Blink/Trident/Presto support this.
+   [Throws]
+@@ -193,8 +191,6 @@
+    *
+    * @param aTopic resource name
+    */
+-  [Throws, Func="Navigator::HasWakeLockSupport"]
+-  MozWakeLock requestWakeLock(DOMString aTopic);
+ };
+ 
+ // nsIDOMNavigatorDeviceStorage
+diff -r 57a35cb98651 -r e870fa674d70 dom/webidl/moz.build
+--- a/dom/webidl/moz.build	Mon Apr 07 00:15:13 2014 +0800
++++ b/dom/webidl/moz.build	Mon Apr 07 03:11:03 2014 +0800
+@@ -223,8 +223,6 @@
+     'MozActivity.webidl',
+     'MozConnection.webidl',
+     'MozNamedAttrMap.webidl',
+-    'MozPowerManager.webidl',
+-    'MozWakeLock.webidl',
+     'MutationEvent.webidl',
+     'MutationObserver.webidl',
+     'NetDashboard.webidl',
+diff -r 57a35cb98651 -r e870fa674d70 hal/Hal.cpp
+--- a/hal/Hal.cpp	Mon Apr 07 00:15:13 2014 +0800
++++ b/hal/Hal.cpp	Mon Apr 07 03:11:03 2014 +0800
+@@ -309,20 +309,6 @@
+ 
+ static NetworkObserversManager sNetworkObservers;
+ 
+-class WakeLockObserversManager : public ObserversManager<WakeLockInformation>
+-{
+-protected:
+-  void EnableNotifications() {
+-    PROXY_IF_SANDBOXED(EnableWakeLockNotifications());
+-  }
+-
+-  void DisableNotifications() {
+-    PROXY_IF_SANDBOXED(DisableWakeLockNotifications());
+-  }
+-};
+-
+-static WakeLockObserversManager sWakeLockObservers;
+-
+ class ScreenConfigurationObserversManager : public CachingObserversManager<ScreenConfiguration>
+ {
+ protected:
+@@ -384,22 +370,6 @@
+   PROXY_IF_SANDBOXED(SetScreenEnabled(enabled));
+ }
+ 
+-bool GetCpuSleepAllowed()
+-{
+-  // Generally for interfaces that are accessible by normal web content
+-  // we should cache the result and be notified on state changes, like
+-  // what the battery API does. But since this is only used by
+-  // privileged interface, the synchronous getter is OK here.
+-  AssertMainThread();
+-  RETURN_PROXY_IF_SANDBOXED(GetCpuSleepAllowed(), true);
+-}
+-
+-void SetCpuSleepAllowed(bool allowed)
+-{
+-  AssertMainThread();
+-  PROXY_IF_SANDBOXED(SetCpuSleepAllowed(allowed));
+-}
+-
+ double GetScreenBrightness()
+ {
+   AssertMainThread();
+@@ -652,51 +622,6 @@
+ #endif
+ 
+ void
+-RegisterWakeLockObserver(WakeLockObserver* aObserver)
+-{
+-  AssertMainThread();
+-  sWakeLockObservers.AddObserver(aObserver);
+-}
+-
+-void
+-UnregisterWakeLockObserver(WakeLockObserver* aObserver)
+-{
+-  AssertMainThread();
+-  sWakeLockObservers.RemoveObserver(aObserver);
+-}
+-
+-void
+-ModifyWakeLock(const nsAString& aTopic,
+-               WakeLockControl aLockAdjust,
+-               WakeLockControl aHiddenAdjust,
+-               uint64_t aProcessID /* = CONTENT_PROCESS_ID_UNKNOWN */)
+-{
+-  AssertMainThread();
+-
+-  if (aProcessID == CONTENT_PROCESS_ID_UNKNOWN) {
+-    aProcessID = InSandbox() ? ContentChild::GetSingleton()->GetID() :
+-                               CONTENT_PROCESS_ID_MAIN;
+-  }
+-
+-  PROXY_IF_SANDBOXED(ModifyWakeLock(aTopic, aLockAdjust,
+-                                    aHiddenAdjust, aProcessID));
+-}
+-
+-void
+-GetWakeLockInfo(const nsAString& aTopic, WakeLockInformation* aWakeLockInfo)
+-{
+-  AssertMainThread();
+-  PROXY_IF_SANDBOXED(GetWakeLockInfo(aTopic, aWakeLockInfo));
+-}
+-
+-void
+-NotifyWakeLockChange(const WakeLockInformation& aInfo)
+-{
+-  AssertMainThread();
+-  sWakeLockObservers.BroadcastInformation(aInfo);
+-}
+-
+-void
+ RegisterScreenConfigurationObserver(ScreenConfigurationObserver* aObserver)
+ {
+   AssertMainThread();
+diff -r 57a35cb98651 -r e870fa674d70 hal/Hal.h
+--- a/hal/Hal.h	Mon Apr 07 00:15:13 2014 +0800
++++ b/hal/Hal.h	Mon Apr 07 03:11:03 2014 +0800
+@@ -18,7 +18,6 @@
+ #include "mozilla/dom/battery/Types.h"
+ #endif
+ #include "mozilla/dom/network/Types.h"
+-#include "mozilla/dom/power/Types.h"
+ #include "mozilla/hal_sandbox/PHal.h"
+ #include "mozilla/dom/ScreenOrientation.h"
+ #include "mozilla/HalScreenConfiguration.h"
+@@ -154,13 +153,13 @@
+ /**
+  * Determine whether the device is allowed to sleep.
+  */
+-bool GetCpuSleepAllowed();
++
+ 
+ /**
+  * Set whether the device is allowed to suspend automatically after
+  * the screen is disabled.
+  */
+-void SetCpuSleepAllowed(bool allowed);
++
+ 
+ /**
+  * Set the value of a light to a particular color, with a specific flash pattern.
+@@ -323,66 +322,6 @@
+ void PowerOff();
+ 
+ /**
+- * Enable wake lock notifications from the backend.
+- *
+- * This method is only used by WakeLockObserversManager.
+- */
+-void EnableWakeLockNotifications();
+-
+-/**
+- * Disable wake lock notifications from the backend.
+- *
+- * This method is only used by WakeLockObserversManager.
+- */
+-void DisableWakeLockNotifications();
+-
+-/**
+- * Inform the wake lock backend there is a new wake lock observer.
+- * @param aWakeLockObserver The observer that should be added.
+- */
+-void RegisterWakeLockObserver(WakeLockObserver* aObserver);
+-
+-/**
+- * Inform the wake lock backend a wake lock observer unregistered.
+- * @param aWakeLockObserver The observer that should be removed.
+- */
+-void UnregisterWakeLockObserver(WakeLockObserver* aObserver);
+-
+-/**
+- * Adjust a wake lock's counts on behalf of a given process.
+- *
+- * In most cases, you shouldn't need to pass the aProcessID argument; the
+- * default of CONTENT_PROCESS_ID_UNKNOWN is probably what you want.
+- *
+- * @param aTopic        lock topic
+- * @param aLockAdjust   to increase or decrease active locks
+- * @param aHiddenAdjust to increase or decrease hidden locks
+- * @param aProcessID    indicates which process we're modifying the wake lock
+- *                      on behalf of.  It is interpreted as
+- *
+- *                      CONTENT_PROCESS_ID_UNKNOWN: The current process
+- *                      CONTENT_PROCESS_ID_MAIN: The root process
+- *                      X: The process with ContentChild::GetID() == X
+- */
+-void ModifyWakeLock(const nsAString &aTopic,
+-                    hal::WakeLockControl aLockAdjust,
+-                    hal::WakeLockControl aHiddenAdjust,
+-                    uint64_t aProcessID = hal::CONTENT_PROCESS_ID_UNKNOWN);
+-
+-/**
+- * Query the wake lock numbers of aTopic.
+- * @param aTopic        lock topic
+- * @param aWakeLockInfo wake lock numbers
+- */
+-void GetWakeLockInfo(const nsAString &aTopic, hal::WakeLockInformation *aWakeLockInfo);
+-
+-/**
+- * Notify of a change in the wake lock state.
+- * @param aWakeLockInfo The new wake lock information.
+- */
+-void NotifyWakeLockChange(const hal::WakeLockInformation& aWakeLockInfo);
+-
+-/**
+  * Inform the backend there is a new screen configuration observer.
+  * @param aScreenConfigurationObserver The observer that should be added.
+  */
+diff -r 57a35cb98651 -r e870fa674d70 hal/moz.build
+--- a/hal/moz.build	Mon Apr 07 00:15:13 2014 +0800
++++ b/hal/moz.build	Mon Apr 07 03:11:03 2014 +0800
+@@ -17,12 +17,10 @@
+     'HalScreenConfiguration.h',
+     'HalSensor.h',
+     'HalTypes.h',
+-    'HalWakeLock.h',
+ ]
+ 
+ TEST_DIRS += ['tests']
+ UNIFIED_SOURCES += [
+-    'HalWakeLock.cpp',
+     'sandbox/SandboxHal.cpp',
+     'WindowIdentifier.cpp',
+ ]
+@@ -153,7 +151,6 @@
+         'fallback/FallbackScreenPower.cpp',
+         'fallback/FallbackSwitch.cpp',
+         'fallback/FallbackTime.cpp',
+-        'fallback/FallbackWakeLocks.cpp',
+     ]
+ 
+ # Fallbacks for backends implemented on Android only.
+diff -r 57a35cb98651 -r e870fa674d70 hal/sandbox/PHal.ipdl
+--- a/hal/sandbox/PHal.ipdl	Mon Apr 07 00:15:13 2014 +0800
++++ b/hal/sandbox/PHal.ipdl	Mon Apr 07 03:11:03 2014 +0800
+@@ -13,7 +13,6 @@
+ using mozilla::hal::LightMode from "mozilla/HalTypes.h";
+ using mozilla::hal::SensorType from "mozilla/HalSensor.h";
+ using mozilla::hal::SensorAccuracyType from "mozilla/HalSensor.h";
+-using mozilla::hal::WakeLockControl from "mozilla/HalTypes.h";
+ using mozilla::hal::SwitchState from "mozilla/HalTypes.h";
+ using mozilla::hal::SwitchDevice from "mozilla/HalTypes.h";
+ using mozilla::hal::ProcessPriority from "mozilla/HalTypes.h";
+@@ -54,13 +53,6 @@
+   SwitchState status;
+ };
+ 
+-struct WakeLockInformation {
+-  nsString topic;
+-  uint32_t numLocks;
+-  uint32_t numHidden;
+-  uint64_t[] lockingProcesses;
+-};
+-
+ struct ScreenConfiguration {
+   nsIntRect rect;
+   ScreenOrientation orientation;
+@@ -98,7 +90,6 @@
+ 
+ child:
+     NotifyNetworkChange(NetworkInformation aNetworkInfo);
+-    NotifyWakeLockChange(WakeLockInformation aWakeLockInfo);
+     NotifyScreenConfigurationChange(ScreenConfiguration aScreenOrientation);
+     NotifySwitchChange(SwitchEvent aEvent);
+     NotifySystemClockChange(int64_t aClockDeltaMS); 
+@@ -116,9 +107,6 @@
+     sync GetScreenEnabled() returns (bool enabled);
+     SetScreenEnabled(bool enabled);
+ 
+-    sync GetCpuSleepAllowed() returns (bool allowed);
+-    SetCpuSleepAllowed(bool allowed);
+-
+     sync GetScreenBrightness() returns (double brightness);
+     SetScreenBrightness(double brightness);
+ 
+@@ -138,15 +126,6 @@
+     sync GetLight(LightType light)
+       returns (LightConfiguration aConfig, bool status);
+ 
+-    ModifyWakeLock(nsString aTopic,
+-                   WakeLockControl aLockAdjust,
+-                   WakeLockControl aHiddenAdjust,
+-                   uint64_t aProcessID);
+-    EnableWakeLockNotifications();
+-    DisableWakeLockNotifications();
+-    sync GetWakeLockInfo(nsString aTopic)
+-      returns (WakeLockInformation aWakeLockInfo);
+-
+     EnableScreenConfigurationNotifications();
+     DisableScreenConfigurationNotifications();
+     sync GetCurrentScreenConfiguration()
+diff -r 57a35cb98651 -r e870fa674d70 hal/sandbox/SandboxHal.cpp
+--- a/hal/sandbox/SandboxHal.cpp	Mon Apr 07 00:15:13 2014 +0800
++++ b/hal/sandbox/SandboxHal.cpp	Mon Apr 07 03:11:03 2014 +0800
+@@ -152,20 +152,6 @@
+   Hal()->SendSetScreenEnabled(enabled);
+ }
+ 
+-bool
+-GetCpuSleepAllowed()
+-{
+-  bool allowed = true;
+-  Hal()->SendGetCpuSleepAllowed(&allowed);
+-  return allowed;
+-}
+-
+-void
+-SetCpuSleepAllowed(bool allowed)
+-{
+-  Hal()->SendSetCpuSleepAllowed(allowed);
+-}
+-
+ double
+ GetScreenBrightness()
+ {
+@@ -286,34 +272,6 @@
+ #endif
+ 
+ void
+-EnableWakeLockNotifications()
+-{
+-  Hal()->SendEnableWakeLockNotifications();
+-}
+-
+-void
+-DisableWakeLockNotifications()
+-{
+-  Hal()->SendDisableWakeLockNotifications();
+-}
+-
+-void
+-ModifyWakeLock(const nsAString &aTopic,
+-               WakeLockControl aLockAdjust,
+-               WakeLockControl aHiddenAdjust,
+-               uint64_t aProcessID)
+-{
+-  MOZ_ASSERT(aProcessID != CONTENT_PROCESS_ID_UNKNOWN);
+-  Hal()->SendModifyWakeLock(nsString(aTopic), aLockAdjust, aHiddenAdjust, aProcessID);
+-}
+-
+-void
+-GetWakeLockInfo(const nsAString &aTopic, WakeLockInformation *aWakeLockInfo)
+-{
+-  Hal()->SendGetWakeLockInfo(nsString(aTopic), aWakeLockInfo);
+-}
+-
+-void
+ EnableSwitchNotifications(SwitchDevice aDevice)
+ {
+   Hal()->SendEnableSwitchNotifications(aDevice);
+@@ -448,7 +406,6 @@
+ class HalParent : public PHalParent
+                 , public NetworkObserver
+                 , public ISensorObserver
+-                , public WakeLockObserver
+                 , public ScreenConfigurationObserver
+                 , public SwitchObserver
+                 , public SystemClockChangeObserver
+@@ -469,7 +426,6 @@
+          sensor < NUM_SENSOR_TYPE; ++sensor) {
+       hal::UnregisterSensorObserver(SensorType(sensor), this);
+     }
+-    hal::UnregisterWakeLockObserver(this);
+     hal::UnregisterSystemClockChangeObserver(this);
+     hal::UnregisterSystemTimezoneChangeObserver(this);
+     for (int32_t switchDevice = SWITCH_DEVICE_UNKNOWN + 1;
+@@ -616,26 +572,6 @@
+   }
+ 
+   virtual bool
+-  RecvGetCpuSleepAllowed(bool *allowed) MOZ_OVERRIDE
+-  {
+-    if (!AssertAppProcessPermission(this, "power")) {
+-      return false;
+-    }
+-    *allowed = hal::GetCpuSleepAllowed();
+-    return true;
+-  }
+-
+-  virtual bool
+-  RecvSetCpuSleepAllowed(const bool &allowed) MOZ_OVERRIDE
+-  {
+-    if (!AssertAppProcessPermission(this, "power")) {
+-      return false;
+-    }
+-    hal::SetCpuSleepAllowed(allowed);
+-    return true;
+-  }
+-
+-  virtual bool
+   RecvGetScreenBrightness(double *brightness) MOZ_OVERRIDE
+   {
+     if (!AssertAppProcessPermission(this, "power")) {
+@@ -766,46 +702,6 @@
+   }
+ 
+   virtual bool
+-  RecvModifyWakeLock(const nsString& aTopic,
+-                     const WakeLockControl& aLockAdjust,
+-                     const WakeLockControl& aHiddenAdjust,
+-                     const uint64_t& aProcessID) MOZ_OVERRIDE
+-  {
+-    MOZ_ASSERT(aProcessID != CONTENT_PROCESS_ID_UNKNOWN);
+-
+-    // We allow arbitrary content to use wake locks.
+-    hal::ModifyWakeLock(aTopic, aLockAdjust, aHiddenAdjust, aProcessID);
+-    return true;
+-  }
+-
+-  virtual bool
+-  RecvEnableWakeLockNotifications() MOZ_OVERRIDE
+-  {
+-    // We allow arbitrary content to use wake locks.
+-    hal::RegisterWakeLockObserver(this);
+-    return true;
+-  }
+-   
+-  virtual bool
+-  RecvDisableWakeLockNotifications() MOZ_OVERRIDE
+-  {
+-    hal::UnregisterWakeLockObserver(this);
+-    return true;
+-  }
+-
+-  virtual bool
+-  RecvGetWakeLockInfo(const nsString &aTopic, WakeLockInformation *aWakeLockInfo) MOZ_OVERRIDE
+-  {
+-    hal::GetWakeLockInfo(aTopic, aWakeLockInfo);
+-    return true;
+-  }
+-  
+-  void Notify(const WakeLockInformation& aWakeLockInfo)
+-  {
+-    unused << SendNotifyWakeLockChange(aWakeLockInfo);
+-  }
+-
+-  virtual bool
+   RecvEnableSwitchNotifications(const SwitchDevice& aDevice) MOZ_OVERRIDE
+   {
+     // Content has no reason to listen to switch events currently.
+@@ -900,12 +796,6 @@
+   }
+ 
+   virtual bool
+-  RecvNotifyWakeLockChange(const WakeLockInformation& aWakeLockInfo) MOZ_OVERRIDE {
+-    hal::NotifyWakeLockChange(aWakeLockInfo);
+-    return true;
+-  }
+-
+-  virtual bool
+   RecvNotifyScreenConfigurationChange(const ScreenConfiguration& aScreenConfiguration) MOZ_OVERRIDE {
+     hal::NotifyScreenConfigurationChange(aScreenConfiguration);
+     return true;
+diff -r 57a35cb98651 -r e870fa674d70 layout/build/nsLayoutModule.cpp
+--- a/layout/build/nsLayoutModule.cpp	Mon Apr 07 00:15:13 2014 +0800
++++ b/layout/build/nsLayoutModule.cpp	Mon Apr 07 03:11:03 2014 +0800
+@@ -221,7 +221,6 @@
+ #include "mozilla/dom/mobilemessage/MobileMessageService.h"
+ #include "mozilla/dom/mobilemessage/SmsServicesFactory.h"
+ #endif
+-#include "nsIPowerManagerService.h"
+ #ifdef MOZ_ALARM
+ #include "nsIAlarmHalService.h"
+ #endif
+@@ -230,7 +229,6 @@
+ 
+ #include "AudioChannelService.h"
+ 
+-#include "mozilla/dom/power/PowerManagerService.h"
+ #ifdef MOZ_ALARM
+ #include "mozilla/dom/alarm/AlarmHalService.h"
+ #endif
+@@ -261,7 +259,6 @@
+ using mozilla::dom::alarm::AlarmHalService;
+ #endif
+ using mozilla::dom::indexedDB::IndexedDatabaseManager;
+-using mozilla::dom::power::PowerManagerService;
+ using mozilla::dom::quota::QuotaManager;
+ using mozilla::dom::TCPSocketChild;
+ using mozilla::dom::TCPSocketParent;
+@@ -342,8 +339,6 @@
+ NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIMobileMessageDatabaseService,
+                                          SmsServicesFactory::CreateMobileMessageDatabaseService)
+ #endif
+-NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIPowerManagerService,
+-                                         PowerManagerService::GetInstance)
+ #ifdef MOZ_ALARM
+ NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIAlarmHalService,
+                                          AlarmHalService::GetInstance)
+@@ -832,7 +827,6 @@
+ NS_DEFINE_NAMED_CID(MOBILE_MESSAGE_SERVICE_CID);
+ NS_DEFINE_NAMED_CID(MOBILE_MESSAGE_DATABASE_SERVICE_CID);
+ #endif
+-NS_DEFINE_NAMED_CID(NS_POWERMANAGERSERVICE_CID);
+ NS_DEFINE_NAMED_CID(OSFILECONSTANTSSERVICE_CID);
+ #ifdef MOZ_ALARM
+ NS_DEFINE_NAMED_CID(NS_ALARMHALSERVICE_CID);
+@@ -1129,7 +1123,6 @@
+   { &kMOBILE_MESSAGE_SERVICE_CID, false, nullptr, nsIMobileMessageServiceConstructor },
+   { &kMOBILE_MESSAGE_DATABASE_SERVICE_CID, false, nullptr, nsIMobileMessageDatabaseServiceConstructor },
+ #endif
+-  { &kNS_POWERMANAGERSERVICE_CID, false, nullptr, nsIPowerManagerServiceConstructor },
+   { &kOSFILECONSTANTSSERVICE_CID, true, nullptr, OSFileConstantsServiceConstructor },
+ #ifdef MOZ_ALARM
+   { &kNS_ALARMHALSERVICE_CID, false, nullptr, nsIAlarmHalServiceConstructor },
+@@ -1292,7 +1285,6 @@
+   { MOBILE_MESSAGE_SERVICE_CONTRACTID, &kMOBILE_MESSAGE_SERVICE_CID },
+   { MOBILE_MESSAGE_DATABASE_SERVICE_CONTRACTID, &kMOBILE_MESSAGE_DATABASE_SERVICE_CID },
+ #endif
+-  { POWERMANAGERSERVICE_CONTRACTID, &kNS_POWERMANAGERSERVICE_CID },
+   { OSFILECONSTANTSSERVICE_CONTRACTID, &kOSFILECONSTANTSSERVICE_CID },
+ #ifdef MOZ_ALARM
+   { ALARMHALSERVICE_CONTRACTID, &kNS_ALARMHALSERVICE_CID },

@@ -1,0 +1,17 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1402049378 -28800
+#      Fri Jun 06 18:09:38 2014 +0800
+# Node ID 385769dab5474efd3c48f42794d13c7eeb5b86ba
+# Parent  8ee06aa66da312c1c54e9d75cbcaf3847f18fcc7
+libvpx pgo
+
+diff -r 8ee06aa66da3 -r 385769dab547 media/libvpx/Makefile.in
+--- a/media/libvpx/Makefile.in	Fri Jun 06 18:08:45 2014 +0800
++++ b/media/libvpx/Makefile.in	Fri Jun 06 18:09:38 2014 +0800
+@@ -126,3 +126,5 @@
+ 	$(CC) -o $@ -c $(patsubst -xO[45],-xO3,$(COMPILE_CFLAGS)) $<
+ endif
+ endif
++
++vp8_asm_enc_offsets.$(OBJ_SUFFIX): CFLAGS += -GL-

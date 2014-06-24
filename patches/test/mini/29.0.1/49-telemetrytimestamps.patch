@@ -1,0 +1,102 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396778372 -28800
+#      Sun Apr 06 17:59:32 2014 +0800
+# Node ID ecab90570e9c74b946b1eea65d86695fc1e8dcac
+# Parent  627cc9799277a80144a22240fea1c4be93617816
+Remove TelemetryTimestamps
+
+diff -r 627cc9799277 -r ecab90570e9c browser/base/content/browser.js
+--- a/browser/base/content/browser.js	Sun Apr 06 17:27:31 2014 +0800
++++ b/browser/base/content/browser.js	Sun Apr 06 17:59:32 2014 +0800
+@@ -946,9 +946,6 @@
+ 
+   _delayedStartup: function(mustLoadSidebar) {
+     let tmp = {};
+-    Cu.import("resource://gre/modules/TelemetryTimestamps.jsm", tmp);
+-    let TelemetryTimestamps = tmp.TelemetryTimestamps;
+-    TelemetryTimestamps.add("delayedStartupStarted");
+ 
+     this._cancelDelayedStartup();
+ 
+@@ -1236,7 +1233,6 @@
+     this.delayedStartupFinished = true;
+ 
+     Services.obs.notifyObservers(window, "browser-delayed-startup-finished", "");
+-    TelemetryTimestamps.add("delayedStartupFinished");
+   },
+ 
+   // Returns the URI(s) to load at startup.
+diff -r 627cc9799277 -r ecab90570e9c browser/components/sessionstore/src/SessionStore.jsm
+--- a/browser/components/sessionstore/src/SessionStore.jsm	Sun Apr 06 17:27:31 2014 +0800
++++ b/browser/components/sessionstore/src/SessionStore.jsm	Sun Apr 06 17:59:32 2014 +0800
+@@ -88,7 +88,6 @@
+ 
+ Cu.import("resource://gre/modules/Services.jsm", this);
+ Cu.import("resource://gre/modules/XPCOMUtils.jsm", this);
+-Cu.import("resource://gre/modules/TelemetryTimestamps.jsm", this);
+ Cu.import("resource://gre/modules/TelemetryStopwatch.jsm", this);
+ Cu.import("resource://gre/modules/osfile.jsm", this);
+ Cu.import("resource://gre/modules/PrivateBrowsingUtils.jsm", this);
+@@ -371,7 +370,6 @@
+       throw new Error("SessionStore.init() must only be called once!");
+     }
+ 
+-    TelemetryTimestamps.add("sessionRestoreInitialized");
+     OBSERVING.forEach(function(aTopic) {
+       Services.obs.addObserver(this, aTopic, true);
+     }, this);
+@@ -795,7 +793,6 @@
+           // Nothing to restore now, notify observers things are complete.
+           Services.obs.notifyObservers(null, NOTIFY_WINDOWS_RESTORED, "");
+         } else {
+-          TelemetryTimestamps.add("sessionRestoreRestoring");
+           this._restoreCount = aInitialState.windows ? aInitialState.windows.length : 0;
+ 
+           // global data must be restored before restoreWindow is called so that
+diff -r 627cc9799277 -r ecab90570e9c toolkit/components/telemetry/TelemetryPing.jsm
+--- a/toolkit/components/telemetry/TelemetryPing.jsm	Sun Apr 06 17:27:31 2014 +0800
++++ b/toolkit/components/telemetry/TelemetryPing.jsm	Sun Apr 06 17:59:32 2014 +0800
+@@ -265,11 +265,6 @@
+     // Look for app-specific timestamps
+     var appTimestamps = {};
+     try {
+-      let o = {};
+-      Cu.import("resource://gre/modules/TelemetryTimestamps.jsm", o);
+-      appTimestamps = o.TelemetryTimestamps.get();
+-    } catch (ex) {}
+-    try {
+       ret.addonManager = AddonManagerPrivate.getSimpleMeasures();
+     } catch (ex) {}
+ 
+diff -r 627cc9799277 -r ecab90570e9c toolkit/modules/moz.build
+--- a/toolkit/modules/moz.build	Sun Apr 06 17:27:31 2014 +0800
++++ b/toolkit/modules/moz.build	Sun Apr 06 17:59:32 2014 +0800
+@@ -42,7 +42,6 @@
+     'SpatialNavigation.jsm',
+     'Sqlite.jsm',
+     'Task.jsm',
+-    'TelemetryTimestamps.jsm',
+     'Timer.jsm',
+ ]
+ 
+diff -r 627cc9799277 -r ecab90570e9c toolkit/mozapps/extensions/AddonManager.jsm
+--- a/toolkit/mozapps/extensions/AddonManager.jsm	Sun Apr 06 17:27:31 2014 +0800
++++ b/toolkit/mozapps/extensions/AddonManager.jsm	Sun Apr 06 17:59:32 2014 +0800
+@@ -462,7 +462,6 @@
+   }),
+ 
+   recordTimestamp: function AMI_recordTimestamp(name, value) {
+-    this.TelemetryTimestamps.add(name, value);
+   },
+ 
+   /**
+@@ -2632,8 +2631,6 @@
+   }
+ };
+ 
+-// load the timestamps module into AddonManagerInternal
+-Cu.import("resource://gre/modules/TelemetryTimestamps.jsm", AddonManagerInternal);
+ Object.freeze(AddonManagerInternal);
+ Object.freeze(AddonManagerPrivate);
+ Object.freeze(AddonManager);

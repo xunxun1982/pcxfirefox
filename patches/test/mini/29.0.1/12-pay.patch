@@ -1,0 +1,48 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396524851 -28800
+#      Thu Apr 03 19:34:11 2014 +0800
+# Node ID 7afc28ec9c3d52aa077c85f42f59b37c132f66bf
+# Parent  438685cc8901902a6a5c57cddf8110eb62c62ac4
+Disable Pay
+
+diff -r 438685cc8901 -r 7afc28ec9c3d browser/installer/package-manifest.in
+--- a/browser/installer/package-manifest.in	Thu Apr 03 19:33:33 2014 +0800
++++ b/browser/installer/package-manifest.in	Thu Apr 03 19:34:11 2014 +0800
+@@ -240,7 +240,9 @@
+ #ifdef MOZ_GAMEPAD
+ @BINPATH@/components/dom_gamepad.xpt
+ #endif
++#ifdef MOZ_PAY
+ @BINPATH@/components/dom_payment.xpt
++#endif
+ @BINPATH@/components/downloads.xpt
+ @BINPATH@/components/editor.xpt
+ @BINPATH@/components/embed_base.xpt
+@@ -569,10 +571,12 @@
+ @BINPATH@/components/ActivityMessageConfigurator.js
+ #endif
+ 
++#ifdef MOZ_PAY
+ @BINPATH@/components/Payment.js
+ @BINPATH@/components/PaymentFlowInfo.js
+ @BINPATH@/components/PaymentRequestInfo.js
+ @BINPATH@/components/Payment.manifest
++#endif
+ 
+ #ifdef MOZ_WEBRTC
+ @BINPATH@/components/PeerConnection.js
+diff -r 438685cc8901 -r 7afc28ec9c3d configure.in
+--- a/configure.in	Thu Apr 03 19:33:33 2014 +0800
++++ b/configure.in	Thu Apr 03 19:34:11 2014 +0800
+@@ -7435,6 +7435,10 @@
+ dnl ========================================================
+ dnl = Enable Support for Payment API
+ dnl ========================================================
++MOZ_ARG_DISABLE_BOOL(pay,
++[  --disable-pay           Disable pay],
++    MOZ_PAY=,
++    MOZ_PAY=1)
+ if test -n "$MOZ_PAY"; then
+     AC_DEFINE(MOZ_PAY)
+ fi

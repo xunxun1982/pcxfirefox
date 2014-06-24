@@ -1,0 +1,40 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1396773676 -28800
+#      Sun Apr 06 16:41:16 2014 +0800
+# Node ID b6e6ee090501aac9548c25e31f0556a32c096389
+# Parent  8382bc02d06055ff7356c22c83352496fa2d7457
+Revert Bug 942244 - [Australis] Add BrowserUiTelemetry module for collecting toolbar measurements
+
+diff -r 8382bc02d060 -r b6e6ee090501 browser/components/nsBrowserGlue.js
+--- a/browser/components/nsBrowserGlue.js	Sun Apr 06 16:32:40 2014 +0800
++++ b/browser/components/nsBrowserGlue.js	Sun Apr 06 16:41:16 2014 +0800
+@@ -88,9 +88,6 @@
+ XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
+                                   "resource:///modules/sessionstore/SessionStore.jsm");
+ 
+-XPCOMUtils.defineLazyModuleGetter(this, "BrowserUITelemetry",
+-                                  "resource:///modules/BrowserUITelemetry.jsm");
+-
+ XPCOMUtils.defineLazyModuleGetter(this, "AsyncShutdown",
+                                   "resource://gre/modules/AsyncShutdown.jsm");
+ 
+@@ -498,7 +495,6 @@
+     webrtcUI.init();
+     AboutHome.init();
+     SessionStore.init();
+-    BrowserUITelemetry.init();
+ 
+     if (Services.appinfo.browserTabsRemote)
+       ContentClick.init();
+diff -r 8382bc02d060 -r b6e6ee090501 browser/modules/moz.build
+--- a/browser/modules/moz.build	Sun Apr 06 16:32:40 2014 +0800
++++ b/browser/modules/moz.build	Sun Apr 06 16:41:16 2014 +0800
+@@ -7,7 +7,6 @@
+ TEST_DIRS += ['test']
+ 
+ EXTRA_JS_MODULES += [
+-    'BrowserUITelemetry.jsm',
+     'ContentClick.jsm',
+     'CustomizationTabPreloader.jsm',
+     'NetworkPrioritizer.jsm',
