@@ -19,7 +19,7 @@
 #  define TETE_EXT_CLASS       TETE_CLASS_IMPORT
 #endif
 
-#define NON_TEMPORAL_STORES_NOT_SUPPORTED 0
+#define NON_TEMPORAL_STORES_NOT_SUPPORTED (DWORD)-1
 
 #ifdef  __cplusplus
 extern "C" {

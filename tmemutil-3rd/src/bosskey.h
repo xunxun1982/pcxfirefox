@@ -2,8 +2,7 @@
 #  define _BOSS_KEY_H_
 
 #ifdef BOSS_EXTERN
-#  undef BOSS_EXTERN
-#  define BOSS_EXTERN
+/* do nothing: it's been defined by bosskey.c */
 #else
 #  define BOSS_EXTERN extern
 #endif
@@ -12,10 +11,10 @@
 
 typedef struct tagWNDINFO
 {
-	int	  atom_str;
+	int	     atom_str;
 	int      key_mod;
 	int      key_vk;
-	DWORD    pFF;
+    DWORD    hPid;
     HWND     hFF;
 } WNDINFO;
 
