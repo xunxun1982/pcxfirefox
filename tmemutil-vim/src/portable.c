@@ -42,7 +42,6 @@ WCHAR   portable_data_path[VALUE_LEN+1] SHARED = {0};
 #endif
 
 static  WNDINFO ff_info;
-
 static _NtSHGetFolderPathW				TrueSHGetFolderPathW				= NULL;
 static _NtSHGetSpecialFolderLocation	TrueSHGetSpecialFolderLocation		= NULL;
 static _NtSHGetSpecialFolderPathW		TrueSHGetSpecialFolderPathW			= NULL;
@@ -328,10 +327,10 @@ void WINAPI undo_it(void)
     {
         Mhook_Unhook((PVOID*)&TrueSHGetFolderPathW);
     }
-	if (TrueSHGetSpecialFolderPathW)
-	{
-		Mhook_Unhook((PVOID*)&TrueSHGetSpecialFolderPathW);
-	}
+    if (TrueSHGetSpecialFolderPathW)
+    {
+        Mhook_Unhook((PVOID*)&TrueSHGetSpecialFolderPathW);
+    }
     if (TrueSHGetSpecialFolderLocation)
     {
         Mhook_Unhook((PVOID*)&TrueSHGetSpecialFolderLocation);
