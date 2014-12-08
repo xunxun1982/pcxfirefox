@@ -1,0 +1,31 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1416208930 -28800
+#      Mon Nov 17 15:22:10 2014 +0800
+# Branch GECKO340b9_2014111321_RELBRANCH
+# Node ID 1e515702c5c75b00919a9e21b0468a3e1da45c95
+# Parent  9f25b634ee9c5a2b60d193f05ff27683913e6c6a
+betterpgo-fix
+
+diff -r 9f25b634ee9c -r 1e515702c5c7 xpcom/base/moz.build
+--- a/xpcom/base/moz.build	Sun Nov 16 20:18:11 2014 +0800
++++ b/xpcom/base/moz.build	Mon Nov 17 15:22:10 2014 +0800
+@@ -89,6 +89,7 @@
+ SOURCES += [
+     'nsDebugImpl.cpp',
+ ]
++SOURCES['nsDebugImpl.cpp'].no_pgo = True
+ 
+ UNIFIED_SOURCES += [
+     'AvailableMemoryTracker.cpp',
+diff -r 9f25b634ee9c -r 1e515702c5c7 xpcom/reflect/xptcall/md/win32/moz.build
+--- a/xpcom/reflect/xptcall/md/win32/moz.build	Sun Nov 16 20:18:11 2014 +0800
++++ b/xpcom/reflect/xptcall/md/win32/moz.build	Mon Nov 17 15:22:10 2014 +0800
+@@ -33,6 +33,7 @@
+             'xptcinvoke.cpp',
+             'xptcstubs.cpp',
+         ]
++        SOURCES['xptcinvoke.cpp'].no_pgo = True
+ 
+ FINAL_LIBRARY = 'xul'
+ 

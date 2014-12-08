@@ -1,0 +1,22 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1412002049 -28800
+#      Mon Sep 29 22:47:29 2014 +0800
+# Branch GECKO340b9_2014111321_RELBRANCH
+# Node ID 8643198905033a4a4ec14157e029f6b0bab97c32
+# Parent  f435e654f2afaf0a678b6b6e9a27f9d025238083
+Bug 1071448 - Speed up binary searches using a bitwise operation.  r=adw
+
+diff -r f435e654f2af -r 864319890503 toolkit/modules/BinarySearch.jsm
+--- a/toolkit/modules/BinarySearch.jsm	Tue Sep 23 23:47:33 2014 +0800
++++ b/toolkit/modules/BinarySearch.jsm	Mon Sep 29 22:47:29 2014 +0800
+@@ -60,7 +60,8 @@
+     let low = 0;
+     let high = array.length - 1;
+     while (low <= high) {
+-      let mid = Math.floor((low + high) / 2);
++      // Thanks to http://jsperf.com/code-review-1480 for this tip.
++      let mid = (low + high) >> 1;
+       let cmp = comparator(target, array[mid]);
+       if (cmp == 0)
+         return [true, mid];

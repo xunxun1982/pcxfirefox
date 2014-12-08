@@ -1,0 +1,77 @@
+# HG changeset patch
+# User Kyle Huey <khuey@kylehuey.com>
+# Date 1414085689 25200
+#      Thu Oct 23 10:34:49 2014 -0700
+# Branch GECKO340b9_2014111321_RELBRANCH
+# Node ID 4f62cce5519fd651ccbd48c5a2d2f2cc1e787098
+# Parent  7bbbf6c622666301696df331ecf4a760f8f5d622
+Bug 1088143: Update SQLite to version 3.8.6.1. r=mak
+
+diff -r 7bbbf6c62266 -r 4f62cce5519f db/sqlite3/README.MOZILLA
+--- a/db/sqlite3/README.MOZILLA	Sun Nov 16 02:27:35 2014 +0800
++++ b/db/sqlite3/README.MOZILLA	Thu Oct 23 10:34:49 2014 -0700
+@@ -1,6 +1,9 @@
+-This is sqlite 3.8.6
++This is sqlite 3.8.6.1
+ 
+--- Ryan VanderMeulen <ryanvm@gmail.com>, 08/2014
++NB: We did not update SQLITE_VERSION in configure.in for this.  See bug 1088143
++    for the rationale.
++
++-- Kyle Huey <khuey@kylehuey.com>, 10/23/2014
+ 
+ See http://www.sqlite.org/ for more info.
+ 
+diff -r 7bbbf6c62266 -r 4f62cce5519f db/sqlite3/src/sqlite3.c
+--- a/db/sqlite3/src/sqlite3.c	Sun Nov 16 02:27:35 2014 +0800
++++ b/db/sqlite3/src/sqlite3.c	Thu Oct 23 10:34:49 2014 -0700
+@@ -1,6 +1,6 @@
+ /******************************************************************************
+ ** This file is an amalgamation of many separate C source files from SQLite
+-** version 3.8.6.  By combining all the individual C code files into this 
++** version 3.8.6.1.  By combining all the individual C code files into this 
+ ** single large file, the entire code can be compiled as a single translation
+ ** unit.  This allows many compilers to do optimizations that would not be
+ ** possible if the files were compiled separately.  Performance improvements
+@@ -222,9 +222,9 @@
+ ** [sqlite3_libversion_number()], [sqlite3_sourceid()],
+ ** [sqlite_version()] and [sqlite_source_id()].
+ */
+-#define SQLITE_VERSION        "3.8.6"
++#define SQLITE_VERSION        "3.8.6.1"
+ #define SQLITE_VERSION_NUMBER 3008006
+-#define SQLITE_SOURCE_ID      "2014-08-15 11:46:33 9491ba7d738528f168657adb43a198238abde19e"
++#define SQLITE_SOURCE_ID      "2014-10-22 14:22:11 1581c30c389acb2af2c7040d3583c89d48f9bea5"
+ 
+ /*
+ ** CAPI3REF: Run-Time Library Version Numbers
+@@ -42202,6 +42202,14 @@
+         rc = SQLITE_OK;
+       }else{
+         rc = sqlite3OsTruncate(pPager->jfd, 0);
++        if( rc==SQLITE_OK && pPager->fullSync ){
++          /* Make sure the new file size is written into the inode right away.
++          ** Otherwise the journal might resurrect following a power loss and
++          ** cause the last transaction to roll back.  See
++          ** https://bugzilla.mozilla.org/show_bug.cgi?id=1072773
++          */
++          rc = sqlite3OsSync(pPager->jfd, pPager->syncFlags);
++        }
+       }
+       pPager->journalOff = 0;
+     }else if( pPager->journalMode==PAGER_JOURNALMODE_PERSIST
+diff -r 7bbbf6c62266 -r 4f62cce5519f db/sqlite3/src/sqlite3.h
+--- a/db/sqlite3/src/sqlite3.h	Sun Nov 16 02:27:35 2014 +0800
++++ b/db/sqlite3/src/sqlite3.h	Thu Oct 23 10:34:49 2014 -0700
+@@ -107,9 +107,9 @@
+ ** [sqlite3_libversion_number()], [sqlite3_sourceid()],
+ ** [sqlite_version()] and [sqlite_source_id()].
+ */
+-#define SQLITE_VERSION        "3.8.6"
++#define SQLITE_VERSION        "3.8.6.1"
+ #define SQLITE_VERSION_NUMBER 3008006
+-#define SQLITE_SOURCE_ID      "2014-08-15 11:46:33 9491ba7d738528f168657adb43a198238abde19e"
++#define SQLITE_SOURCE_ID      "2014-10-22 14:22:11 1581c30c389acb2af2c7040d3583c89d48f9bea5"
+ 
+ /*
+ ** CAPI3REF: Run-Time Library Version Numbers

@@ -1,0 +1,21 @@
+# HG changeset patch
+# User Hannes Verschore <hv1989@gmail.com>
+# Date 1409934495 -7200
+#      Fri Sep 05 18:28:15 2014 +0200
+# Branch GECKO340b9_2014111321_RELBRANCH
+# Node ID fc909e5742e86877137244d5c3bdd62357364de2
+# Parent  38e5825050448988e448705dac080c98665fddf5
+Bug 1061646 - Inline CheckForInterrupt on windows, just like we do on linux, r=jorendorff
+
+diff -r 38e582505044 -r fc909e5742e8 js/src/jscntxt.h
+--- a/js/src/jscntxt.h	Fri Sep 19 18:35:00 2014 +0200
++++ b/js/src/jscntxt.h	Fri Sep 05 18:28:15 2014 +0200
+@@ -816,7 +816,7 @@
+  * break out of its loop. This happens if, for example, the user clicks "Stop
+  * script" on the slow script dialog; treat it as an uncatchable error.
+  */
+-inline bool
++MOZ_ALWAYS_INLINE bool
+ CheckForInterrupt(JSContext *cx)
+ {
+     MOZ_ASSERT(cx->runtime()->requestDepth >= 1);

@@ -1,0 +1,33 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1411487253 -28800
+#      Tue Sep 23 23:47:33 2014 +0800
+# Branch GECKO340b9_2014111321_RELBRANCH
+# Node ID f435e654f2afaf0a678b6b6e9a27f9d025238083
+# Parent  ef0efc6b7cd36aee989bb1fef8bbf2c8fa84b84f
+Bug 1062277 - Ensure calls to IMFTransform::ProcessMessage() pass 64bit pointer values on 64bit builds. r=edwin
+
+diff -r ef0efc6b7cd3 -r f435e654f2af content/media/fmp4/wmf/MFTDecoder.cpp
+--- a/content/media/fmp4/wmf/MFTDecoder.cpp	Sun Sep 28 18:08:37 2014 +0800
++++ b/content/media/fmp4/wmf/MFTDecoder.cpp	Tue Sep 23 23:47:33 2014 +0800
+@@ -111,7 +111,7 @@
+ }
+ 
+ HRESULT
+-MFTDecoder::SendMFTMessage(MFT_MESSAGE_TYPE aMsg, UINT32 aData)
++MFTDecoder::SendMFTMessage(MFT_MESSAGE_TYPE aMsg, ULONG_PTR aData)
+ {
+   NS_ENSURE_TRUE(mDecoder != nullptr, E_POINTER);
+   HRESULT hr = mDecoder->ProcessMessage(aMsg, aData);
+diff -r ef0efc6b7cd3 -r f435e654f2af content/media/fmp4/wmf/MFTDecoder.h
+--- a/content/media/fmp4/wmf/MFTDecoder.h	Sun Sep 28 18:08:37 2014 +0800
++++ b/content/media/fmp4/wmf/MFTDecoder.h	Tue Sep 23 23:47:33 2014 +0800
+@@ -74,7 +74,7 @@
+   HRESULT Flush();
+ 
+   // Sends a message to the MFT.
+-  HRESULT SendMFTMessage(MFT_MESSAGE_TYPE aMsg, UINT32 aData);
++  HRESULT SendMFTMessage(MFT_MESSAGE_TYPE aMsg, ULONG_PTR aData);
+ 
+ private:
+ 

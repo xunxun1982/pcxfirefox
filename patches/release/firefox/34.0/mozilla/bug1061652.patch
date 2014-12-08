@@ -1,0 +1,21 @@
+# HG changeset patch
+# User Michael Shuen <mz_mhs-ctb@outlook.com>
+# Date 1411144500 -7200
+#      Fri Sep 19 18:35:00 2014 +0200
+# Branch GECKO340b9_2014111321_RELBRANCH
+# Node ID 38e5825050448988e448705dac080c98665fddf5
+# Parent  4ff185a9c3b95de6de4710b845ecad0944daf7bf
+Bug 1061652 - Inline setCrossCompartmentSlot on windows. r=luke
+
+diff -r 4ff185a9c3b9 -r 38e582505044 js/src/vm/ObjectImpl.h
+--- a/js/src/vm/ObjectImpl.h	Tue Nov 11 16:37:50 2014 +0800
++++ b/js/src/vm/ObjectImpl.h	Fri Sep 19 18:35:00 2014 +0200
+@@ -772,7 +772,7 @@
+         getSlotRef(slot).set(this->asObjectPtr(), HeapSlot::Slot, slot, value);
+     }
+ 
+-    inline void setCrossCompartmentSlot(uint32_t slot, const Value &value) {
++    MOZ_ALWAYS_INLINE void setCrossCompartmentSlot(uint32_t slot, const Value &value) {
+         MOZ_ASSERT(slotInRange(slot));
+         getSlotRef(slot).set(this->asObjectPtr(), HeapSlot::Slot, slot, value);
+     }

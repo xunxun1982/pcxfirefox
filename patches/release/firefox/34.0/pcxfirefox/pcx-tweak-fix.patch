@@ -1,0 +1,32 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1416392463 -28800
+#      Wed Nov 19 18:21:03 2014 +0800
+# Branch GECKO340b9_2014111321_RELBRANCH
+# Node ID d9c615b66bc6a2e63405fcc7da9d275fcb736748
+# Parent  222392639aeb55b4e540889df3147e17d6de2622
+pcx-tweak-fix
+
+diff -r 222392639aeb -r d9c615b66bc6 browser/branding/official/pref/firefox-branding.js
+--- a/browser/branding/official/pref/firefox-branding.js	Wed Nov 19 18:18:26 2014 +0800
++++ b/browser/branding/official/pref/firefox-branding.js	Wed Nov 19 18:21:03 2014 +0800
+@@ -30,3 +30,19 @@
+ pref("browser.search.param.ms-pc-metro", "MOZW");
+ pref("browser.search.param.yahoo-fr-metro", "mozilla_metro_search");
+ #endif
++
++//pcxfirefox tweak
++//browser
++pref("browser.download.manager.scanWhenDone", false);
++pref("browser.download.useDownloadDir", false);
++pref("browser.tabs.closeWindowWithLastTab", false);
++//dom
++pref("dom.popup_maximum", 5);
++//datareporting
++pref("datareporting.healthreport.uploadEnabled", false);
++pref("datareporting.healthreport.logging.consoleEnabled", false);
++pref("datareporting.policy.dataSubmissionEnabled", false);
++//special
++pref("pdfjs.disabled", false);
++pref("config.trim_on_minimize", false);
++pref("plugin.expose_full_path", true);

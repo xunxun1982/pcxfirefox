@@ -1,0 +1,28 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1411898917 -28800
+#      Sun Sep 28 18:08:37 2014 +0800
+# Branch GECKO340b9_2014111321_RELBRANCH
+# Node ID ef0efc6b7cd36aee989bb1fef8bbf2c8fa84b84f
+# Parent  da61988a42d2d5ff14d75d3672b6e962407c0d6d
+Bug 1061764 - Atomic<bool, Relaxed> should mean no synchronization on windows x86, r=froydnj
+
+diff -r da61988a42d2 -r ef0efc6b7cd3 mfbt/Atomics.h
+--- a/mfbt/Atomics.h	Thu Sep 11 18:00:15 2014 +0900
++++ b/mfbt/Atomics.h	Sun Sep 28 18:08:37 2014 +0800
+@@ -40,7 +40,14 @@
+ #  elif MOZ_USING_LIBCXX
+ #    define MOZ_HAVE_CXX11_ATOMICS
+ #  endif
+-#elif defined(_MSC_VER) && _MSC_VER >= 1700
++/*
++ * Although Visual Studio 2012's CRT supports <atomic>, its atomic load
++ * implementation unnecessarily uses an atomic intrinsic for the less
++ * restrictive memory orderings, which can be prohibitively expensive.
++ * Therefore, we require at least Visual Studio 2013 for using the CRT
++ * (bug 1061764).
++ */
++#elif defined(_MSC_VER) && _MSC_VER >= 1800
+ #  if defined(DEBUG)
+      /*
+       * Provide our own failure code since we're having trouble linking to

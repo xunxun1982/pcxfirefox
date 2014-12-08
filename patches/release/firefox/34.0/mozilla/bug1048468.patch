@@ -1,0 +1,108 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1411397855 -28800
+#      Mon Sep 22 22:57:35 2014 +0800
+# Branch GECKO340b9_2014111321_RELBRANCH
+# Node ID acf2cb5b198191f73a87c4578d9bfaab8e4590d9
+# Parent  f77c2ba83ec4c561aa9db6bf6266ea3f40276f86
+bug 1048468 - pac resolution with myIPAddress can block on dns timeouts r=sworkman
+
+diff -r f77c2ba83ec4 -r acf2cb5b1981 netwerk/base/src/ProxyAutoConfig.cpp
+--- a/netwerk/base/src/ProxyAutoConfig.cpp	Mon Sep 22 19:38:31 2014 +0800
++++ b/netwerk/base/src/ProxyAutoConfig.cpp	Mon Sep 22 22:57:35 2014 +0800
+@@ -485,7 +485,11 @@
+ 
+ static const JSFunctionSpec PACGlobalFunctions[] = {
+   JS_FS("dnsResolve", PACDnsResolve, 1, 0),
++
++  // a global "var pacUseMultihomedDNS = true;" will change behavior
++  // of myIpAddress to actively use DNS
+   JS_FS("myIpAddress", PACMyIpAddress, 0, 0),
++  
+   JS_FS("alert", PACProxyAlert, 1, 0),
+   JS_FS_END
+ };
+@@ -834,14 +838,31 @@
+   nsAutoCString remoteDottedDecimal;
+   nsAutoCString localDottedDecimal;
+   JSContext *cx = mJSRuntime->Context();
++  JS::RootedValue v(cx);
++  JS::Rooted<JSObject*> global(cx, mJSRuntime->Global());
++
++  bool useMultihomedDNS =
++    JS_GetProperty(cx,  global, "pacUseMultihomedDNS", &v) &&
++    !v.isUndefined() && ToBoolean(v);
+ 
+   // first, lookup the local address of a socket connected
+   // to the host of uri being resolved by the pac file. This is
+   // v6 safe.. but is the last step like that
+   bool rvalAssigned = false;
+-  if (!MyIPAddressTryHost(mRunningHost, kTimeout, aArgs, &rvalAssigned) ||
+-      rvalAssigned) {
+-    return rvalAssigned;
++  if (useMultihomedDNS) {
++    if (!MyIPAddressTryHost(mRunningHost, kTimeout, aArgs, &rvalAssigned) ||
++        rvalAssigned) {
++      return rvalAssigned;
++    }
++  } else {
++    // we can still do the fancy multi homing thing if the host is a literal
++    PRNetAddr tempAddr;
++    memset(&tempAddr, 0, sizeof(PRNetAddr));
++    if ((PR_StringToNetAddr(mRunningHost.get(), &tempAddr) == PR_SUCCESS) &&
++        (!MyIPAddressTryHost(mRunningHost, kTimeout, aArgs, &rvalAssigned) ||
++         rvalAssigned)) {
++      return rvalAssigned;
++    }
+   }
+ 
+   // next, look for a route to a public internet address that doesn't need DNS.
+@@ -854,11 +875,14 @@
+     return rvalAssigned;
+   }
+   
+-  // next, use the old algorithm based on the local hostname
++  // finally, use the old algorithm based on the local hostname
+   nsAutoCString hostName;
+   nsCOMPtr<nsIDNSService> dns = do_GetService(NS_DNSSERVICE_CONTRACTID);
++  // without multihomedDNS use such a short timeout that we are basically
++  // just looking at the cache for raw dotted decimals
++  uint32_t timeout = useMultihomedDNS ? kTimeout : 1;
+   if (dns && NS_SUCCEEDED(dns->GetMyHostName(hostName)) &&
+-      PACResolveToString(hostName, localDottedDecimal, kTimeout)) {
++      PACResolveToString(hostName, localDottedDecimal, timeout)) {
+     JSString *dottedDecimalString =
+       JS_NewStringCopyZ(cx, localDottedDecimal.get());
+     if (!dottedDecimalString) {
+diff -r f77c2ba83ec4 -r acf2cb5b1981 netwerk/base/src/ProxyAutoConfig.h
+--- a/netwerk/base/src/ProxyAutoConfig.h	Mon Sep 22 19:38:31 2014 +0800
++++ b/netwerk/base/src/ProxyAutoConfig.h	Mon Sep 22 22:57:35 2014 +0800
+@@ -77,7 +77,8 @@
+                           nsACString &result);
+ 
+ private:
+-  const static unsigned int kTimeout = 1000; // ms to allow for myipaddress dns queries
++  // allow 665ms for myipaddress dns queries. That's 95th percentile.
++  const static unsigned int kTimeout = 665;
+ 
+   // used to compile the PAC file and setup the execution context
+   nsresult SetupJS();
+diff -r f77c2ba83ec4 -r acf2cb5b1981 netwerk/test/unit/test_protocolproxyservice.js
+--- a/netwerk/test/unit/test_protocolproxyservice.js	Mon Sep 22 19:38:31 2014 +0800
++++ b/netwerk/test/unit/test_protocolproxyservice.js	Mon Sep 22 22:57:35 2014 +0800
+@@ -612,6 +612,7 @@
+   // should be created.
+ 
+   var pac = 'data:text/plain,' +
++            'var pacUseMultihomedDNS = true;\n' +
+             'function FindProxyForURL(url, host) {' +
+             ' return "PROXY " + myIpAddress() + ":1234";' +
+             '}';
+@@ -648,6 +649,7 @@
+   // FindProxyForURL(). bug 829646.
+ 
+   var pac = 'data:text/plain,' +
++            'var pacUseMultihomedDNS = true;\n' +
+             'var myaddr = myIpAddress(); ' +
+             'function FindProxyForURL(url, host) {' +
+             ' return "PROXY " + myaddr + ":5678";' +

@@ -1,0 +1,120 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1416134038 -28800
+#      Sun Nov 16 18:33:58 2014 +0800
+# Branch GECKO340b9_2014111321_RELBRANCH
+# Node ID c0878a89cfab5f7cc1776961ce4511abc31b74ad
+# Parent  96fda3e1a4f6292a381935e9a602ad77b07e57d0
+pcx-tweak
+
+diff -r 96fda3e1a4f6 -r c0878a89cfab browser/app/profile/firefox.js
+--- a/browser/app/profile/firefox.js	Sun Nov 16 18:26:27 2014 +0800
++++ b/browser/app/profile/firefox.js	Sun Nov 16 18:33:58 2014 +0800
+@@ -381,6 +381,10 @@
+ // This records whether or not the panel has been shown at least once.
+ pref("browser.download.panel.shown", false);
+ 
++//pcxfirefox tweak
++pref("browser.download.manager.scanWhenDone", false);
++pref("browser.download.useDownloadDir", false);
++
+ #ifndef XP_MACOSX
+ pref("browser.helperApps.deleteTempFileOnExit", true);
+ #endif
+@@ -450,7 +454,7 @@
+ #endif
+ 
+ // Tabbed browser
+-pref("browser.tabs.closeWindowWithLastTab", true);
++pref("browser.tabs.closeWindowWithLastTab", false);
+ pref("browser.tabs.insertRelatedAfterCurrent", true);
+ pref("browser.tabs.warnOnClose", true);
+ pref("browser.tabs.warnOnCloseOtherTabs", true);
+@@ -850,6 +854,56 @@
+ pref("plugin.state.libplugins", 2);
+ #endif
+ 
++//pcx other tweak
++#ifdef XP_WIN
++//WMP
++pref("plugin.state.np-mswmp", 2);
++//Alipay
++pref("plugin.state.npaliedit", 2);
++pref("plugin.state.npalidcp", 2);
++pref("plugin.state.npalicdo", 2);
++pref("plugin.state.npalisecctrl", 2);
++pref("plugin.state.npalissologin", 2);
++//BOC
++pref("plugin.state.npseceditctl", 2);
++pref("plugin.state.npseceditctl.boc.x86", 2);
++//ICBC
++pref("plugin.state.npclcache", 2);
++pref("plugin.state.npclientbinding", 2);
++pref("plugin.state.npfullscreen", 2);
++pref("plugin.state.npsubmit", 2);
++pref("plugin.state.npxxin", 2);
++//CMB
++pref("plugin.state.npcmbedit", 2);
++//Tenpay
++pref("plugin.state.npqqcert", 2);
++pref("plugin.state.npqqedit", 2);
++//QQ Login
++pref("plugin.state.npssoaxctrlforptlogin", 2);
++//AliWangwang
++pref("plugin.state.npwangwang", 2);
++//SumatraPDF
++pref("plugin.state.nppdfviewer", 2);
++//Baiduyun upload
++pref("plugin.state.npuploader", 2);
++//360yun upload
++pref("plugin.state.npuploadplugin", 2);
++//115 upload
++pref("plugin.state.npuploadfile", 2);
++//QQ upload
++pref("plugin.state.nptxftnWebKit", 2);
++//CNTV
++pref("plugin.state.npcntvlive2", 2);
++//QzoneMusic
++pref("plugin.state.npqzonemusic", 2);
++//UnionPay
++pref("plugin.state.npupeditor2", 2);
++//JDEdit
++pref("plugin.state.npjdedit", 2);
++//Baifubao
++pref("plugin.state.npbaiedit", 2);
++#endif
++
+ // display door hanger if flash not installed
+ pref("plugins.notifyMissingFlash", true);
+ 
+@@ -1011,7 +1065,7 @@
+ pref("urlclassifier.gethashnoise", 4);
+ 
+ // Gethash timeout for Safebrowsing.
+-pref("urlclassifier.gethash.timeout_ms", 5000);
++pref("urlclassifier.gethash.timeout_ms", 200);
+ 
+ // If an urlclassifier table has not been updated in this number of seconds,
+ // a gethash request will be forced to check that the result is still in
+@@ -1741,3 +1795,9 @@
+ 
+ // Enable the OpenH264 plugin support in the addon manager.
+ pref("media.gmp-gmpopenh264.provider.enabled", true);
++
++//pcxfirefox tweak
++pref("config.trim_on_minimize", false);
++pref("datareporting.healthreport.uploadEnabled", false);
++pref("datareporting.healthreport.logging.consoleEnabled", false);
++pref("datareporting.policy.dataSubmissionEnabled", false);
+diff -r 96fda3e1a4f6 -r c0878a89cfab modules/libpref/init/all.js
+--- a/modules/libpref/init/all.js	Sun Nov 16 18:26:27 2014 +0800
++++ b/modules/libpref/init/all.js	Sun Nov 16 18:33:58 2014 +0800
+@@ -870,7 +870,7 @@
+ pref("dom.allow_scripts_to_close_windows",          false);
+ 
+ pref("dom.disable_open_during_load",                false);
+-pref("dom.popup_maximum",                           20);
++pref("dom.popup_maximum",                           5);
+ pref("dom.popup_allowed_events", "change click dblclick mouseup reset submit touchend");
+ pref("dom.disable_open_click_delay", 1000);
+ 

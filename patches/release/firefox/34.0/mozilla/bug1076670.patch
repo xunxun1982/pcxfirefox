@@ -1,0 +1,51 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1416072151 -28800
+#      Sun Nov 16 01:22:31 2014 +0800
+# Branch GECKO340b9_2014111321_RELBRANCH
+# Node ID d8aba208895c77161132485040a37208d8212615
+# Parent  07fa1a1f51dee3d9af7c023bfd7d581856d1ee9c
+Bug 1076670 - Workaround VS2013 64-bit returning +0 instead of -0 for sin(-0). r=luke
+
+diff -r 07fa1a1f51de -r d8aba208895c js/src/asmjs/AsmJSModule.cpp
+--- a/js/src/asmjs/AsmJSModule.cpp	Wed Oct 01 10:43:53 2014 -0400
++++ b/js/src/asmjs/AsmJSModule.cpp	Sun Nov 16 01:22:31 2014 +0800
+@@ -670,7 +670,12 @@
+       case AsmJSImm_ModD:
+         return RedirectCall(FuncCast(NumberMod), Args_Double_DoubleDouble);
+       case AsmJSImm_SinD:
++#ifdef _WIN64
++        // Workaround a VS 2013 sin issue, see math_sin_uncached.
++        return RedirectCall(FuncCast<double (double)>(js::math_sin_uncached), Args_Double_Double);
++#else
+         return RedirectCall(FuncCast<double (double)>(sin), Args_Double_Double);
++#endif
+       case AsmJSImm_CosD:
+         return RedirectCall(FuncCast<double (double)>(cos), Args_Double_Double);
+       case AsmJSImm_TanD:
+diff -r 07fa1a1f51de -r d8aba208895c js/src/jsmath.cpp
+--- a/js/src/jsmath.cpp	Wed Oct 01 10:43:53 2014 -0400
++++ b/js/src/jsmath.cpp	Sun Nov 16 01:22:31 2014 +0800
+@@ -941,12 +941,22 @@
+ double JS_VECTORCALL
+ js::math_sin_impl(MathCache *cache, double x)
+ {
++#ifdef _WIN64
++    return MATHCACHE_MAYBE_VEC_LOOKUP(cache, math_sin_uncached, x, MathCache::Sin);
++#else
+     return MATHCACHE_MAYBE_VEC_LOOKUP(cache, sin, x, MathCache::Sin);
++#endif
+ }
+ 
+ double JS_VECTORCALL
+ js::math_sin_uncached(double x)
+ {
++#ifdef _WIN64
++    // Workaround MSVC bug where sin(-0) is +0 instead of -0 on x64 on
++    // CPUs without FMA3 (pre-Haswell). See bug 1076670.
++    if (IsNegativeZero(x))
++        return -0.0;
++#endif
+     return sin(x);
+ }
+ 

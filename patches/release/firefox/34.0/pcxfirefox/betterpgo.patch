@@ -1,0 +1,105 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1416082191 -28800
+#      Sun Nov 16 04:09:51 2014 +0800
+# Branch GECKO340b9_2014111321_RELBRANCH
+# Node ID 4c503c3e599343d1316acccb87ce6bb73fb0ff10
+# Parent  4f62cce5519fd651ccbd48c5a2d2f2cc1e787098
+betterpgo
+
+diff -r 4f62cce5519f -r 4c503c3e5993 content/media/AudioStream.cpp
+--- a/content/media/AudioStream.cpp	Thu Oct 23 10:34:49 2014 -0700
++++ b/content/media/AudioStream.cpp	Sun Nov 16 04:09:51 2014 +0800
+@@ -825,19 +825,12 @@
+   return mAudioClock.GetPositionUnlocked();
+ }
+ 
+-// This function is miscompiled by PGO with MSVC 2010.  See bug 768333.
+-#ifdef _MSC_VER
+-#pragma optimize("", off)
+-#endif
+ int64_t
+ AudioStream::GetPositionInFrames()
+ {
+   MonitorAutoLock mon(mMonitor);
+   return mAudioClock.GetPositionInFrames();
+ }
+-#ifdef _MSC_VER
+-#pragma optimize("", on)
+-#endif
+ 
+ int64_t
+ AudioStream::GetPositionInFramesUnlocked()
+diff -r 4f62cce5519f -r 4c503c3e5993 gfx/layers/moz.build
+--- a/gfx/layers/moz.build	Thu Oct 23 10:34:49 2014 -0700
++++ b/gfx/layers/moz.build	Sun Nov 16 04:09:51 2014 +0800
+@@ -338,14 +338,6 @@
+ # Disable RTTI in google protocol buffer
+ DEFINES['GOOGLE_PROTOBUF_NO_RTTI'] = True
+ 
+-# Workaround compiler bug (Bug 795594)
+-if CONFIG['_MSC_VER'] and CONFIG['CPU_ARCH'] == 'x86_64':
+-    for src in [
+-        'Layers.cpp',
+-        'LayerTreeInvalidation.cpp',
+-    ]:
+-        SOURCES[src].no_pgo = True
+-
+ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
+     SOURCES += [
+         'basic/MacIOSurfaceTextureHostBasic.cpp',
+diff -r 4f62cce5519f -r 4c503c3e5993 js/src/moz.build
+--- a/js/src/moz.build	Thu Oct 23 10:34:49 2014 -0700
++++ b/js/src/moz.build	Sun Nov 16 04:09:51 2014 +0800
+@@ -489,10 +489,6 @@
+     DEFINES['MOZ_LINKER'] = True
+ 
+ if CONFIG['_MSC_VER']:
+-    if CONFIG['CPU_ARCH'] == 'x86':
+-        SOURCES['builtin/RegExp.cpp'].no_pgo = True # Bug 772303
+-    elif CONFIG['CPU_ARCH'] == 'x86_64' and CONFIG['JS_HAS_CTYPES']:
+-        SOURCES['ctypes/CTypes.cpp'].no_pgo = True # Bug 810661
+     # Prevent floating point errors caused by VC++ optimizations
+     # XXX We should add this to CXXFLAGS, too?
+     CFLAGS += ['-fp:precise']
+diff -r 4f62cce5519f -r 4c503c3e5993 layout/style/nsCSSParser.cpp
+--- a/layout/style/nsCSSParser.cpp	Thu Oct 23 10:34:49 2014 -0700
++++ b/layout/style/nsCSSParser.cpp	Sun Nov 16 04:09:51 2014 +0800
+@@ -1440,7 +1440,6 @@
+ 
+ // See Bug 723197
+ #ifdef _MSC_VER
+-#pragma optimize( "", off )
+ #pragma warning( push )
+ #pragma warning( disable : 4748 )
+ #endif
+@@ -1582,7 +1581,6 @@
+ 
+ #ifdef _MSC_VER
+ #pragma warning( pop )
+-#pragma optimize( "", on )
+ #endif
+ 
+ void
+diff -r 4f62cce5519f -r 4c503c3e5993 xpcom/base/moz.build
+--- a/xpcom/base/moz.build	Thu Oct 23 10:34:49 2014 -0700
++++ b/xpcom/base/moz.build	Sun Nov 16 04:09:51 2014 +0800
+@@ -89,7 +89,6 @@
+ SOURCES += [
+     'nsDebugImpl.cpp',
+ ]
+-SOURCES['nsDebugImpl.cpp'].no_pgo = True
+ 
+ UNIFIED_SOURCES += [
+     'AvailableMemoryTracker.cpp',
+diff -r 4f62cce5519f -r 4c503c3e5993 xpcom/reflect/xptcall/md/win32/moz.build
+--- a/xpcom/reflect/xptcall/md/win32/moz.build	Thu Oct 23 10:34:49 2014 -0700
++++ b/xpcom/reflect/xptcall/md/win32/moz.build	Sun Nov 16 04:09:51 2014 +0800
+@@ -33,7 +33,6 @@
+             'xptcinvoke.cpp',
+             'xptcstubs.cpp',
+         ]
+-        SOURCES['xptcinvoke.cpp'].no_pgo = True
+ 
+ FINAL_LIBRARY = 'xul'
+ 

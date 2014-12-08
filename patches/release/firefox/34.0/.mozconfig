@@ -1,0 +1,71 @@
+. $topsrcdir/browser/config/mozconfig
+
+mk_add_options MOZ_MAKE_FLAGS=-j2
+
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/../obju-vc-pgo
+
+# for 64-bit build
+#ac_add_options --target=x86_64-pc-mingw32
+#ac_add_options --host=x86_64-pc-mingw32
+
+export MOZ_OPTIMIZE_LDFLAGS="-opt:ref,icf -LARGEADDRESSAWARE e:/mozilla/mylib.lib"
+mk_add_options MOZ_OPTIMIZE_LDFLAGS="-opt:ref,icf -LARGEADDRESSAWARE e:/mozilla/mylib.lib"
+# for 64-bit build
+#export MOZ_OPTIMIZE_LDFLAGS="-MACHINE:X64 -OPT:REF,ICF"
+#mk_add_options MOZ_OPTIMIZE_LDFLAGS="-MACHINE:X64 -OPT:REF,ICF"
+
+ac_add_options --disable-tests
+ac_add_options --enable-installer
+#ac_add_options --with-branding=browser/branding/aurora
+ac_add_options --enable-official-branding
+
+#ac_add_options --enable-strip
+#ac_add_options --enable-install-strip
+
+# for Athlon 64/Pentium 4/
+# for X86
+ac_add_options --enable-optimize="-O2 -arch:SSE2 -FI e:/mozilla/pcxfunc.h -DTT_MEMUTIL -FI e:/mozilla/tmemutil.h"
+
+
+# for X64
+#ac_add_options --enable-optimize="-O2 -Ot -Oi -Ob2 -Oy -GT -Gy -GF -GR- -GS- -GL -favor:blend"
+
+# diasble updater
+ac_add_options --disable-updater
+
+# diasble crashreporter
+ac_add_options --disable-crashreporter
+
+# Enable jemalloc
+ac_add_options --enable-jemalloc
+
+# for debug
+ac_add_options --enable-debugger-info-modules=yes
+ac_add_options --enable-debugger-info-modules
+ac_add_options --enable-debug-symbols
+
+# for auto pgo build
+#mk_add_options PROFILE_GEN_SCRIPT='$(PYTHON) $(MOZ_OBJDIR)/_profile/pgo/profileserver.py'
+mk_add_options PROFILE_GEN_SCRIPT='cscript E:/Mozilla/PgoMsg.vbs'
+
+ac_add_options --disable-activex
+ac_add_options --disable-activex-scripting
+ac_add_options --disable-metro
+ac_add_options --disable-cpp-rtti
+
+ac_add_options --disable-maintenance-service
+
+# crt dir
+WIN32_REDIST_DIR=$VCINSTALLDIR/redist/x86/Microsoft.VC120.CRT
+#WIN32_REDIST_DIR=$VCINSTALLDIR/redist/x64/Microsoft.VC120.CRT
+
+#for x64
+#ac_add_options --disable-shared-js
+
+ac_add_options --disable-unified-compilation
+
+#ac_add_options --disable-shared-js
+
+ac_add_options --disable-js-diagnostics
+ac_add_options --disable-profiling
+ac_add_options --disable-signmar

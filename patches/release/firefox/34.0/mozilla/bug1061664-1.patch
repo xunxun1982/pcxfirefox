@@ -1,0 +1,193 @@
+# HG changeset patch
+# User Benjamin Bouvier <benj@benj.me>
+# Date 1409751490 -7200
+#      Wed Sep 03 15:38:10 2014 +0200
+# Branch GECKO340b9_2014111321_RELBRANCH
+# Node ID d59ee3b048ac45e7e173eeee7d4965d4b6317dd7
+# Parent  d8aba208895c77161132485040a37208d8212615
+Bug 1061664: Make a few variables and functions debug-only in /js; r=till
+
+diff -r d8aba208895c -r d59ee3b048ac js/src/asmjs/AsmJSValidate.cpp
+--- a/js/src/asmjs/AsmJSValidate.cpp	Sun Nov 16 01:22:31 2014 +0800
++++ b/js/src/asmjs/AsmJSValidate.cpp	Wed Sep 03 15:38:10 2014 +0200
+@@ -1997,10 +1997,9 @@
+     JS_ALWAYS_TRUE(IsSimdTuple(m, pn, &type));
+ 
+     ParseNode *arg = CallArgList(pn);
+-    unsigned length = SimdTypeToLength(type);
+     switch (type) {
+       case AsmJSSimdType_int32x4: {
+-        JS_ASSERT(length == 4);
++        JS_ASSERT(SimdTypeToLength(type) == 4);
+         int32_t val[4];
+         for (size_t i = 0; i < 4; i++, arg = NextNode(arg)) {
+             uint32_t u32;
+@@ -2011,7 +2010,7 @@
+         return AsmJSNumLit::Create(AsmJSNumLit::Int32x4, SimdConstant::CreateX4(val));
+       }
+       case AsmJSSimdType_float32x4: {
+-        JS_ASSERT(length == 4);
++        JS_ASSERT(SimdTypeToLength(type) == 4);
+         float val[4];
+         for (size_t i = 0; i < 4; i++, arg = NextNode(arg))
+             val[i] = float(ExtractNumericNonFloatValue(arg));
+diff -r d8aba208895c -r d59ee3b048ac js/src/gc/Marking.cpp
+--- a/js/src/gc/Marking.cpp	Sun Nov 16 01:22:31 2014 +0800
++++ b/js/src/gc/Marking.cpp	Wed Sep 03 15:38:10 2014 +0200
+@@ -1873,11 +1873,13 @@
+     }
+ }
+ 
++#ifdef DEBUG
+ static void
+ AssertNonGrayGCThing(JSTracer *trc, void **thingp, JSGCTraceKind kind)
+ {
+     MOZ_ASSERT(!JS::GCThingIsMarkedGray(*thingp));
+ }
++#endif
+ 
+ static void
+ UnmarkGrayGCThing(void *thing)
+diff -r d8aba208895c -r d59ee3b048ac js/src/jit/BaselineDebugModeOSR.cpp
+--- a/js/src/jit/BaselineDebugModeOSR.cpp	Sun Nov 16 01:22:31 2014 +0800
++++ b/js/src/jit/BaselineDebugModeOSR.cpp	Wed Sep 03 15:38:10 2014 +0200
+@@ -19,6 +19,8 @@
+ using namespace js;
+ using namespace js::jit;
+ 
++using mozilla::DebugOnly;
++
+ struct DebugModeOSREntry
+ {
+     JSScript *script;
+@@ -310,7 +312,7 @@
+ 
+     IonCommonFrameLayout *prev = nullptr;
+     size_t entryIndex = *start;
+-    bool expectedDebugMode = cx->compartment()->debugMode();
++    DebugOnly<bool> expectedDebugMode = cx->compartment()->debugMode();
+ 
+     for (JitFrameIterator iter(activation); !iter.done(); ++iter) {
+         DebugModeOSREntry &entry = entries[entryIndex];
+diff -r d8aba208895c -r d59ee3b048ac js/src/jit/LiveRangeAllocator.cpp
+--- a/js/src/jit/LiveRangeAllocator.cpp	Sun Nov 16 01:22:31 2014 +0800
++++ b/js/src/jit/LiveRangeAllocator.cpp	Wed Sep 03 15:38:10 2014 +0200
+@@ -1027,6 +1027,7 @@
+ #endif
+ }
+ 
++#ifdef DEBUG
+ static bool
+ IsHintInteresting(const Requirement &requirement, const Requirement &hint)
+ {
+@@ -1042,6 +1043,7 @@
+ 
+     return merge.kind() != requirement.kind();
+ }
++#endif
+ 
+ const char *
+ LiveInterval::toString() const
+diff -r d8aba208895c -r d59ee3b048ac js/src/jsscript.cpp
+--- a/js/src/jsscript.cpp	Sun Nov 16 01:22:31 2014 +0800
++++ b/js/src/jsscript.cpp	Wed Sep 03 15:38:10 2014 +0200
+@@ -3132,6 +3132,7 @@
+ JSScript::destroyDebugScript(FreeOp *fop)
+ {
+     if (hasDebugScript_) {
++#ifdef DEBUG
+         for (jsbytecode *pc = code(); pc < codeEnd(); pc++) {
+             if (BreakpointSite *site = getBreakpointSite(pc)) {
+                 /* Breakpoints are swept before finalization. */
+@@ -3139,6 +3140,7 @@
+                 JS_ASSERT(getBreakpointSite(pc) == nullptr);
+             }
+         }
++#endif
+         fop->free_(releaseDebugScript());
+     }
+ }
+diff -r d8aba208895c -r d59ee3b048ac js/src/vm/TypedArrayObject.cpp
+--- a/js/src/vm/TypedArrayObject.cpp	Sun Nov 16 01:22:31 2014 +0800
++++ b/js/src/vm/TypedArrayObject.cpp	Wed Sep 03 15:38:10 2014 +0200
+@@ -47,6 +47,7 @@
+ using namespace js::gc;
+ using namespace js::types;
+ 
++using mozilla::DebugOnly;
+ using mozilla::IsNaN;
+ using mozilla::NegativeInfinity;
+ using mozilla::PodCopy;
+@@ -579,7 +580,7 @@
+             return false;
+         }
+ 
+-        const size_t ElementSize = sizeof(NativeType);
++        DebugOnly<const size_t> ElementSize = sizeof(NativeType);
+         MOZ_ASSERT(to <= INT32_MAX / ElementSize, "overall byteLength capped at INT32_MAX");
+         MOZ_ASSERT(from <= INT32_MAX / ElementSize, "overall byteLength capped at INT32_MAX");
+         MOZ_ASSERT(count <= INT32_MAX / ElementSize, "overall byteLength capped at INT32_MAX");
+@@ -1160,63 +1161,54 @@
+ class Int8ArrayObject : public TypedArrayObjectTemplate<int8_t> {
+   public:
+     enum { ACTUAL_TYPE = Scalar::Int8 };
+-    static const JSProtoKey key = JSProto_Int8Array;
+     static const JSFunctionSpec jsfuncs[];
+     static const JSPropertySpec jsprops[];
+ };
+ class Uint8ArrayObject : public TypedArrayObjectTemplate<uint8_t> {
+   public:
+     enum { ACTUAL_TYPE = Scalar::Uint8 };
+-    static const JSProtoKey key = JSProto_Uint8Array;
+     static const JSFunctionSpec jsfuncs[];
+     static const JSPropertySpec jsprops[];
+ };
+ class Int16ArrayObject : public TypedArrayObjectTemplate<int16_t> {
+   public:
+     enum { ACTUAL_TYPE = Scalar::Int16 };
+-    static const JSProtoKey key = JSProto_Int16Array;
+     static const JSFunctionSpec jsfuncs[];
+     static const JSPropertySpec jsprops[];
+ };
+ class Uint16ArrayObject : public TypedArrayObjectTemplate<uint16_t> {
+   public:
+     enum { ACTUAL_TYPE = Scalar::Uint16 };
+-    static const JSProtoKey key = JSProto_Uint16Array;
+     static const JSFunctionSpec jsfuncs[];
+     static const JSPropertySpec jsprops[];
+ };
+ class Int32ArrayObject : public TypedArrayObjectTemplate<int32_t> {
+   public:
+     enum { ACTUAL_TYPE = Scalar::Int32 };
+-    static const JSProtoKey key = JSProto_Int32Array;
+     static const JSFunctionSpec jsfuncs[];
+     static const JSPropertySpec jsprops[];
+ };
+ class Uint32ArrayObject : public TypedArrayObjectTemplate<uint32_t> {
+   public:
+     enum { ACTUAL_TYPE = Scalar::Uint32 };
+-    static const JSProtoKey key = JSProto_Uint32Array;
+     static const JSFunctionSpec jsfuncs[];
+     static const JSPropertySpec jsprops[];
+ };
+ class Float32ArrayObject : public TypedArrayObjectTemplate<float> {
+   public:
+     enum { ACTUAL_TYPE = Scalar::Float32 };
+-    static const JSProtoKey key = JSProto_Float32Array;
+     static const JSFunctionSpec jsfuncs[];
+     static const JSPropertySpec jsprops[];
+ };
+ class Float64ArrayObject : public TypedArrayObjectTemplate<double> {
+   public:
+     enum { ACTUAL_TYPE = Scalar::Float64 };
+-    static const JSProtoKey key = JSProto_Float64Array;
+     static const JSFunctionSpec jsfuncs[];
+     static const JSPropertySpec jsprops[];
+ };
+ class Uint8ClampedArrayObject : public TypedArrayObjectTemplate<uint8_clamped> {
+   public:
+     enum { ACTUAL_TYPE = Scalar::Uint8Clamped };
+-    static const JSProtoKey key = JSProto_Uint8ClampedArray;
+     static const JSFunctionSpec jsfuncs[];
+     static const JSPropertySpec jsprops[];
+ };

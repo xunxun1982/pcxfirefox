@@ -1,0 +1,93 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1416074553 -28800
+#      Sun Nov 16 02:02:33 2014 +0800
+# Branch GECKO340b9_2014111321_RELBRANCH
+# Node ID 25b0c173d645f8fa5c9767900c825bf412c2025f
+# Parent  5761ae0dbc975814699bc4f650790e935ef1c110
+Bug 1084162 - PGO all the things on Windows
+
+diff -r 5761ae0dbc97 -r 25b0c173d645 config/config.mk
+--- a/config/config.mk	Sun Nov 16 01:37:45 2014 +0800
++++ b/config/config.mk	Sun Nov 16 02:02:33 2014 +0800
+@@ -268,13 +268,6 @@
+ endif
+ endif
+ 
+-# PGO on MSVC is opt-in
+-ifdef _MSC_VER
+-ifndef MSVC_ENABLE_PGO
+-NO_PROFILE_GUIDED_OPTIMIZE = 1
+-endif
+-endif
+-
+ # No sense in profiling tools
+ ifdef INTERNAL_TOOLS
+ NO_PROFILE_GUIDED_OPTIMIZE = 1
+diff -r 5761ae0dbc97 -r 25b0c173d645 dom/mobileconnection/moz.build
+--- a/dom/mobileconnection/moz.build	Sun Nov 16 01:37:45 2014 +0800
++++ b/dom/mobileconnection/moz.build	Sun Nov 16 02:02:33 2014 +0800
+@@ -26,6 +26,9 @@
+     'MobileNetworkInfo.cpp',
+ ]
+ 
++if CONFIG['_MSC_VER'] and CONFIG['CPU_ARCH'] == 'x86_64':
++    SOURCES['MobileConnection.cpp'].no_pgo = True # VS2013 crashes, bug 1084162
++
+ FAIL_ON_WARNINGS = True
+ 
+ include('/ipc/chromium/chromium-config.mozbuild')
+diff -r 5761ae0dbc97 -r 25b0c173d645 toolkit/crashreporter/test/Makefile.in
+--- a/toolkit/crashreporter/test/Makefile.in	Sun Nov 16 01:37:45 2014 +0800
++++ b/toolkit/crashreporter/test/Makefile.in	Sun Nov 16 02:02:33 2014 +0800
+@@ -3,6 +3,8 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
++INTERNAL_TOOLS = 1
++
+ UNIT_FILES = $(SHARED_LIBRARY) CrashTestUtils.jsm
+ UNIT_DEST = $(DEPTH)/_tests/xpcshell/$(relativesrcdir)/unit/
+ INSTALL_TARGETS += UNIT
+diff -r 5761ae0dbc97 -r 25b0c173d645 toolkit/mozapps/installer/packager.py
+--- a/toolkit/mozapps/installer/packager.py	Sun Nov 16 01:37:45 2014 +0800
++++ b/toolkit/mozapps/installer/packager.py	Sun Nov 16 02:02:33 2014 +0800
+@@ -80,6 +80,13 @@
+         for e in extra_env:
+             env[e] = extra_env[e]
+ 
++        # For VC12, make sure we can find the right bitness of pgort120.dll
++        if 'VS120COMNTOOLS' in env and not buildconfig.substs['HAVE_64BIT_BUILD']:
++            vc12dir = os.path.abspath(os.path.join(env['VS120COMNTOOLS'],
++                                                   '../../VC/bin'))
++            if os.path.exists(vc12dir):
++                env['PATH'] = vc12dir + ';' + env['PATH']
++
+         # Work around a bug in Python 2.7.2 and lower where unicode types in
+         # environment variables aren't handled by subprocess.
+         for k, v in env.items():
+@@ -138,14 +145,6 @@
+     os.close(fd)
+     os.remove(cache)
+ 
+-    # For VC12, make sure we can find the right bitness of pgort120.dll
+-    env = os.environ.copy()
+-    if 'VS120COMNTOOLS' in env and not buildconfig.substs['HAVE_64BIT_BUILD']:
+-      vc12dir = os.path.abspath(os.path.join(env['VS120COMNTOOLS'],
+-                                             '../../VC/bin'))
+-      if os.path.exists(vc12dir):
+-        env['PATH'] = vc12dir + ';' + env['PATH']
+-
+     try:
+         if launcher.launch(['xpcshell', '-g', gre_path, '-a', app_path,
+                             '-f', os.path.join(os.path.dirname(__file__),
+@@ -153,8 +152,7 @@
+                             '-e', 'precompile_startupcache("resource://%s/");'
+                                   % resource],
+                            extra_linker_path=gre_path,
+-                           extra_env={'MOZ_STARTUP_CACHE': cache,
+-                                      'PATH': env['PATH']}):
++                           extra_env={'MOZ_STARTUP_CACHE': cache}):
+             errors.fatal('Error while running startup cache precompilation')
+             return
+         from mozpack.mozjar import JarReader
