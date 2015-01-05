@@ -1,0 +1,18 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1390806606 -28800
+#      Mon Jan 27 15:10:06 2014 +0800
+# Node ID 82b440eb11c8623d13d0b85fa665d823103b9d12
+# Parent  c40099a42c1f80c9c20adb4c925160c6d0ce3ea8
+init patch
+
+diff -r c40099a42c1f -r 82b440eb11c8 python/mozbuild/mozbuild/util.py
+--- a/python/mozbuild/mozbuild/util.py	Sat Jan 25 03:20:26 2014 -0800
++++ b/python/mozbuild/mozbuild/util.py	Mon Jan 27 15:10:06 2014 +0800
+@@ -572,4 +572,5 @@
+     # Single quoted strings can contain any characters unescaped except the
+     # single quote itself, which can't even be escaped, so the string needs to
+     # be closed, an escaped single quote added, and reopened.
+-    return "'%s'" % s.replace("'", "'\\''")
++    t = type(s)
++    return t("'%s'") % s.replace(t("'"), t("'\\''"))

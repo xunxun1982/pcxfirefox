@@ -1,0 +1,939 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1418941472 -28800
+#      Fri Dec 19 06:24:32 2014 +0800
+# Node ID f9d34fed061720fb224cf1b74c0b9d8aecafbd37
+# Parent  16f3cac5e8fe471e12f76d6a94a477b14e78df7c
+webp32
+
+diff -r 16f3cac5e8fe -r f9d34fed0617 browser/components/BrowserComponents.manifest
+--- a/browser/components/BrowserComponents.manifest	Mon Jun 09 10:58:48 2014 -0400
++++ b/browser/components/BrowserComponents.manifest	Fri Dec 19 06:24:32 2014 +0800
+@@ -19,6 +19,7 @@
+ contract @mozilla.org/uriloader/content-handler;1?type=image/x-icon {5d0ce354-df01-421a-83fb-7ead0990c24e} application={ec8030f7-c20a-464f-9b0e-13a3a9e97384}
+ contract @mozilla.org/uriloader/content-handler;1?type=image/vnd.microsoft.icon {5d0ce354-df01-421a-83fb-7ead0990c24e} application={ec8030f7-c20a-464f-9b0e-13a3a9e97384}
+ contract @mozilla.org/uriloader/content-handler;1?type=application/http-index-format {5d0ce354-df01-421a-83fb-7ead0990c24e} application={ec8030f7-c20a-464f-9b0e-13a3a9e97384}
++contract @mozilla.org/uriloader/content-handler;1?type=image/webp {5d0ce354-df01-421a-83fb-7ead0990c24e} application={ec8030f7-c20a-464f-9b0e-13a3a9e97384}
+ category command-line-handler m-browser @mozilla.org/browser/clh;1 application={ec8030f7-c20a-464f-9b0e-13a3a9e97384}
+ category command-line-handler x-default @mozilla.org/browser/final-clh;1 application={ec8030f7-c20a-464f-9b0e-13a3a9e97384}
+ category command-line-validator b-browser @mozilla.org/browser/clh;1 application={ec8030f7-c20a-464f-9b0e-13a3a9e97384}
+diff -r 16f3cac5e8fe -r f9d34fed0617 image/build/moz.build
+--- a/image/build/moz.build	Mon Jun 09 10:58:48 2014 -0400
++++ b/image/build/moz.build	Fri Dec 19 06:24:32 2014 +0800
+@@ -14,6 +14,10 @@
+ 
+ LIBRARY_NAME = 'imglib2'
+ 
++SOURCES['nsImageModule.cpp'].flags += [
++            '-IE:/Mozilla/3rdLib/webp/source/build/src',
++        ]
++
+ FAIL_ON_WARNINGS = True
+ 
+ FINAL_LIBRARY = 'xul'
+@@ -22,6 +26,7 @@
+     '../encoders/ico',
+     '../encoders/jpeg',
+     '../encoders/png',
++    '../encoders/webp',
+     '../src',
+ ]
+ 
+diff -r 16f3cac5e8fe -r f9d34fed0617 image/build/nsImageModule.cpp
+--- a/image/build/nsImageModule.cpp	Mon Jun 09 10:58:48 2014 -0400
++++ b/image/build/nsImageModule.cpp	Fri Dec 19 06:24:32 2014 +0800
+@@ -23,6 +23,7 @@
+ #include "nsPNGEncoder.h"
+ #include "nsJPEGEncoder.h"
+ #include "nsBMPEncoder.h"
++#include "nsWEBPEncoder.h"
+ 
+ // objects that just require generic constructors
+ using namespace mozilla::image;
+@@ -34,6 +35,7 @@
+ NS_GENERIC_FACTORY_CONSTRUCTOR(nsJPEGEncoder)
+ NS_GENERIC_FACTORY_CONSTRUCTOR(nsPNGEncoder)
+ NS_GENERIC_FACTORY_CONSTRUCTOR(nsBMPEncoder)
++NS_GENERIC_FACTORY_CONSTRUCTOR(nsWEBPEncoder)
+ NS_DEFINE_NAMED_CID(NS_IMGLOADER_CID);
+ NS_DEFINE_NAMED_CID(NS_IMGREQUESTPROXY_CID);
+ NS_DEFINE_NAMED_CID(NS_IMGTOOLS_CID);
+@@ -41,6 +43,7 @@
+ NS_DEFINE_NAMED_CID(NS_JPEGENCODER_CID);
+ NS_DEFINE_NAMED_CID(NS_PNGENCODER_CID);
+ NS_DEFINE_NAMED_CID(NS_BMPENCODER_CID);
++NS_DEFINE_NAMED_CID(NS_WEBPENCODER_CID);
+ 
+ static const mozilla::Module::CIDEntry kImageCIDs[] = {
+   { &kNS_IMGLOADER_CID, false, nullptr, imgLoaderConstructor, },
+@@ -50,6 +53,7 @@
+   { &kNS_JPEGENCODER_CID, false, nullptr, nsJPEGEncoderConstructor, },
+   { &kNS_PNGENCODER_CID, false, nullptr, nsPNGEncoderConstructor, },
+   { &kNS_BMPENCODER_CID, false, nullptr, nsBMPEncoderConstructor, },
++  { &kNS_WEBPENCODER_CID, false, nullptr, nsWEBPEncoderConstructor, },
+   { nullptr }
+ };
+ 
+@@ -62,6 +66,7 @@
+   { "@mozilla.org/image/encoder;2?type=" IMAGE_JPEG, &kNS_JPEGENCODER_CID },
+   { "@mozilla.org/image/encoder;2?type=" IMAGE_PNG, &kNS_PNGENCODER_CID },
+   { "@mozilla.org/image/encoder;2?type=" IMAGE_BMP, &kNS_BMPENCODER_CID },
++  { "@mozilla.org/image/encoder;2?type=" IMAGE_WEBP, &kNS_WEBPENCODER_CID },
+   { nullptr }
+ };
+ 
+@@ -77,6 +82,7 @@
+   { "Gecko-Content-Viewers", IMAGE_ICON_MS, "@mozilla.org/content/document-loader-factory;1" },
+   { "Gecko-Content-Viewers", IMAGE_PNG, "@mozilla.org/content/document-loader-factory;1" },
+   { "Gecko-Content-Viewers", IMAGE_X_PNG, "@mozilla.org/content/document-loader-factory;1" },
++  { "Gecko-Content-Viewers", IMAGE_WEBP, "@mozilla.org/content/document-loader-factory;1" },
+   { "content-sniffing-services", "@mozilla.org/image/loader;1", "@mozilla.org/image/loader;1" },
+   { nullptr }
+ };
+diff -r 16f3cac5e8fe -r f9d34fed0617 image/decoders/moz.build
+--- a/image/decoders/moz.build	Mon Jun 09 10:58:48 2014 -0400
++++ b/image/decoders/moz.build	Fri Dec 19 06:24:32 2014 +0800
+@@ -34,8 +34,13 @@
+     'nsBMPDecoder.cpp',
+     'nsJPEGDecoder.cpp',
+     'nsPNGDecoder.cpp',
++    'nsWEBPDecoder.cpp',
+ ]
+ 
++SOURCES['nsWEBPDecoder.cpp'].flags += [
++            '-IE:/Mozilla/3rdLib/webp/source/build/src',
++        ]
++
+ FAIL_ON_WARNINGS = True
+ 
+ SOURCES += [
+diff -r 16f3cac5e8fe -r f9d34fed0617 image/decoders/nsWEBPDecoder.cpp
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/image/decoders/nsWEBPDecoder.cpp	Fri Dec 19 06:24:32 2014 +0800
+@@ -0,0 +1,163 @@
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#include "ImageLogging.h"
++#include "nsWEBPDecoder.h"
++
++#include "nsIInputStream.h"
++
++#include "nspr.h"
++#include "nsCRT.h"
++#include "gfxColor.h"
++
++#include "gfxPlatform.h"
++
++namespace mozilla {
++namespace image {
++
++#if defined(PR_LOGGING)
++static PRLogModuleInfo *gWEBPLog = PR_NewLogModule("WEBPDecoder");
++static PRLogModuleInfo *gWEBPDecoderAccountingLog =
++                        PR_NewLogModule("WEBPDecoderAccounting");
++#else
++#define gWEBPlog
++#define gWEBPDecoderAccountingLog
++#endif
++
++nsWEBPDecoder::nsWEBPDecoder(RasterImage &aImage)
++ : Decoder(aImage)
++{
++  PR_LOG(gWEBPDecoderAccountingLog, PR_LOG_DEBUG,
++         ("nsWEBPDecoder::nsWEBPDecoder: Creating WEBP decoder %p",
++          this));
++}
++
++nsWEBPDecoder::~nsWEBPDecoder()
++{
++  PR_LOG(gWEBPDecoderAccountingLog, PR_LOG_DEBUG,
++         ("nsWEBPDecoder::~nsWEBPDecoder: Destroying WEBP decoder %p",
++          this));
++}
++
++
++void
++nsWEBPDecoder::InitInternal()
++{
++  if (!WebPInitDecBuffer(&mDecBuf)) {
++    PostDecoderError(NS_ERROR_FAILURE);
++    return;
++  }
++  mLastLine = 0;
++  mDecBuf.colorspace = MODE_rgbA;
++  mDecoder = WebPINewDecoder(&mDecBuf);
++  if (!mDecoder) {
++    PostDecoderError(NS_ERROR_FAILURE);
++  }
++}
++
++void
++nsWEBPDecoder::FinishInternal()
++{
++  // Flush the Decoder and let it free the output image buffer.
++  WebPIDelete(mDecoder);
++  WebPFreeDecBuffer(&mDecBuf);
++
++  // We should never make multiple frames
++  NS_ABORT_IF_FALSE(GetFrameCount() <= 1, "Multiple WebP frames?");
++
++  // Send notifications if appropriate
++  if (!IsSizeDecode() && (GetFrameCount() == 1)) {
++    PostFrameStop();
++    PostDecodeDone();
++  }
++}
++
++void
++nsWEBPDecoder::WriteInternal(const char *aBuffer, uint32_t aCount, DecodeStrategy)
++{
++  NS_ABORT_IF_FALSE(!HasError(), "Shouldn't call WriteInternal after error!");
++
++  const uint8_t* buf = (const uint8_t*)aBuffer;
++  VP8StatusCode rv = WebPIAppend(mDecoder, buf, aCount);
++  if (rv == VP8_STATUS_OUT_OF_MEMORY) {
++    PostDecoderError(NS_ERROR_OUT_OF_MEMORY);
++    return;
++  } else if (rv == VP8_STATUS_INVALID_PARAM ||
++             rv == VP8_STATUS_BITSTREAM_ERROR) {
++    PostDataError();
++    return;
++  } else if (rv == VP8_STATUS_UNSUPPORTED_FEATURE ||
++             rv == VP8_STATUS_USER_ABORT) {
++    PostDecoderError(NS_ERROR_FAILURE);
++    return;
++  }
++
++  // Catch any remaining erroneous return value.
++  if (rv != VP8_STATUS_OK && rv != VP8_STATUS_SUSPENDED) {
++    PostDecoderError(NS_ERROR_FAILURE);
++    return;
++  }
++
++  int lastLineRead = -1;
++  int height = 0;
++  int width = 0;
++  int stride = 0;
++
++  mData = WebPIDecGetRGB(mDecoder, &lastLineRead, &width, &height, &stride);
++
++  if (lastLineRead == -1 || !mData)
++    return;
++
++  if (width <= 0 || height <= 0) {
++    PostDataError();
++    return;
++  }
++
++  if (!HasSize())
++    PostSize(width, height);
++
++  if (IsSizeDecode())
++    return;
++
++  uint32_t imagelength;
++  // First incremental Image data chunk. Special handling required.
++  if (mLastLine == 0 && lastLineRead > 0) {
++    imgFrame *aFrame;
++    nsresult res = mImage.EnsureFrame(0, 0, 0, width, height,
++                                       gfx::SurfaceFormat::B8G8R8A8,
++                                       (uint8_t**)&mImageData, &imagelength, &aFrame);
++    if (NS_FAILED(res) || !mImageData) {
++      PostDecoderError(NS_ERROR_FAILURE);
++      return;
++    }
++ }
++
++
++  if (!mImageData) {
++    PostDecoderError(NS_ERROR_FAILURE);
++    return;
++  }
++
++
++  if (lastLineRead > mLastLine) {
++    for (int line = mLastLine; line < lastLineRead; line++) {
++      uint32_t *cptr32 = (uint32_t*)(mImageData + (line * width));
++      uint8_t *cptr8 = mData + (line * stride);
++      for (int pix = 0; pix < width; pix++, cptr8 += 4) {
++	// if((cptr8[3] != 0) && (cptr8[0] != 0) && (cptr8[1] != 0) && (cptr8[2] != 0))
++	   *cptr32++ = gfxPackedPixel(cptr8[3], cptr8[0], cptr8[1], cptr8[2]);
++      }
++    }
++
++    // Invalidate
++    nsIntRect r(0, mLastLine, width, lastLineRead);
++    PostInvalidation(r);
++  }
++
++  mLastLine = lastLineRead;
++  return;
++}
++
++} // namespace imagelib
++} // namespace mozilla
+diff -r 16f3cac5e8fe -r f9d34fed0617 image/decoders/nsWEBPDecoder.h
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/image/decoders/nsWEBPDecoder.h	Fri Dec 19 06:24:32 2014 +0800
+@@ -0,0 +1,44 @@
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#ifndef nsWEBPDecoder_h__
++#define nsWEBPDecoder_h__
++
++#include "Decoder.h"
++
++#include "nsCOMPtr.h"
++
++extern "C" {
++#include "webp/decode.h"
++}
++
++namespace mozilla {
++namespace image {
++class RasterImage;
++
++//////////////////////////////////////////////////////////////////////
++// nsWEBPDecoder Definition
++
++class nsWEBPDecoder : public Decoder
++{
++public:
++  explicit nsWEBPDecoder(RasterImage &aImage);
++  virtual ~nsWEBPDecoder();
++
++  virtual void InitInternal();
++  virtual void WriteInternal(const char* aBuffer, uint32_t aCount, DecodeStrategy aStrategy);
++  virtual void FinishInternal();
++public:
++  WebPDecBuffer mDecBuf;   
++  WebPIDecoder *mDecoder;  
++  uint8_t *mData;          // Pointer to WebP-decoded data.
++  uint8_t *mImageData;     // Pointer to RGBA image buffer (allocated by Image Frame).
++  int mLastLine;           // Last image scan-line read so far.
++
++};
++
++} // namespace image
++} // namespace mozilla
++
++#endif // nsWEBPDecoder_h__
+diff -r 16f3cac5e8fe -r f9d34fed0617 image/encoders/moz.build
+--- a/image/encoders/moz.build	Mon Jun 09 10:58:48 2014 -0400
++++ b/image/encoders/moz.build	Fri Dec 19 06:24:32 2014 +0800
+@@ -9,4 +9,5 @@
+     'png',
+     'jpeg',
+     'bmp',
++    'webp',
+ ]
+diff -r 16f3cac5e8fe -r f9d34fed0617 image/encoders/webp/moz.build
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/image/encoders/webp/moz.build	Fri Dec 19 06:24:32 2014 +0800
+@@ -0,0 +1,21 @@
++# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
++# vim: set filetype=python:
++# This Source Code Form is subject to the terms of the Mozilla Public
++# License, v. 2.0. If a copy of the MPL was not distributed with this
++# file, You can obtain one at http://mozilla.org/MPL/2.0/.
++
++SOURCES += [
++    'nsWEBPEncoder.cpp',
++]
++
++SOURCES['nsWEBPEncoder.cpp'].flags += [
++            '-IE:/Mozilla/3rdLib/webp/source/build/src',
++        ]
++
++FAIL_ON_WARNINGS = True
++
++LOCAL_INCLUDES += [
++    '/image/src',
++]
++
++FINAL_LIBRARY = 'xul'
+diff -r 16f3cac5e8fe -r f9d34fed0617 image/encoders/webp/nsWEBPEncoder.cpp
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/image/encoders/webp/nsWEBPEncoder.cpp	Fri Dec 19 06:24:32 2014 +0800
+@@ -0,0 +1,376 @@
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#include "nsCRT.h"
++#include "nsWEBPEncoder.h"
++#include "prprf.h"
++#include "nsString.h"
++#include "nsStreamUtils.h"
++
++using namespace mozilla;
++
++NS_IMPL_ISUPPORTS(nsWEBPEncoder, imgIEncoder, nsIInputStream, nsIAsyncInputStream)
++
++nsWEBPEncoder::nsWEBPEncoder() : picture(), config(), memory_writer(),
++				 mFinished(false),
++				 mImageBuffer(nullptr), mImageBufferSize(0),
++                                 mImageBufferUsed(0), mImageBufferReadPoint(0),
++                                 mCallback(nullptr),
++                                 mCallbackTarget(nullptr), mNotifyThreshold(0),
++                                 mReentrantMonitor("nsWEBPEncoder.mReentrantMonitor")
++{
++}
++
++nsWEBPEncoder::~nsWEBPEncoder()
++{
++  if (mImageBuffer) {
++    moz_free(mImageBuffer);
++    mImageBuffer = nullptr;
++  }
++}
++
++NS_IMETHODIMP nsWEBPEncoder::InitFromData(const uint8_t* aData,
++                                          uint32_t aLength, // (unused, req'd by JS)
++                                          uint32_t aWidth,
++                                          uint32_t aHeight,
++                                          uint32_t aStride,
++                                          uint32_t aInputFormat,
++                                          const nsAString& aOutputOptions)
++{
++  NS_ENSURE_ARG(aData);
++  nsresult rv;
++
++  rv = StartImageEncode(aWidth, aHeight, aInputFormat, aOutputOptions);
++  if (!NS_SUCCEEDED(rv))
++    return rv;
++
++  rv = AddImageFrame(aData, aLength, aWidth, aHeight, aStride,
++                     aInputFormat, aOutputOptions);
++  if (!NS_SUCCEEDED(rv))
++    return rv;
++
++  rv = EndImageEncode();
++
++  return rv;
++}
++
++NS_IMETHODIMP nsWEBPEncoder::StartImageEncode(uint32_t aWidth,
++                                              uint32_t aHeight,
++                                              uint32_t aInputFormat,
++                                              const nsAString& aOutputOptions)
++{
++  // can't initialize more than once
++  if (mImageBuffer != nullptr)
++    return NS_ERROR_ALREADY_INITIALIZED;
++
++  // validate input format
++  if (aInputFormat != INPUT_FORMAT_RGB &&
++      aInputFormat != INPUT_FORMAT_RGBA &&
++      aInputFormat != INPUT_FORMAT_HOSTARGB)
++    return NS_ERROR_INVALID_ARG;
++
++  // Initializing webp needs
++  /* WebPPicture picture;
++  WebPConfig config;
++  WebPMemoryWriter memory_writer; */
++  
++  WebPMemoryWriterInit(&memory_writer);
++  
++  // Checking initialization
++  if (!WebPConfigInit(&config) || !WebPPictureInit(&picture))
++	return NS_ERROR_FAILURE; 
++
++  picture.width = aWidth;
++  picture.height = aHeight;
++
++  // Memory allocation
++  // The memory will be freed on EndImageEncode
++  if (!WebPPictureAlloc(&picture))
++	return NS_ERROR_OUT_OF_MEMORY;
++  
++  // Setting our webp writer
++  // picture.writer = WebPMemoryWrite;
++  // picture.custom_ptr = &memory_writer;
++
++  // Set up to read the data into our image buffer, start out with an 8K
++  // estimated size. Note: we don't have to worry about freeing this data
++  // in this function. It will be freed on object destruction.
++  mImageBufferSize = 8192;
++  mImageBuffer = (uint8_t*)moz_malloc(mImageBufferSize);
++  if (!mImageBuffer) {
++    return NS_ERROR_OUT_OF_MEMORY;
++  }
++  mImageBufferUsed = 0;
++  
++  picture.custom_ptr = &memory_writer;
++  picture.writer = WebPMemoryWrite;
++
++  return NS_OK;
++
++}
++
++// Returns the number of bytes in the image buffer used.
++NS_IMETHODIMP nsWEBPEncoder::GetImageBufferUsed(uint32_t *aOutputSize)
++{
++  NS_ENSURE_ARG_POINTER(aOutputSize);
++  *aOutputSize = mImageBufferUsed;
++  return NS_OK;
++}
++
++// Returns a pointer to the start of the image buffer
++NS_IMETHODIMP nsWEBPEncoder::GetImageBuffer(char **aOutputBuffer)
++{
++  NS_ENSURE_ARG_POINTER(aOutputBuffer);
++  *aOutputBuffer = reinterpret_cast<char*>(mImageBuffer);
++  return NS_OK;
++}
++
++// TODO
++
++NS_IMETHODIMP nsWEBPEncoder::AddImageFrame(const uint8_t* aData,
++                                           uint32_t aLength,
++                                           uint32_t aWidth,
++                                           uint32_t aHeight,
++                                           uint32_t aStride,
++                                           uint32_t aInputFormat,
++                                           const nsAString& aFrameOptions)
++{
++
++  // must be initialized
++  if (mImageBuffer == nullptr)
++    return NS_ERROR_NOT_INITIALIZED;
++
++  // validate input format
++  if (aInputFormat != INPUT_FORMAT_RGB &&
++      aInputFormat != INPUT_FORMAT_RGBA &&
++      aInputFormat != INPUT_FORMAT_HOSTARGB)
++    return NS_ERROR_INVALID_ARG;
++
++  // Simple conversion first
++  size_t buffSize = sizeof(aData);
++  uint8_t* row = new uint8_t[aWidth * 4];
++  for (uint32_t y = 0; y < aHeight; y ++) {
++      ConvertHostARGBRow(&aData[y * aStride], row, aWidth, 1);
++      WebPMemoryWrite(row, buffSize, &picture);
++  }
++
++  memory_writer.mem = mImageBuffer;
++  memory_writer.size = sizeof(mImageBuffer);
++
++  picture.writer = &WriteCallback;
++
++  int success = WebPEncode(&config, &picture);
++
++  if (!success)
++    return NS_ERROR_FAILURE;
++
++  return NS_OK;
++
++}
++
++NS_IMETHODIMP nsWEBPEncoder::EndImageEncode()
++{
++
++  // must be initialized
++  if (mImageBuffer == nullptr)
++    return NS_ERROR_NOT_INITIALIZED;
++
++  // if output callback can't get enough memory, it will free our buffer
++  if (!mImageBuffer)
++    return NS_ERROR_OUT_OF_MEMORY;
++
++  WebPPictureFree(&picture);
++
++  mFinished = true;
++  NotifyListener();
++
++return NS_OK;
++
++}
++
++NS_IMETHODIMP nsWEBPEncoder::Close()
++{
++  if (mImageBuffer != nullptr) {
++    moz_free(mImageBuffer);
++    mImageBuffer = nullptr;
++    mImageBufferSize = 0;
++    mImageBufferUsed = 0;
++    mImageBufferReadPoint = 0;
++  }
++  return NS_OK;
++}
++
++NS_IMETHODIMP nsWEBPEncoder::Available(uint64_t *_retval)
++{
++  if (!mImageBuffer)
++    return NS_BASE_STREAM_CLOSED;
++
++  *_retval = mImageBufferUsed - mImageBufferReadPoint;
++  return NS_OK;
++}
++
++NS_IMETHODIMP nsWEBPEncoder::Read(char * aBuf, uint32_t aCount,
++                                 uint32_t *_retval)
++{
++  return ReadSegments(NS_CopySegmentToBuffer, aBuf, aCount, _retval);
++}
++
++/* [noscript] unsigned long readSegments (in nsWriteSegmentFun aWriter, in voidPtr aClosure, in unsigned long aCount); */
++NS_IMETHODIMP nsWEBPEncoder::ReadSegments(nsWriteSegmentFun aWriter, void *aClosure, uint32_t aCount, uint32_t *_retval)
++{
++  // Avoid another thread reallocing the buffer underneath us
++  ReentrantMonitorAutoEnter autoEnter(mReentrantMonitor);
++
++  uint32_t maxCount = mImageBufferUsed - mImageBufferReadPoint;
++  if (maxCount == 0) {
++    *_retval = 0;
++    return mFinished ? NS_OK : NS_BASE_STREAM_WOULD_BLOCK;
++  }
++
++  if (aCount > maxCount)
++    aCount = maxCount;
++  nsresult rv = aWriter(this, aClosure,
++                        reinterpret_cast<const char*>(mImageBuffer+mImageBufferReadPoint),
++                        0, aCount, _retval);
++  if (NS_SUCCEEDED(rv)) {
++    NS_ASSERTION(*_retval <= aCount, "bad write count");
++    mImageBufferReadPoint += *_retval;
++  }
++
++  // errors returned from the writer end here!
++  return NS_OK;
++}
++
++NS_IMETHODIMP nsWEBPEncoder::IsNonBlocking(bool *_retval)
++{
++  *_retval = true;
++  return NS_OK;
++}
++
++NS_IMETHODIMP nsWEBPEncoder::AsyncWait(nsIInputStreamCallback *aCallback,
++                                      uint32_t aFlags,
++                                      uint32_t aRequestedCount,
++                                      nsIEventTarget *aTarget)
++{
++  if (aFlags != 0)
++    return NS_ERROR_NOT_IMPLEMENTED;
++
++  if (mCallback || mCallbackTarget)
++    return NS_ERROR_UNEXPECTED;
++
++  mCallbackTarget = aTarget;
++  // 0 means "any number of bytes except 0"
++  mNotifyThreshold = aRequestedCount;
++  if (!aRequestedCount)
++    mNotifyThreshold = 1024; // We don't want to notify incessantly
++
++  // We set the callback absolutely last, because NotifyListener uses it to
++  // determine if someone needs to be notified.  If we don't set it last,
++  // NotifyListener might try to fire off a notification to a null target
++  // which will generally cause non-threadsafe objects to be used off the main thread
++  mCallback = aCallback;
++
++  // What we are being asked for may be present already
++  NotifyListener();
++  return NS_OK;
++}
++
++NS_IMETHODIMP nsWEBPEncoder::CloseWithStatus(nsresult aStatus)
++{
++  return Close();
++}
++
++// nsWEBPEncoder::ConvertHostARGBRow
++//
++//    Our colors are stored with premultiplied alphas, but PNGs use
++//    post-multiplied alpha. This swaps to PNG-style alpha.
++//
++//    Copied from gfx/cairo/cairo/src/cairo-png.c
++
++void
++nsWEBPEncoder::ConvertHostARGBRow(const uint8_t* aSrc, uint8_t* aDest,
++                                 uint32_t aPixelWidth,
++                                 bool aUseTransparency)
++{
++  uint32_t pixelStride = aUseTransparency ? 4 : 3;
++  for (uint32_t x = 0; x < aPixelWidth; x ++) {
++    const uint32_t& pixelIn = ((const uint32_t*)(aSrc))[x];
++    uint8_t *pixelOut = &aDest[x * pixelStride];
++
++    uint8_t alpha = (pixelIn & 0xff000000) >> 24;
++    if (alpha == 0) {
++      pixelOut[0] = pixelOut[1] = pixelOut[2] = pixelOut[3] = 0;
++    } else {
++      pixelOut[0] = (((pixelIn & 0xff0000) >> 16) * 255 + alpha / 2) / alpha;
++      pixelOut[1] = (((pixelIn & 0x00ff00) >>  8) * 255 + alpha / 2) / alpha;
++      pixelOut[2] = (((pixelIn & 0x0000ff) >>  0) * 255 + alpha / 2) / alpha;
++      if (aUseTransparency)
++        pixelOut[3] = alpha;
++    }
++  }
++}
++
++// nsWEBPEncoder::WriteCallback
++
++int // static
++nsWEBPEncoder::WriteCallback(const uint8_t* data, size_t size, const WebPPicture* const picture)
++{
++  nsWEBPEncoder* that = static_cast<nsWEBPEncoder*>(picture->custom_ptr);
++  if (! that->mImageBuffer)
++    return 0;
++
++  if (that->mImageBufferUsed + size > that->mImageBufferSize) {
++    // When we're reallocing the buffer we need to take the lock to ensure
++    // that nobody is trying to read from the buffer we are destroying
++    ReentrantMonitorAutoEnter autoEnter(that->mReentrantMonitor);
++
++    // expand buffer, just double each time
++    that->mImageBufferSize *= 2;
++    uint8_t* newBuf = (uint8_t*)moz_realloc(that->mImageBuffer,
++                                            that->mImageBufferSize);
++    if (! newBuf) {
++      // can't resize, just zero (this will keep us from writing more)
++      moz_free(that->mImageBuffer);
++      that->mImageBuffer = nullptr;
++      that->mImageBufferSize = 0;
++      that->mImageBufferUsed = 0;
++      return 0;
++    }
++    that->mImageBuffer = newBuf;
++  }
++  memcpy(&that->mImageBuffer[that->mImageBufferUsed], data, size);
++  that->mImageBufferUsed += size;
++  that->NotifyListener();
++  return 1;
++}
++
++void
++nsWEBPEncoder::NotifyListener()
++{
++  // We might call this function on multiple threads (any threads that call
++  // AsyncWait and any that do encoding) so we lock to avoid notifying the
++  // listener twice about the same data (which generally leads to a truncated
++  // image).
++  ReentrantMonitorAutoEnter autoEnter(mReentrantMonitor);
++
++  if (mCallback &&
++      (mImageBufferUsed - mImageBufferReadPoint >= mNotifyThreshold ||
++       mFinished)) {
++    nsCOMPtr<nsIInputStreamCallback> callback;
++    if (mCallbackTarget) {
++      callback = NS_NewInputStreamReadyEvent(mCallback, mCallbackTarget);
++    } else {
++      callback = mCallback;
++    }
++
++    NS_ASSERTION(callback, "Shouldn't fail to make the callback");
++    // Null the callback first because OnInputStreamReady could reenter
++    // AsyncWait
++    mCallback = nullptr;
++    mCallbackTarget = nullptr;
++    mNotifyThreshold = 0;
++
++    callback->OnInputStreamReady(this);
++  }
++}
+diff -r 16f3cac5e8fe -r f9d34fed0617 image/encoders/webp/nsWEBPEncoder.h
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/image/encoders/webp/nsWEBPEncoder.h	Fri Dec 19 06:24:32 2014 +0800
+@@ -0,0 +1,67 @@
++/* This Source Code Form is subject to the terms of the Mozilla Public
++   * License, v. 2.0. If a copy of the MPL was not distributed with this
++   * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++  
++#include "mozilla/Attributes.h"
++#include "mozilla/ReentrantMonitor.h"
++  
++#include "imgIEncoder.h"
++
++#include "nsCOMPtr.h"
++
++#define NS_WEBPENCODER_CID \
++{ /* 05848c32-1722-462d-bb49-688dd1a63ee5 */			\
++ 	0x05848c32,						\
++	0x1722,							\
++	0x462d,							\
++       {0xbb, 0x49, 0x68, 0x8d, 0xd1, 0xa6, 0x3e, 0xe5} 	\
++}
++
++extern "C" {
++#include "webp/encode.h"
++}
++
++class nsWEBPEncoder MOZ_FINAL : public imgIEncoder
++{
++  typedef mozilla::ReentrantMonitor ReentrantMonitor;
++public:
++  NS_DECL_ISUPPORTS
++  NS_DECL_IMGIENCODER
++  NS_DECL_NSIINPUTSTREAM
++  NS_DECL_NSIASYNCINPUTSTREAM
++
++  nsWEBPEncoder();
++
++private:
++  ~nsWEBPEncoder();
++
++protected:
++
++  WebPPicture picture;
++  WebPConfig config;
++  WebPMemoryWriter memory_writer;
++
++  void NotifyListener();
++  bool mFinished;
++
++  // image buffer
++  uint8_t* mImageBuffer;
++  uint32_t mImageBufferSize;
++  uint32_t mImageBufferUsed;
++
++  uint32_t mImageBufferReadPoint;
++
++  nsCOMPtr<nsIInputStreamCallback> mCallback;
++  nsCOMPtr<nsIEventTarget> mCallbackTarget;
++  uint32_t mNotifyThreshold;
++  static int WriteCallback(const uint8_t* data, size_t size, const WebPPicture* const picture);
++  void ConvertHostARGBRow(const uint8_t* aSrc, uint8_t* aDest, uint32_t aPixelWidth, bool aUseTransparency);
++
++  /*
++    nsWEBPEncoder is designed to allow one thread to pump data into it while another
++    reads from it.  We lock to ensure that the buffer remains append-only while
++    we read from it (that it is not realloced) and to ensure that only one thread
++    dispatches a callback for each call to AsyncWait.
++   */
++  ReentrantMonitor mReentrantMonitor;
++};
+diff -r 16f3cac5e8fe -r f9d34fed0617 image/src/Image.cpp
+--- a/image/src/Image.cpp	Mon Jun 09 10:58:48 2014 -0400
++++ b/image/src/Image.cpp	Fri Dec 19 06:24:32 2014 +0800
+@@ -65,6 +65,10 @@
+   else if (!strcmp(aMimeType, IMAGE_JPG))
+     rv = eDecoderType_jpeg;
+ 
++  // WEBP
++  else if (!strcmp(aMimeType, IMAGE_WEBP))
++    rv = eDecoderType_webp;
++
+   // BMP
+   else if (!strcmp(aMimeType, IMAGE_BMP))
+     rv = eDecoderType_bmp;
+diff -r 16f3cac5e8fe -r f9d34fed0617 image/src/Image.h
+--- a/image/src/Image.h	Mon Jun 09 10:58:48 2014 -0400
++++ b/image/src/Image.h	Fri Dec 19 06:24:32 2014 +0800
+@@ -29,7 +29,8 @@
+     eDecoderType_bmp     = 3,
+     eDecoderType_ico     = 4,
+     eDecoderType_icon    = 5,
+-    eDecoderType_unknown = 6
++    eDecoderType_webp    = 6,
++    eDecoderType_unknown = 7
+   };
+   static eDecoderType GetDecoderType(const char *aMimeType);
+ 
+diff -r 16f3cac5e8fe -r f9d34fed0617 image/src/RasterImage.cpp
+--- a/image/src/RasterImage.cpp	Mon Jun 09 10:58:48 2014 -0400
++++ b/image/src/RasterImage.cpp	Fri Dec 19 06:24:32 2014 +0800
+@@ -31,6 +31,7 @@
+ #include "nsBMPDecoder.h"
+ #include "nsICODecoder.h"
+ #include "nsIconDecoder.h"
++#include "nsWEBPDecoder.h"
+ 
+ #include "gfxContext.h"
+ 
+@@ -2071,6 +2072,9 @@
+     case eDecoderType_icon:
+       mDecoder = new nsIconDecoder(*this);
+       break;
++    case eDecoderType_webp:
++      mDecoder = new nsWEBPDecoder(*this);
++      break;
+     default:
+       NS_ABORT_IF_FALSE(0, "Shouldn't get here!");
+   }
+diff -r 16f3cac5e8fe -r f9d34fed0617 image/src/moz.build
+--- a/image/src/moz.build	Mon Jun 09 10:58:48 2014 -0400
++++ b/image/src/moz.build	Fri Dec 19 06:24:32 2014 +0800
+@@ -44,6 +44,10 @@
+     'RasterImage.cpp',
+ ]
+ 
++SOURCES['RasterImage.cpp'].flags += [
++            '-IE:/Mozilla/3rdLib/webp/source/build/src',
++        ]
++
+ FAIL_ON_WARNINGS = True
+ 
+ include('/ipc/chromium/chromium-config.mozbuild')
+diff -r 16f3cac5e8fe -r f9d34fed0617 media/libvpx/Makefile.in
+--- a/media/libvpx/Makefile.in	Mon Jun 09 10:58:48 2014 -0400
++++ b/media/libvpx/Makefile.in	Fri Dec 19 06:24:32 2014 +0800
+@@ -121,3 +121,5 @@
+ 	$(CC) -o $@ -c $(patsubst -xO[45],-xO3,$(COMPILE_CFLAGS)) $<
+ endif
+ endif
++
++host_obj_int_extract.$(OBJ_SUFFIX): MOZ_OPTIMIZE_FLAGS += -GS
+diff -r 16f3cac5e8fe -r f9d34fed0617 media/libvpx/moz.build
+--- a/media/libvpx/moz.build	Mon Jun 09 10:58:48 2014 -0400
++++ b/media/libvpx/moz.build	Fri Dec 19 06:24:32 2014 +0800
+@@ -33,6 +33,7 @@
+     if CONFIG['_MSC_VER']:
+         for s in offset_sources:
+             SOURCES[s].no_pgo = True
++            SOURCES[s].flags += ['-GL-']
+ 
+ if CONFIG['VPX_X86_ASM']:
+     SOURCES += files['X86_ASM']
+diff -r 16f3cac5e8fe -r f9d34fed0617 netwerk/mime/nsMimeTypes.h
+--- a/netwerk/mime/nsMimeTypes.h	Mon Jun 09 10:58:48 2014 -0400
++++ b/netwerk/mime/nsMimeTypes.h	Fri Dec 19 06:24:32 2014 +0800
+@@ -104,6 +104,7 @@
+ #define IMAGE_MNG                           "video/x-mng"
+ #define IMAGE_JNG                           "image/x-jng"
+ #define IMAGE_SVG_XML                       "image/svg+xml"
++#define IMAGE_WEBP                          "image/webp"
+ 
+ #define MESSAGE_EXTERNAL_BODY               "message/external-body"
+ #define MESSAGE_NEWS                        "message/news"
+diff -r 16f3cac5e8fe -r f9d34fed0617 toolkit/library/Makefile.in
+--- a/toolkit/library/Makefile.in	Mon Jun 09 10:58:48 2014 -0400
++++ b/toolkit/library/Makefile.in	Fri Dec 19 06:24:32 2014 +0800
+@@ -27,3 +27,5 @@
+ .PHONY: gtestxul
+ gtestxul:
+ 	$(MAKE) -C gtest libs LINK_GTEST=1
++
++LDFLAGS += -LIBPATH:E:/Mozilla/3rdLib/webp/source/build/output/release-static/x86/lib libwebp.lib
+diff -r 16f3cac5e8fe -r f9d34fed0617 toolkit/library/build/Makefile.in
+--- a/toolkit/library/build/Makefile.in	Mon Jun 09 10:58:48 2014 -0400
++++ b/toolkit/library/build/Makefile.in	Fri Dec 19 06:24:32 2014 +0800
+@@ -23,3 +23,5 @@
+ 
+ $(FINAL_TARGET)/dependentlibs.list: $(topsrcdir)/toolkit/library/dependentlibs.py $(SHARED_LIBRARY) $(wildcard $(if $(wildcard $(FINAL_TARGET)/dependentlibs.list),$(addprefix $(FINAL_TARGET)/,$(shell cat $(FINAL_TARGET)/dependentlibs.list))))
+ 	$(PYTHON) $< $(SHARED_LIBRARY) -L $(FINAL_TARGET) $(if $(TOOLCHAIN_PREFIX),$(addprefix -p ,$(TOOLCHAIN_PREFIX))) > $@
++
++LDFLAGS += -LIBPATH:E:/Mozilla/3rdLib/webp/source/build/output/release-static/x86/lib libwebp.lib
+diff -r 16f3cac5e8fe -r f9d34fed0617 uriloader/exthandler/nsExternalHelperAppService.cpp
+--- a/uriloader/exthandler/nsExternalHelperAppService.cpp	Mon Jun 09 10:58:48 2014 -0400
++++ b/uriloader/exthandler/nsExternalHelperAppService.cpp	Fri Dec 19 06:24:32 2014 +0800
+@@ -447,6 +447,7 @@
+   { APPLICATION_RDF, "rdf" },
+   { TEXT_XUL, "xul" },
+   { IMAGE_PNG, "png" },
++  { IMAGE_WEBP, "webp" },
+   // -- end extensions used during startup
+   { TEXT_CSS, "css" },
+   { IMAGE_JPEG, "jpeg" },
+@@ -530,6 +531,7 @@
+   { IMAGE_PNG, "png", "PNG Image" },
+   { IMAGE_TIFF, "tiff,tif", "TIFF Image" },
+   { IMAGE_XBM, "xbm", "XBM Image" },
++  { IMAGE_WEBP, "webp", "WEBP Image" },
+   { IMAGE_SVG_XML, "svg", "Scalable Vector Graphics" },
+   { MESSAGE_RFC822, "eml", "RFC-822 data" },
+   { TEXT_PLAIN, "txt,text", "Text File" },
