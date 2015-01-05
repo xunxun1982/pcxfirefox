@@ -1,0 +1,32 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1417775430 -28800
+#      Fri Dec 05 18:30:30 2014 +0800
+# Node ID 5c18ba6111adc2c85b65ab89a5c342689d9c18fb
+# Parent  17df280a8b4461553dc16b2e8003d3012879d503
+trim-mini
+
+diff -r 17df280a8b44 -r 5c18ba6111ad widget/windows/nsWindow.cpp
+--- a/widget/windows/nsWindow.cpp	Wed Sep 24 02:01:34 2014 +0800
++++ b/widget/windows/nsWindow.cpp	Fri Dec 05 18:30:30 2014 +0800
+@@ -589,7 +589,7 @@
+     // bugs over the years, disable it (sTrimOnMinimize=1) on Vista and up.
+     sTrimOnMinimize =
+       Preferences::GetBool("config.trim_on_minimize",
+-        (WinUtils::GetWindowsVersion() >= WinUtils::VISTA_VERSION)) ? 1 : 0;
++        false);
+     sSwitchKeyboardLayout =
+       Preferences::GetBool("intl.keyboard.per_window_layout", false);
+   }
+@@ -1601,6 +1601,11 @@
+         // If sTrimOnMinimize is set, we let windows handle minimization normally
+         // using SW_MINIMIZE.
+         mode = sTrimOnMinimize ? SW_MINIMIZE : SW_SHOWMINIMIZED;
++		if (sTrimOnMinimize) {
++			HANDLE hProcess = GetCurrentProcess();
++			if(hProcess != NULL)
++				SetProcessWorkingSetSize(hProcess, -1, -1);
++		}
+         break;
+ 
+       default :

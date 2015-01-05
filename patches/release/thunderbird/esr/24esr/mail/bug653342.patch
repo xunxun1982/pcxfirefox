@@ -1,0 +1,192 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1418009377 -28800
+#      Mon Dec 08 11:29:37 2014 +0800
+# Node ID ae5cdc6f083ab60b2418a59dac0cc4ade08b7de7
+# Parent  4b8605e6a17d6bfb0d0dfbe92049ea3be7aaeeba
+Bug 653342 - CJK(Chinese, Japanese, Korean): extra space is inserted within text in mail, due to wrap produced by editor.htmlWrapColumn(which looks 76 or 78 unicode chars regardless of the setting), mailnews.wraplength, and line length limitation of 1000bytes of SMTP
+
+diff -r 4b8605e6a17d -r ae5cdc6f083a mailnews/compose/src/nsMsgAttachmentHandler.cpp
+--- a/mailnews/compose/src/nsMsgAttachmentHandler.cpp	Wed Sep 24 00:53:52 2014 -0400
++++ b/mailnews/compose/src/nsMsgAttachmentHandler.cpp	Mon Dec 08 11:29:37 2014 +0800
+@@ -349,6 +349,9 @@
+            m_type.LowerCaseEqualsLiteral(TEXT_CSS) ||
+            m_type.LowerCaseEqualsLiteral(TEXT_JSSS)))
+         needsB64 = true;
++      else if (!IsMultipartAlternative() &&
++               m_type.LowerCaseEqualsLiteral(TEXT_HTML))
++        needsB64 = true;
+       else if (charset && nsMsgI18Nstateful_charset(charset))
+         m_encoding = ENCODING_7BIT;
+       else if (encode_p &&
+@@ -1088,8 +1091,7 @@
+   // a need to do conversion to plain text...if so, the magic happens here,
+   // otherwise, just move on to other attachments...
+   //
+-  if (NS_SUCCEEDED(status) && !m_type.LowerCaseEqualsLiteral(TEXT_PLAIN) &&
+-      m_desiredType.LowerCaseEqualsLiteral(TEXT_PLAIN))
++  if (NS_SUCCEEDED(status) && NeedsConvertionToPlainText())
+   {
+     //
+     // Conversion to plain text desired.
+@@ -1264,3 +1266,19 @@
+   m_mime_delivery_state = mime_delivery_state;
+   return NS_OK;
+ }
++
++bool
++nsMsgAttachmentHandler::IsMultipartAlternative()
++{
++  return mCompFields && mCompFields->GetUseMultipartAlternative();
++}
++
++bool
++nsMsgAttachmentHandler::NeedsConvertionToPlainText()
++{
++  return !m_type.LowerCaseEqualsLiteral(TEXT_PLAIN) &&
++         ((mCompFields && mCompFields->GetForcePlainText()) ||
++          IsMultipartAlternative() ||
++          !m_type.LowerCaseEqualsLiteral(TEXT_HTML)) &&
++          m_desiredType.LowerCaseEqualsLiteral(TEXT_PLAIN);
++}
+diff -r 4b8605e6a17d -r ae5cdc6f083a mailnews/compose/src/nsMsgAttachmentHandler.h
+--- a/mailnews/compose/src/nsMsgAttachmentHandler.h	Wed Sep 24 00:53:52 2014 -0400
++++ b/mailnews/compose/src/nsMsgAttachmentHandler.h	Mon Dec 08 11:29:37 2014 +0800
+@@ -101,6 +101,9 @@
+   bool HasResourceFork(FSRef *fsRef);
+ #endif
+ 
++  bool NeedsConvertionToPlainText();
++  bool IsMultipartAlternative();
++
+   //
+ public:
+   nsCOMPtr<nsIURI> mURL;
+diff -r 4b8605e6a17d -r ae5cdc6f083a mailnews/compose/src/nsMsgSend.cpp
+--- a/mailnews/compose/src/nsMsgSend.cpp	Wed Sep 24 00:53:52 2014 -0400
++++ b/mailnews/compose/src/nsMsgSend.cpp	Mon Dec 08 11:29:37 2014 +0800
+@@ -615,8 +615,10 @@
+   if (m_attachment1_body)
+     mCompFields->GetBodyIsAsciiOnly(&body_is_us_ascii);
+ 
+-  if (!mCompFields->GetForceMsgEncoding() && (body_is_us_ascii ||
+-      nsMsgI18Nstateful_charset(mCompFields->GetCharacterSet())))
++  if (!PL_strcmp(m_attachment1_type, TEXT_HTML))
++    m_attachment1_encoding = PL_strdup (ENCODING_BASE64);
++  else if (!mCompFields->GetForceMsgEncoding() && (body_is_us_ascii ||
++           nsMsgI18Nstateful_charset(mCompFields->GetCharacterSet())))
+     m_attachment1_encoding = PL_strdup (ENCODING_7BIT);
+   else if (mime_use_quoted_printable_p)
+     m_attachment1_encoding = PL_strdup (ENCODING_QUOTED_PRINTABLE);
+@@ -1525,7 +1527,6 @@
+   //
+   nsString  format;
+   format.AssignLiteral(TEXT_HTML);
+-  uint32_t  flags = nsIDocumentEncoder::OutputFormatted  | nsIDocumentEncoder::OutputNoFormattingInPre;
+   nsAutoString bodyStr;
+   PRUnichar* bodyText = nullptr;
+   nsresult rv;
+@@ -1534,7 +1535,7 @@
+   // Ok, get the body...the DOM should have been whacked with
+   // Content ID's already
+   if (mEditor)
+-    mEditor->OutputToString(format, flags, bodyStr);
++    mEditor->OutputToString(format, nsIDocumentEncoder::OutputRaw, bodyStr);
+   else
+     bodyStr = NS_ConvertASCIItoUTF16(m_attachment1_body);
+ 
+@@ -1693,9 +1694,9 @@
+ // See #684508
+ #define LINE_BREAK_MAX (1000 - MSG_LINEBREAK_LEN)
+ 
+-// EnsureLineBreaks() will set m_attachment1_body and m_attachment1_body_length
+ nsresult
+-nsMsgComposeAndSend::EnsureLineBreaks(const nsCString &aBody)
++nsMsgComposeAndSend::EnsureLineBreaks(const nsCString &aBody,
++                                      nsACString &outString)
+ {
+   const char *body = aBody.get();
+   uint32_t bodyLen = aBody.Length();
+@@ -1708,19 +1709,9 @@
+   char *newBody = nullptr;
+   char *newBodyPos = nullptr;
+ 
+-  // the most common way to get into the state where we have to insert
+-  // linebreaks is when we do HTML reply and we quote large <pre> blocks.
+-  // see #83381 and #84261
+-  //
+-  // until #67334 is fixed, we'll be replacing newlines with <br>, which can lead
+-  // to large quoted <pre> blocks without linebreaks.
+-  // this hack makes it so we can at least save (as draft or template) and send or post
+-  // the message.
+-  //
+   // XXX TODO
+   // march backwards and determine the "best" place for the linebreak
+-  // for example, we don't want <a hrLINEBREAKref=""> or <bLINEBREAKr>
+-  // or "MississLINEBREAKippi"
++  // for example, we don't want "MississLINEBREAKippi".
+   for (i = 0; i < bodyLen-1; i++) {
+     if (strncmp(body+i, MSG_LINEBREAK, MSG_LINEBREAK_LEN)) {
+       charsSinceLineBreak++;
+@@ -1754,18 +1745,11 @@
+       // don't forget about part after the last linebreak we inserted
+      PL_strncpy(newBodyPos, body+lastPos, bodyLen - lastPos);
+ 
+-     m_attachment1_body = newBody;
+-     m_attachment1_body_length = PL_strlen(newBody);  // not worstCaseLen
++     outString.Adopt(newBody);
++  } else {
++     outString.Assign(body, bodyLen);
+   }
+-  else {
+-     // body did not require any additional linebreaks, so just use it
+-     // body will not have any null bytes, so we can use PL_strdup
+-     m_attachment1_body = PL_strdup(body);
+-     if (!m_attachment1_body) {
+-      return NS_ERROR_OUT_OF_MEMORY;
+-     }
+-     m_attachment1_body_length = bodyLen;
+-  }
++
+   return NS_OK;
+ }
+ 
+@@ -3181,9 +3165,22 @@
+ 
+   if (body.Length() > 0)
+   {
+-    // will set m_attachment1_body and m_attachment1_body_length
+-    nsresult rv = EnsureLineBreaks(body);
+-    NS_ENSURE_SUCCESS(rv, rv);
++    nsAutoCString outString;
++    // In case of html mail we use base64 so line break is inserted
++    // in base64 encoder.
++    if (PL_strcmp(attachment1_type, TEXT_HTML))
++    {
++      nsresult rv = EnsureLineBreaks(body, outString);
++      NS_ENSURE_SUCCESS(rv,rv);
++
++      body = outString;
++    }
++
++    m_attachment1_body = PL_strdup(body.get());
++    if (!m_attachment1_body)
++     return NS_ERROR_OUT_OF_MEMORY;
++
++    m_attachment1_body_length = body.Length();
+   }
+ 
+   PR_FREEIF(m_attachment1_type);
+diff -r 4b8605e6a17d -r ae5cdc6f083a mailnews/compose/src/nsMsgSend.h
+--- a/mailnews/compose/src/nsMsgSend.h	Wed Sep 24 00:53:52 2014 -0400
++++ b/mailnews/compose/src/nsMsgSend.h	Mon Dec 08 11:29:37 2014 +0800
+@@ -369,7 +369,8 @@
+   nsresult GetNotificationCallbacks(nsIInterfaceRequestor** aCallbacks);
+ private:
+   // will set m_attachment1_body & m_attachment1_body_length;
+-  nsresult EnsureLineBreaks(const nsCString &aBody);
++  nsresult EnsureLineBreaks(const nsCString &aBody,
++                            nsACString &outString);
+ 
+   // generates a message id for our message, if necessary
+   void GenerateMessageId( );

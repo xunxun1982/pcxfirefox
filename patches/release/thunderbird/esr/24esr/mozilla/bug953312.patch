@@ -1,0 +1,20 @@
+# HG changeset patch
+# User Richard Newman <rnewman@mozilla.com>
+# Date 1389203252 -3600
+#      Wed Jan 08 18:47:32 2014 +0100
+# Node ID 98a6247d40869dd06f026a8789ceb80114922b2a
+# Parent  aad94573c6de0d3cd19e5b8e0a54e707436c676c
+Bug 953312 - Fix idle observer notification in Places expiration. r=mak, a=bajaj
+
+diff -r aad94573c6de -r 98a6247d4086 toolkit/components/places/nsPlacesExpiration.js
+--- a/toolkit/components/places/nsPlacesExpiration.js	Wed Oct 22 01:01:12 2014 +0800
++++ b/toolkit/components/places/nsPlacesExpiration.js	Wed Jan 08 18:47:32 2014 +0100
+@@ -36,7 +36,7 @@
+ const TOPIC_DEBUG_START_EXPIRATION = "places-debug-start-expiration";
+ const TOPIC_EXPIRATION_FINISHED = "places-expiration-finished";
+ const TOPIC_IDLE_BEGIN = "idle";
+-const TOPIC_IDLE_END = "back";
++const TOPIC_IDLE_END = "active";
+ const TOPIC_IDLE_DAILY = "idle-daily";
+ 
+ // Branch for all expiration preferences.

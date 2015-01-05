@@ -1,0 +1,76 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1380215929 -28800
+#      Fri Sep 27 01:18:49 2013 +0800
+# Node ID 461114d460d8c540634b33d0ada6452525362fec
+# Parent  1be9c19c23ee195b3983e4f1622c5a45ae3690ea
+--disable-webgl should not build Angle code
+
+diff -r 1be9c19c23ee -r 461114d460d8 gfx/moz.build
+--- a/gfx/moz.build	Thu Sep 26 14:14:13 2013 +0200
++++ b/gfx/moz.build	Fri Sep 27 01:18:49 2013 +0800
+@@ -10,7 +10,6 @@
+ DIRS += [
+     '2d',
+     'ycbcr',
+-    'angle',
+     'src',
+     'qcms',
+     'gl',
+@@ -22,6 +21,9 @@
+     'ipc',
+ ]
+ 
++if CONFIG['MOZ_WEBGL']:
++    DIRS += ['angle']
++
+ if CONFIG['MOZ_ENABLE_SKIA']:
+     DIRS += ['skia']
+ 
+diff -r 1be9c19c23ee -r 461114d460d8 layout/media/Makefile.in
+--- a/layout/media/Makefile.in	Thu Sep 26 14:14:13 2013 +0200
++++ b/layout/media/Makefile.in	Fri Sep 27 01:18:49 2013 +0800
+@@ -93,8 +93,13 @@
+ 	$(NULL)
+ endif
+ 
++ifdef MOZ_WEBGL
+ SHARED_LIBRARY_LIBS 	+= \
+ 	$(DEPTH)/gfx/angle/$(LIB_PREFIX)angle.$(LIB_SUFFIX) \
++	$(NULL)
++endif
++
++SHARED_LIBRARY_LIBS 	+= \
+ 	$(DEPTH)/parser/expat/lib/$(LIB_PREFIX)mozexpat_s.$(LIB_SUFFIX) \
+ 	$(NULL)
+ 
+diff -r 1be9c19c23ee -r 461114d460d8 layout/media/symbols.def.in
+--- a/layout/media/symbols.def.in	Thu Sep 26 14:14:13 2013 +0200
++++ b/layout/media/symbols.def.in	Fri Sep 27 01:18:49 2013 +0800
+@@ -157,6 +157,7 @@
+ opus_encode
+ opus_encode_float
+ #endif
++#ifdef MOZ_WEBGL
+ ShInitialize
+ ShFinalize
+ ShGetObjectCode
+@@ -165,6 +166,7 @@
+ ShCompile
+ ShGetInfo
+ ShConstructCompiler
++#endif
+ #ifdef MOZ_WEBRTC_GKMEDIA
+ #ifdef HAVE_64BIT_OS
+ ?GetInterface@ViERender@webrtc@@SAPEAV12@PEAVVideoEngine@2@@Z
+@@ -180,8 +182,10 @@
+ ?Delete@VideoEngine@webrtc@@SA_NAAPAV12@@Z
+ #endif
+ #endif
++#ifdef MOZ_WEBGL
+ ShGetActiveAttrib
+ ShGetActiveUniform
++#endif
+ #ifndef MOZ_NATIVE_PNG
+ MOZ_APNG_get_first_frame_is_hidden
+ MOZ_APNG_get_next_frame_blend_op

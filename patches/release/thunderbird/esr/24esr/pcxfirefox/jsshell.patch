@@ -1,0 +1,28 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1417774215 -28800
+#      Fri Dec 05 18:10:15 2014 +0800
+# Node ID 97b5fa53266d3b7832f536ea83d97ada4a809685
+# Parent  4afdea1e970622092f0490bc4e277f97a8b78ca3
+jsshell
+
+diff -r 4afdea1e9706 -r 97b5fa53266d js/src/configure.in
+--- a/js/src/configure.in	Wed Sep 24 01:18:03 2014 +0800
++++ b/js/src/configure.in	Fri Dec 05 18:10:15 2014 +0800
+@@ -4132,7 +4132,7 @@
+ 
+ JS_NATIVE_EDITLINE=
+ EDITLINE_LIBS=
+-JS_DISABLE_SHELL=
++JS_DISABLE_SHELL=1
+ 
+ case "$target" in
+ *-mingw*)
+@@ -4156,6 +4156,7 @@
+   dnl Either way, we want to build with line editing support.
+   AC_DEFINE(EDITLINE)
+ fi
++AC_DEFINE(JS_DISABLE_SHELL)
+ AC_SUBST(JS_NATIVE_EDITLINE)
+ AC_SUBST(JS_DISABLE_SHELL)
+ AC_SUBST(EDITLINE_LIBS)

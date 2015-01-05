@@ -1,0 +1,20 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1413902413 -28800
+#      Tue Oct 21 22:40:13 2014 +0800
+# Node ID 8eb9290b02a2fda38414e7d801917a4e4d9005bd
+# Parent  2bd7d2d64c082bc9d5c17136d35aa8b89978207a
+Bug 953282 - Fix idle observer notification, after Bug 715041 broke in-tree consumers. r=gps, a=bajaj
+
+diff -r 2bd7d2d64c08 -r 8eb9290b02a2 services/sync/modules/policies.js
+--- a/services/sync/modules/policies.js	Tue Oct 21 22:36:31 2014 +0800
++++ b/services/sync/modules/policies.js	Tue Oct 21 22:40:13 2014 +0800
+@@ -217,7 +217,7 @@
+         // were just active.)
+         this.adjustSyncInterval();
+         break;
+-      case "back":
++      case "active":
+         this._log.trace("Received notification that we're back from idle.");
+         this.idle = false;
+         Utils.namedTimer(function onBack() {

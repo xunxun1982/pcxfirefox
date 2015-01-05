@@ -1,0 +1,34 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1417776761 -28800
+#      Fri Dec 05 18:52:41 2014 +0800
+# Node ID f019b5759ee0ce5291648dad97fa1072a095a5fb
+# Parent  2ce5d186e571c411c1250413a4bbdc995150cc91
+xp32-fix
+
+diff -r 2ce5d186e571 -r f019b5759ee0 js/src/config/config.mk
+--- a/js/src/config/config.mk	Fri Dec 05 18:40:34 2014 +0800
++++ b/js/src/config/config.mk	Fri Dec 05 18:52:41 2014 +0800
+@@ -583,7 +583,7 @@
+ ifdef GNU_CC
+ WIN32_EXE_LDFLAGS	+= -mconsole
+ else
+-WIN32_EXE_LDFLAGS	+= -SUBSYSTEM:CONSOLE
++WIN32_EXE_LDFLAGS	+= -SUBSYSTEM:CONSOLE,5.01
+ endif
+ endif
+ else # MOZ_WINCONSOLE
+@@ -594,10 +594,12 @@
+ ifdef GNU_CC
+ WIN32_EXE_LDFLAGS	+= -mwindows
+ else
+-WIN32_EXE_LDFLAGS	+= -SUBSYSTEM:WINDOWS
++WIN32_EXE_LDFLAGS	+= -SUBSYSTEM:WINDOWS,5.01
+ endif
+ endif
+ endif
++else
++LDFLAGS += -SUBSYSTEM:CONSOLE,5.01
+ endif
+ 
+ ifdef _MSC_VER

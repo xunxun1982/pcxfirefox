@@ -1,0 +1,20 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1411495294 -28800
+#      Wed Sep 24 02:01:34 2014 +0800
+# Node ID 17df280a8b4461553dc16b2e8003d3012879d503
+# Parent  381abc3422ead001f2b2682788da6a6f343fc2d0
+slim-little
+
+diff -r 381abc3422ea -r 17df280a8b44 configure.in
+--- a/configure.in	Fri Dec 05 18:24:28 2014 +0800
++++ b/configure.in	Wed Sep 24 02:01:34 2014 +0800
+@@ -1638,7 +1638,7 @@
+ dnl ========================================================
+ dnl SPS Profiler
+ dnl ========================================================
+-MOZ_ENABLE_PROFILER_SPS=1
++MOZ_ENABLE_PROFILER_SPS=
+ 
+ case "${OS_TARGET}" in
+ Android)

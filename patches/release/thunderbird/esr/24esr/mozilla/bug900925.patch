@@ -1,0 +1,41 @@
+# HG changeset patch
+# User Robert Strong <robert.bugzilla@gmail.com>
+# Date 1384993364 28800
+#      Wed Nov 20 16:22:44 2013 -0800
+# Node ID ac0d907451d649eeaccbbd57d469686caf0f3740
+# Parent  98a6247d40869dd06f026a8789ceb80114922b2a
+Bug 900925 - don't report error except when it isn't expected. r=mconnor
+
+diff -r 98a6247d4086 -r ac0d907451d6 browser/base/content/aboutDialog.js
+--- a/browser/base/content/aboutDialog.js	Wed Jan 08 18:47:32 2014 +0100
++++ b/browser/base/content/aboutDialog.js	Wed Nov 20 16:22:44 2013 -0800
+@@ -21,17 +21,22 @@
+       distroIdField.value = distroId + " - " + distroVersion;
+       distroIdField.style.display = "block";
+ 
+-      // This must be set last because it might not exist due to bug 895473.
+-      var distroAbout = Services.prefs.getComplexValue("distribution.about",
+-        Components.interfaces.nsISupportsString);
+-      var distroField = document.getElementById("distribution");
+-      distroField.value = distroAbout;
+-      distroField.style.display = "block";
++      try {
++        // This is in its own try catch due to bug 895473 and bug 900925.
++        var distroAbout = Services.prefs.getComplexValue("distribution.about",
++          Components.interfaces.nsISupportsString);
++        var distroField = document.getElementById("distribution");
++        distroField.value = distroAbout;
++        distroField.style.display = "block";
++      }
++      catch (ex) {
++        // Pref is unset
++        Components.utils.reportError(ex);
++      }
+     }
+   }
+   catch (e) {
+     // Pref is unset
+-    Components.utils.reportError(e);
+   }
+ 
+   // Include the build ID and display warning if this is an "a#" (nightly or aurora) build

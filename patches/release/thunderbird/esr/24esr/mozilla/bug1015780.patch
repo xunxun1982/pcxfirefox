@@ -1,0 +1,25 @@
+# HG changeset patch
+# User pcxfirefox
+# Date 1405415342 -28800
+#      Tue Jul 15 17:09:02 2014 +0800
+# Node ID a4f59756dd24e115cd5a7c1460b4e9ab906d3677
+# Parent  2b585eb48d044c8df281773c58472706e79b31e7
+Bug 1015780 - Make Moz2D's GetAlignedStride() faster
+
+diff -r 2b585eb48d04 -r a4f59756dd24 gfx/2d/Tools.h
+--- a/gfx/2d/Tools.h	Fri Feb 28 20:19:51 2014 +0800
++++ b/gfx/2d/Tools.h	Tue Jul 15 17:09:02 2014 +0800
+@@ -132,11 +132,8 @@
+ template<int alignment>
+ int32_t GetAlignedStride(int32_t aStride)
+ {
+-  if (aStride % alignment) {
+-    return aStride + (alignment - (aStride % alignment));
+-  }
+-
+-  return aStride;
++  const int32_t mask = alignment - 1;
++  return (aStride + mask) & ~mask;
+ }
+ 
+ }

@@ -1,0 +1,35 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1413906849 -28800
+#      Tue Oct 21 23:54:09 2014 +0800
+# Node ID 6e680ae81c99d0e4922e11966aa684ada3d02e4b
+# Parent  47abf4677ed047a4691c1acf9f99c0efdfde5e7c
+Bug 872971 - Clamp regexp quantifiers to INT_MAX. r=jandem
+
+diff -r 47abf4677ed0 -r 6e680ae81c99 js/src/yarr/YarrParser.h
+--- a/js/src/yarr/YarrParser.h	Tue Oct 21 23:14:30 2014 +0800
++++ b/js/src/yarr/YarrParser.h	Tue Oct 21 23:54:09 2014 +0800
+@@ -612,12 +612,23 @@
+                     unsigned min;
+                     if (!consumeNumber(min))
+                         break;
++                    // Clamping to INT_MAX is technically a spec deviation. In practice, it's
++                    // undetectable, because we can't even allocate strings large enough for
++                    // quantifiers this large to ever create different results than smaller ones.
++                    if (min > INT_MAX)
++                        min = INT_MAX;
+ 
+                     unsigned max = min;
+                     if (tryConsume(',')) {
+                         if (peekIsDigit()) {
+                             if (!consumeNumber(max))
+                                 break;
++                            // Clamping to INT_MAX is technically a spec deviation. In practice,
++                            // it's undetectable, because we can't even allocate strings large
++                            // enough for quantifiers this large to ever create different results
++                            // than smaller ones.
++                            if (max > INT_MAX)
++                                max = INT_MAX;
+                         } else {
+                             max = quantifyInfinite;
+                         }

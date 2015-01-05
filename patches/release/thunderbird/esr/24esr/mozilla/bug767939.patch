@@ -1,0 +1,20 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1413902191 -28800
+#      Tue Oct 21 22:36:31 2014 +0800
+# Node ID 2bd7d2d64c082bc9d5c17136d35aa8b89978207a
+# Parent  3fa58240a59c6d54be63b2b6a7098e9576ae1523
+Bug 767939 - Editing a bookmark and changing URL drops tags. r=dietrich a=gavin
+
+diff -r 3fa58240a59c -r 2bd7d2d64c08 toolkit/components/places/PlacesUtils.jsm
+--- a/toolkit/components/places/PlacesUtils.jsm	Tue Oct 21 22:31:27 2014 +0800
++++ b/toolkit/components/places/PlacesUtils.jsm	Tue Oct 21 22:36:31 2014 +0800
+@@ -2675,7 +2675,7 @@
+       // only untag the old URI if this is the only bookmark
+       if (PlacesUtils.getBookmarksForURI(this.item.uri, {}).length == 0)
+         PlacesUtils.tagging.untagURI(this.item.uri, this.item.tags);
+-      PlacesUtils.tagging.tagURI(this.new.URI, this.item.tags);
++      PlacesUtils.tagging.tagURI(this.new.uri, this.item.tags);
+     }
+   },
+ 

@@ -1,0 +1,53 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1408896008 -28800
+#      Mon Aug 25 00:00:08 2014 +0800
+# Node ID 4a23060122ff32076fe23171412ce692760e5d06
+# Parent  a4f59756dd24e115cd5a7c1460b4e9ab906d3677
+Bug 1035068: Remove unused Windows logging code that VS2013 doesn't like. r=jesup
+
+diff -r a4f59756dd24 -r 4a23060122ff netwerk/sctp/datachannel/DataChannel.cpp
+--- a/netwerk/sctp/datachannel/DataChannel.cpp	Tue Jul 15 17:09:02 2014 +0800
++++ b/netwerk/sctp/datachannel/DataChannel.cpp	Mon Aug 25 00:00:08 2014 +0800
+@@ -1434,36 +1434,26 @@
+ void
+ DataChannelConnection::HandlePeerAddressChangeEvent(const struct sctp_paddr_change *spc)
+ {
++  const char *addr = "";
++#if !defined(__Userspace_os_Windows)
+   char addr_buf[INET6_ADDRSTRLEN];
+-  const char *addr = "";
+   struct sockaddr_in *sin;
+   struct sockaddr_in6 *sin6;
+-#if defined(__Userspace_os_Windows)
+-  DWORD addr_len = INET6_ADDRSTRLEN;
+ #endif
+ 
+   switch (spc->spc_aaddr.ss_family) {
+   case AF_INET:
++#if !defined(__Userspace_os_Windows)
+     sin = (struct sockaddr_in *)&spc->spc_aaddr;
+-#if !defined(__Userspace_os_Windows)
+     addr = inet_ntop(AF_INET, &sin->sin_addr, addr_buf, INET6_ADDRSTRLEN);
+-#else
+-    if (WSAAddressToStringA((LPSOCKADDR)sin, sizeof(sin->sin_addr), nullptr,
+-                            addr_buf, &addr_len)) {
+-      return;
+-    }
+ #endif
+     break;
+   case AF_INET6:
++#if !defined(__Userspace_os_Windows)
+     sin6 = (struct sockaddr_in6 *)&spc->spc_aaddr;
+-#if !defined(__Userspace_os_Windows)
+     addr = inet_ntop(AF_INET6, &sin6->sin6_addr, addr_buf, INET6_ADDRSTRLEN);
+-#else
+-    if (WSAAddressToStringA((LPSOCKADDR)sin6, sizeof(sin6), nullptr,
+-                            addr_buf, &addr_len)) {
+-      return;
+-    }
+ #endif
++    break;
+   case AF_CONN:
+     addr = "DTLS connection";
+     break;

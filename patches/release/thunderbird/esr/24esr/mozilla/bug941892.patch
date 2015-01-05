@@ -1,0 +1,24 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1413910872 -28800
+#      Wed Oct 22 01:01:12 2014 +0800
+# Node ID aad94573c6de0d3cd19e5b8e0a54e707436c676c
+# Parent  c671b3fb028ecb22589e9dfcca2309a98d60c563
+Bug 941892 - Take an early return if nsPluginStreamListenerPeer gets passed an unknown stream. r=bsmedberg, a=bajaj
+
+diff -r c671b3fb028e -r aad94573c6de dom/plugins/base/nsPluginStreamListenerPeer.cpp
+--- a/dom/plugins/base/nsPluginStreamListenerPeer.cpp	Wed Oct 22 00:45:00 2014 +0800
++++ b/dom/plugins/base/nsPluginStreamListenerPeer.cpp	Wed Oct 22 01:01:12 2014 +0800
+@@ -788,8 +788,10 @@
+                                                           uint64_t sourceOffset,
+                                                           uint32_t aLength)
+ {
+-  NS_ASSERTION(mRequests.IndexOfObject(GetBaseRequest(request)) != -1,
+-               "Received OnDataAvailable for untracked request.");
++  if (mRequests.IndexOfObject(GetBaseRequest(request)) == -1) {
++    MOZ_ASSERT(false, "Received OnDataAvailable for untracked request.");
++    return NS_ERROR_UNEXPECTED;
++  }
+   
+   if (mRequestFailed)
+     return NS_ERROR_FAILURE;

@@ -1,0 +1,20 @@
+# HG changeset patch
+# User Maks Naumov <maksqwe1@ukr.net>
+# Date 1392595510 28800
+#      Sun Feb 16 16:05:10 2014 -0800
+# Node ID f44a9643bbd14ebd199281619e6c2ebd98666e90
+# Parent  ac0d907451d649eeaccbbd57d469686caf0f3740
+Bug 973187:  Fix typo (checking mRadiusX twice and not checking mRadiusY) in nsStyleGradient::HasCalc().  r=dbaron
+
+diff -r ac0d907451d6 -r f44a9643bbd1 layout/style/nsStyleStruct.cpp
+--- a/layout/style/nsStyleStruct.cpp	Wed Nov 20 16:22:44 2013 -0800
++++ b/layout/style/nsStyleStruct.cpp	Sun Feb 16 16:05:10 2014 -0800
+@@ -1397,7 +1397,7 @@
+       return true;
+   }
+   return mBgPosX.IsCalcUnit() || mBgPosY.IsCalcUnit() || mAngle.IsCalcUnit() ||
+-         mRadiusX.IsCalcUnit() || mRadiusX.IsCalcUnit();
++         mRadiusX.IsCalcUnit() || mRadiusY.IsCalcUnit();
+ }
+ 
+ // --------------------

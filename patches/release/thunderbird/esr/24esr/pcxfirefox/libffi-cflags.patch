@@ -1,0 +1,24 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1393587857 -28800
+#      Fri Feb 28 19:44:17 2014 +0800
+# Node ID f56be51ae0906d0fdfcd90e082d1406085faa892
+# Parent  97b5fa53266d3b7832f536ea83d97ada4a809685
+libffi-cflags
+
+diff -r 97b5fa53266d -r f56be51ae090 js/src/configure.in
+--- a/js/src/configure.in	Fri Dec 05 18:10:15 2014 +0800
++++ b/js/src/configure.in	Fri Feb 28 19:44:17 2014 +0800
+@@ -4590,10 +4590,10 @@
+     case "${target_cpu}" in
+     x86_64)
+       # Need target since MSYS tools into mozilla-build may be 32bit
+-      ac_configure_args="$ac_configure_args CC=\"$_topsrcdir/ctypes/libffi/msvcc.sh -m64\" --build=$build --host=$target"
++      ac_configure_args="$ac_configure_args CC=\"$_topsrcdir/ctypes/libffi/msvcc.sh -m64\" CFLAGS=\"$MOZ_OPTIMIZE_FLAGS -fp:precise -Qfast_transcendentals -GL-\" CXXFLAGS=\"$MOZ_OPTIMIZE_FLAGS -fp:precise -Qfast_transcendentals -GL-\"  --build=$build --host=$target"
+       ;;
+     *)
+-      ac_configure_args="$ac_configure_args CC=$_topsrcdir/ctypes/libffi/msvcc.sh"
++      ac_configure_args="$ac_configure_args CC=$_topsrcdir/ctypes/libffi/msvcc.sh CFLAGS=\"$MOZ_OPTIMIZE_FLAGS -fp:precise -Qfast_transcendentals -GL-\" CXXFLAGS=\"$MOZ_OPTIMIZE_FLAGS -fp:precise -Qfast_transcendentals -GL-\""
+       ;;
+     esac
+   fi

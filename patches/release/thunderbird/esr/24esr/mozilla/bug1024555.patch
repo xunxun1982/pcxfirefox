@@ -1,0 +1,123 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1417773567 -28800
+#      Fri Dec 05 17:59:27 2014 +0800
+# Node ID 66bd50deeab5ec0667a6811a8fd634965cb3be64
+# Parent  4a23060122ff32076fe23171412ce692760e5d06
+Bug 1024555: Cancel gethash requests after 5 seconds if they are still pending
+
+diff -r 4a23060122ff -r 66bd50deeab5 b2g/app/b2g.js
+--- a/b2g/app/b2g.js	Mon Aug 25 00:00:08 2014 +0800
++++ b/b2g/app/b2g.js	Fri Dec 05 17:59:27 2014 +0800
+@@ -323,6 +323,9 @@
+ // The list of tables that use the gethash request to confirm partial results.
+ pref("urlclassifier.gethashtables", "goog-phish-shavar,goog-malware-shavar");
+ 
++// Gethash timeout for Safebrowsing.
++pref("urlclassifier.gethash.timeout_ms", 5000);
++
+ // If an urlclassifier table has not been updated in this number of seconds,
+ // a gethash request will be forced to check that the result is still in
+ // the database.
+diff -r 4a23060122ff -r 66bd50deeab5 browser/app/profile/firefox.js
+--- a/browser/app/profile/firefox.js	Mon Aug 25 00:00:08 2014 +0800
++++ b/browser/app/profile/firefox.js	Fri Dec 05 17:59:27 2014 +0800
+@@ -781,6 +781,9 @@
+ // The list of tables that use the gethash request to confirm partial results.
+ pref("urlclassifier.gethashtables", "goog-phish-shavar,goog-malware-shavar");
+ 
++// Gethash timeout for Safebrowsing.
++pref("urlclassifier.gethash.timeout_ms", 5000);
++
+ // If an urlclassifier table has not been updated in this number of seconds,
+ // a gethash request will be forced to check that the result is still in
+ // the database.
+diff -r 4a23060122ff -r 66bd50deeab5 browser/metro/profile/metro.js
+--- a/browser/metro/profile/metro.js	Mon Aug 25 00:00:08 2014 +0800
++++ b/browser/metro/profile/metro.js	Fri Dec 05 17:59:27 2014 +0800
+@@ -586,6 +586,9 @@
+ // The list of tables that use the gethash request to confirm partial results.
+ pref("urlclassifier.gethashtables", "goog-phish-shavar,goog-malware-shavar");
+ 
++// Gethash timeout for Safebrowsing.
++pref("urlclassifier.gethash.timeout_ms", 5000);
++
+ // If an urlclassifier table has not been updated in this number of seconds,
+ // a gethash request will be forced to check that the result is still in
+ // the database.
+diff -r 4a23060122ff -r 66bd50deeab5 mobile/android/app/mobile.js
+--- a/mobile/android/app/mobile.js	Mon Aug 25 00:00:08 2014 +0800
++++ b/mobile/android/app/mobile.js	Fri Dec 05 17:59:27 2014 +0800
+@@ -598,6 +598,9 @@
+ // The list of tables that use the gethash request to confirm partial results.
+ pref("urlclassifier.gethashtables", "goog-phish-shavar,goog-malware-shavar");
+ 
++// Gethash timeout for Safebrowsing.
++pref("urlclassifier.gethash.timeout_ms", 5000);
++
+ // If an urlclassifier table has not been updated in this number of seconds,
+ // a gethash request will be forced to check that the result is still in
+ // the database.
+diff -r 4a23060122ff -r 66bd50deeab5 toolkit/components/url-classifier/nsUrlClassifierHashCompleter.js
+--- a/toolkit/components/url-classifier/nsUrlClassifierHashCompleter.js	Mon Aug 25 00:00:08 2014 +0800
++++ b/toolkit/components/url-classifier/nsUrlClassifierHashCompleter.js	Fri Dec 05 17:59:27 2014 +0800
+@@ -74,6 +74,7 @@
+                                          Ci.nsIRunnable,
+                                          Ci.nsIObserver,
+                                          Ci.nsISupportsWeakReference,
++                                         Ci.nsITimerCallback,
+                                          Ci.nsISupports]),
+ 
+   // This is mainly how the HashCompleter interacts with other components.
+@@ -282,6 +283,16 @@
+     this._uri = aURI;
+   },
+ 
++  notify: function HCR_notify() {
++    // If we haven't gotten onStopRequest, just cancel. This will call us
++    // with onStopRequest since we implement nsIStreamListener on the
++    // channel.
++    if (this._channel && this._channel.isPending()) {
++      dump("hashcompleter: cancelling request to " + this.gethashUrl + "\n");
++      this._channel.cancel(Cr.NS_BINDING_ABORTED);
++    }
++  },
++
+   // Creates an nsIChannel for the request and fills the body.
+   openChannel: function HCR_openChannel() {
+     let loadFlags = Ci.nsIChannel.INHIBIT_CACHING |
+@@ -295,6 +306,13 @@
+     let body = this.buildRequest();
+     this.addRequestBody(body);
+ 
++    // Set a timer that cancels the channel after timeout_ms in case we
++    // don't get a gethash response.
++    this.timer_ = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
++    // Ask the timer to use nsITimerCallback (.notify()) when ready
++    let timeout = Services.prefs.getIntPref(
++      "urlclassifier.gethash.timeout_ms");
++    this.timer_.initWithCallback(this, timeout, this.timer_.TYPE_ONE_SHOT);
+     channel.asyncOpen(this, null);
+   },
+ 
+@@ -480,6 +498,7 @@
+     }
+   },
+   notifyFailure: function HCR_notifyFailure(aStatus) {
++    dump("hashcompleter: notifying failure\n");
+     for (let i = 0; i < this._requests; i++) {
+       let request = this._requests[i];
+       request.callback.completionFinished(aStatus);
+diff -r 4a23060122ff -r 66bd50deeab5 toolkit/components/url-classifier/tests/unit/head_urlclassifier.js
+--- a/toolkit/components/url-classifier/tests/unit/head_urlclassifier.js	Mon Aug 25 00:00:08 2014 +0800
++++ b/toolkit/components/url-classifier/tests/unit/head_urlclassifier.js	Fri Dec 05 17:59:27 2014 +0800
+@@ -31,6 +31,9 @@
+ prefBranch.setBoolPref("browser.safebrowsing.malware.enabled", true);
+ prefBranch.setBoolPref("browser.safebrowsing.enabled", true);
+ 
++// Hash completion timeout
++prefBranch.setIntPref("urlclassifier.gethash.timeout_ms", 5000);
++
+ function delFile(name) {
+   try {
+     // Delete a previously created sqlite file

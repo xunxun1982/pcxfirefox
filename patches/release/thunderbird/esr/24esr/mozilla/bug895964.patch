@@ -1,0 +1,21 @@
+# HG changeset patch
+# User pcxfirefox@gmail.com
+# Date 1393589991 -28800
+#      Fri Feb 28 20:19:51 2014 +0800
+# Node ID 2b585eb48d044c8df281773c58472706e79b31e7
+# Parent  53bd996e0d32115977d5d2149f47d46c79ef2988
+Bug895964
+
+diff -r 53bd996e0d32 -r 2b585eb48d04 toolkit/components/diskspacewatcher/DiskSpaceWatcher.cpp
+--- a/toolkit/components/diskspacewatcher/DiskSpaceWatcher.cpp	Wed Apr 23 20:04:55 2014 +0800
++++ b/toolkit/components/diskspacewatcher/DiskSpaceWatcher.cpp	Fri Feb 28 20:19:51 2014 +0800
+@@ -144,7 +144,9 @@
+ };
+ 
+ static const mozilla::Module::CategoryEntry kDiskSpaceWatcherCategories[] = {
++#ifdef MOZ_WIDGET_GONK
+   { "profile-after-change", "Disk Space Watcher Service", DISKSPACEWATCHER_CONTRACTID },
++#endif
+   { nullptr }
+ };
+ 
