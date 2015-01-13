@@ -1,0 +1,24 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1419524123 -28800
+#      Fri Dec 26 00:15:23 2014 +0800
+# Branch GECKO350b6_2014122222_RELBRANCH
+# Node ID b2f03a190ce8e2a7b0f9b2d0b304ed5c12baeacc
+# Parent  da9526724eabf2dca1edaf6012a4678f81a2693f
+Bug 1103176: Block Direct2D when D3D11 layers is blacklisted. r=BenWa
+
+diff -r da9526724eab -r b2f03a190ce8 gfx/thebes/gfxWindowsPlatform.cpp
+--- a/gfx/thebes/gfxWindowsPlatform.cpp	Fri Dec 26 00:10:03 2014 +0800
++++ b/gfx/thebes/gfxWindowsPlatform.cpp	Fri Dec 26 00:15:23 2014 +0800
+@@ -381,6 +381,11 @@
+                 d2dBlocked = true;
+             }
+         }
++        if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_11_LAYERS, &status))) {
++            if (status != nsIGfxInfo::FEATURE_STATUS_OK) {
++                d2dBlocked = true;
++            }
++        }
+     }
+ 
+     // These will only be evaluated once, and any subsequent changes to

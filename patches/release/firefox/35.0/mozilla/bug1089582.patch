@@ -1,0 +1,239 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1419522367 -28800
+#      Thu Dec 25 23:46:07 2014 +0800
+# Branch GECKO350b6_2014122222_RELBRANCH
+# Node ID 4203ba12a42b8ae913451b1620a923127b522185
+# Parent  ac49ce9e4bae620c725b38ea2d4f4d07b4d3658d
+Bug 1089582 - Don't do a major GC when the store buffer is full
+
+diff -r ac49ce9e4bae -r 4203ba12a42b js/src/gc/GCRuntime.h
+--- a/js/src/gc/GCRuntime.h	Thu Nov 20 20:47:09 2014 +0800
++++ b/js/src/gc/GCRuntime.h	Thu Dec 25 23:46:07 2014 +0800
+@@ -281,7 +281,7 @@
+     void minorGC(JS::gcreason::Reason reason);
+     void minorGC(JSContext *cx, JS::gcreason::Reason reason);
+     void evictNursery(JS::gcreason::Reason reason = JS::gcreason::EVICT_NURSERY) { minorGC(reason); }
+-    void gcIfNeeded(JSContext *cx);
++    void gcIfNeeded(JSContext *cx = nullptr);
+     void gc(JSGCInvocationKind gckind, JS::gcreason::Reason reason);
+     void gcSlice(JSGCInvocationKind gckind, JS::gcreason::Reason reason, int64_t millis = 0);
+     void gcFinalSlice(JSGCInvocationKind gckind, JS::gcreason::Reason reason);
+@@ -330,6 +330,10 @@
+     void waitBackgroundSweepOrAllocEnd() { helperState.waitBackgroundSweepOrAllocEnd(); }
+     void startBackgroundAllocationIfIdle() { helperState.startBackgroundAllocationIfIdle(); }
+ 
++#ifdef JSGC_GENERATIONAL
++    void requestMinorGC(JS::gcreason::Reason reason);
++#endif
++
+ #ifdef DEBUG
+ 
+     bool onBackgroundThread() { return helperState.onBackgroundThread(); }
+@@ -440,7 +444,7 @@
+     bool areGrayBitsValid() { return grayBitsValid; }
+     void setGrayBitsInvalid() { grayBitsValid = false; }
+ 
+-    bool isGcNeeded() { return isNeeded; }
++    bool isGcNeeded() { return minorGCRequested || majorGCRequested; }
+ 
+     double computeHeapGrowthFactor(size_t lastBytes);
+     size_t computeTriggerBytes(double growthFactor, size_t lastBytes);
+@@ -498,7 +502,7 @@
+     inline bool wantBackgroundAllocation() const;
+ 
+     bool initZeal();
+-    void requestInterrupt(JS::gcreason::Reason reason);
++    void requestMajorGC(JS::gcreason::Reason reason);
+     void collect(bool incremental, int64_t budget, JSGCInvocationKind gckind,
+                  JS::gcreason::Reason reason);
+     bool gcCycle(bool incremental, int64_t budget, JSGCInvocationKind gckind,
+@@ -630,12 +634,13 @@
+      */
+     bool                  grayBitsValid;
+ 
+-    /*
+-     * These flags must be kept separate so that a thread requesting a
+-     * compartment GC doesn't cancel another thread's concurrent request for a
+-     * full GC.
+-     */
+-    volatile uintptr_t    isNeeded;
++    volatile uintptr_t    majorGCRequested;
++    JS::gcreason::Reason  majorGCTriggerReason;
++
++#ifdef JSGC_GENERATIONAL
++    bool                  minorGCRequested;
++    JS::gcreason::Reason  minorGCTriggerReason;
++#endif
+ 
+     /* Incremented at the start of every major GC. */
+     uint64_t              majorGCNumber;
+@@ -658,9 +663,6 @@
+     /* The invocation kind of the current GC, taken from the first slice. */
+     JSGCInvocationKind    invocationKind;
+ 
+-    /* The reason that an interrupt-triggered GC should be called. */
+-    JS::gcreason::Reason  triggerReason;
+-
+     /*
+      * If this is 0, all cross-compartment proxies must be registered in the
+      * wrapper map. This checking must be disabled temporarily while creating
+diff -r ac49ce9e4bae -r 4203ba12a42b js/src/gc/StoreBuffer.cpp
+--- a/js/src/gc/StoreBuffer.cpp	Thu Nov 20 20:47:09 2014 +0800
++++ b/js/src/gc/StoreBuffer.cpp	Thu Dec 25 23:46:07 2014 +0800
+@@ -306,7 +306,7 @@
+ StoreBuffer::setAboutToOverflow()
+ {
+     aboutToOverflow_ = true;
+-    runtime_->requestInterrupt(JSRuntime::RequestInterruptMainThread);
++    runtime_->gc.requestMinorGC(JS::gcreason::FULL_STORE_BUFFER);
+ }
+ 
+ bool
+diff -r ac49ce9e4bae -r 4203ba12a42b js/src/jsgc.cpp
+--- a/js/src/jsgc.cpp	Thu Nov 20 20:47:09 2014 +0800
++++ b/js/src/jsgc.cpp	Thu Dec 25 23:46:07 2014 +0800
+@@ -1150,13 +1150,17 @@
+     decommitThreshold(32 * 1024 * 1024),
+     cleanUpEverything(false),
+     grayBitsValid(false),
+-    isNeeded(0),
++    majorGCRequested(0),
++    majorGCTriggerReason(JS::gcreason::NO_REASON),
++#ifdef JSGC_GENERATIONAL
++    minorGCRequested(false),
++    minorGCTriggerReason(JS::gcreason::NO_REASON),
++#endif
+     majorGCNumber(0),
+     jitReleaseNumber(0),
+     number(0),
+     startNumber(0),
+     isFull(false),
+-    triggerReason(JS::gcreason::NO_REASON),
+ #ifdef DEBUG
+     disableStrictProxyCheckingCount(0),
+ #endif
+@@ -2836,13 +2840,25 @@
+ }
+ 
+ void
+-GCRuntime::requestInterrupt(JS::gcreason::Reason reason)
+-{
+-    if (isNeeded)
++GCRuntime::requestMajorGC(JS::gcreason::Reason reason)
++{
++    if (majorGCRequested)
+         return;
+ 
+-    isNeeded = true;
+-    triggerReason = reason;
++    majorGCRequested = true;
++    majorGCTriggerReason = reason;
++    rt->requestInterrupt(JSRuntime::RequestInterruptMainThread);
++}
++
++void
++GCRuntime::requestMinorGC(JS::gcreason::Reason reason)
++{
++    MOZ_ASSERT(CurrentThreadCanAccessRuntime(rt));
++    if (minorGCRequested)
++        return;
++
++    minorGCRequested = true;
++    minorGCTriggerReason = reason;
+     rt->requestInterrupt(JSRuntime::RequestInterruptMainThread);
+ }
+ 
+@@ -2871,7 +2887,7 @@
+         return false;
+ 
+     JS::PrepareForFullGC(rt);
+-    requestInterrupt(reason);
++    requestMajorGC(reason);
+     return true;
+ }
+ 
+@@ -2913,7 +2929,7 @@
+     }
+ 
+     PrepareZoneForGC(zone);
+-    requestInterrupt(reason);
++    requestMajorGC(reason);
+     return true;
+ }
+ 
+@@ -2930,10 +2946,8 @@
+     }
+ #endif
+ 
+-    if (isNeeded) {
+-        gcSlice(GC_NORMAL, JS::gcreason::MAYBEGC);
++    if (gcIfNeeded())
+         return true;
+-    }
+ 
+     double factor = schedulingState.inHighFrequencyGCMode() ? 0.85 : 0.9;
+     if (zone->usage.gcBytes() > 1024 * 1024 &&
+@@ -5647,7 +5661,7 @@
+ 
+     AutoTraceSession session(rt, MajorCollecting);
+ 
+-    isNeeded = false;
++    majorGCRequested = false;
+     interFrameGC = true;
+ 
+     number++;
+@@ -5973,6 +5987,7 @@
+ GCRuntime::minorGC(JS::gcreason::Reason reason)
+ {
+ #ifdef JSGC_GENERATIONAL
++    minorGCRequested = false;
+     TraceLogger *logger = TraceLoggerForMainThread(rt);
+     AutoTraceLog logMinorGC(logger, TraceLogger::MinorGC);
+     nursery.collect(rt, reason, nullptr);
+@@ -5986,6 +6001,7 @@
+     // Alternate to the runtime-taking form above which allows marking type
+     // objects as needing pretenuring.
+ #ifdef JSGC_GENERATIONAL
++    minorGCRequested = false;
+     TraceLogger *logger = TraceLoggerForMainThread(rt);
+     AutoTraceLog logMinorGC(logger, TraceLogger::MinorGC);
+     Nursery::TypeObjectList pretenureTypes;
+@@ -6024,20 +6040,26 @@
+ #endif
+ }
+ 
+-void
+-GCRuntime::gcIfNeeded(JSContext *cx)
+-{
++bool
++GCRuntime::gcIfNeeded(JSContext *cx /* = nullptr */)
++{
++    // This method returns whether a major GC was performed.
++
+ #ifdef JSGC_GENERATIONAL
+-    /*
+-     * In case of store buffer overflow perform minor GC first so that the
+-     * correct reason is seen in the logs.
+-     */
+-    if (storeBuffer.isAboutToOverflow())
+-        minorGC(cx, JS::gcreason::FULL_STORE_BUFFER);
++    if (minorGCRequested) {
++        if (cx)
++            minorGC(cx, minorGCTriggerReason);
++        else
++            minorGC(minorGCTriggerReason);
++    }
+ #endif
+ 
+-    if (isNeeded)
+-        gcSlice(GC_NORMAL, rt->gc.triggerReason, 0);
++    if (majorGCRequested) {
++        gcSlice(GC_NORMAL, rt->gc.majorGCTriggerReason);
++        return true;
++    }
++
++    return false;
+ }
+ 
+ AutoFinishGC::AutoFinishGC(JSRuntime *rt)

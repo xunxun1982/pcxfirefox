@@ -1,0 +1,78 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1416132150 -28800
+#      Sun Nov 16 18:02:30 2014 +0800
+# Branch GECKO350b6_2014122222_RELBRANCH
+# Node ID 9daff1be8974c1f18ace6b0190ff2fa937ba8497
+# Parent  d1d875388a90405f626abebef3bf87f6b6fc4edd
+security-better
+
+diff -r d1d875388a90 -r 9daff1be8974 security/nss/coreconf/WIN32.mk
+--- a/security/nss/coreconf/WIN32.mk	Thu Dec 25 23:17:49 2014 +0800
++++ b/security/nss/coreconf/WIN32.mk	Sun Nov 16 18:02:30 2014 +0800
+@@ -157,9 +157,9 @@
+     endif
+     ifdef BUILD_OPT
+ 	ifeq (11,$(ALLOW_OPT_CODE_SIZE)$(OPT_CODE_SIZE))
+-		OPTIMIZER += -O1
++		OPTIMIZER += -O2 -Ot -Oi -Ob2 -Oy -Gy -GF -GS- -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -Gw -Qpar -GL
+ 	else
+-		OPTIMIZER += -O2
++		OPTIMIZER += -O2 -Ot -Oi -Ob2 -Oy -Gy -GF -GS- -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -Gw -Qpar -GL
+ 	endif
+ 	DEFINES    += -UDEBUG -U_DEBUG -DNDEBUG
+ 	DLLFLAGS   += -OUT:$@
+diff -r d1d875388a90 -r 9daff1be8974 security/nss/coreconf/command.mk
+--- a/security/nss/coreconf/command.mk	Thu Dec 25 23:17:49 2014 +0800
++++ b/security/nss/coreconf/command.mk	Sun Nov 16 18:02:30 2014 +0800
+@@ -11,7 +11,7 @@
+ AS            = $(CC)
+ ASFLAGS      += $(CFLAGS)
+ CCF           = $(CC) $(CFLAGS)
+-LINK_DLL      = $(LINK) $(OS_DLLFLAGS) $(DLLFLAGS)
++LINK_DLL      = $(LINK) $(OS_DLLFLAGS) $(DLLFLAGS) -opt:ref,icf -LARGEADDRESSAWARE 
+ LINK_EXE      = $(LINK) $(OS_LFLAGS) $(LFLAGS)
+ CFLAGS        = $(OPTIMIZER) $(OS_CFLAGS) $(XP_DEFINE) $(DEFINES) $(INCLUDES) \
+ 		$(XCFLAGS)
+diff -r d1d875388a90 -r 9daff1be8974 security/nss/lib/freebl/Makefile
+--- a/security/nss/lib/freebl/Makefile	Thu Dec 25 23:17:49 2014 +0800
++++ b/security/nss/lib/freebl/Makefile	Sun Nov 16 18:02:30 2014 +0800
+@@ -132,7 +132,7 @@
+     DEFINES += -DMP_ASSEMBLY_MULTIPLY -DMP_ASSEMBLY_SQUARE 
+     DEFINES += -DMP_ASSEMBLY_DIV_2DX1D -DMP_USE_UINT_DIGIT -DMP_NO_MP_WORD
+     ifdef BUILD_OPT
+-	OPTIMIZER += -O2  # maximum optimization for freebl
++	OPTIMIZER += -O2 -Ot -Oi -Ob2 -Oy -Gy -GF -GS- -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -Gw -Qpar -GL  # maximum optimization for freebl
+     endif
+     # The Intel AES assembly code requires Visual C++ 2010.
+     # if $(_MSC_VER) >= 1600 (Visual C++ 2010)
+@@ -154,7 +154,7 @@
+ else
+ # MSVC
+     ifdef BUILD_OPT
+-	OPTIMIZER += -Ox  # maximum optimization for freebl
++	OPTIMIZER += -O2 -Ot -Oi -Ob2 -Oy -Gy -GF -GS- -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -Gw -Qpar -GL  # maximum optimization for freebl
+     endif
+     ASFILES  = arcfour-amd64-masm.asm mpi_amd64_masm.asm mp_comba_amd64_masm.asm
+     DEFINES += -DNSS_BEVAND_ARCFOUR -DMPI_AMD64 -DMP_ASSEMBLY_MULTIPLY
+diff -r d1d875388a90 -r 9daff1be8974 security/nss/lib/freebl/mpi/Makefile.win
+--- a/security/nss/lib/freebl/mpi/Makefile.win	Thu Dec 25 23:17:49 2014 +0800
++++ b/security/nss/lib/freebl/mpi/Makefile.win	Sun Nov 16 18:02:30 2014 +0800
+@@ -35,7 +35,7 @@
+ 
+ ifeq ($(CPU_ARCH),x86_64)
+ AS_SRCS = mpi_x86_64.asm
+-CFLAGS = -O2 -Z7 -MD -W3 -nologo -DXP_PC -UDEBUG -U_DEBUG -DNDEBUG \
++CFLAGS = -O2 -Ot -Oi -Ob2 -Oy -Gy -GF -GS- -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -Gw -Qpar -GL -Z7 -MD -W3 -nologo -DXP_PC -UDEBUG -U_DEBUG -DNDEBUG \
+  -DWIN32 -D_WIN64 -D_AMD64_ -D_M_AMD64 -D_WINDOWS -DWIN95 $(MPICMN)
+ ASFLAGS = -Cp -Sn -Zi -I.
+ else
+@@ -48,7 +48,7 @@
+  -DWIN32 -D_WINDOWS -DWIN95 $(MPICMN)
+ #CFLAGS = -Od -Z7 -MD -W3 -nologo -D_X86_ -DXP_PC -UDEBUG -U_DEBUG -DNDEBUG \
+  -DWIN32 -D_WINDOWS -DWIN95 $(MPICMN)
+-CFLAGS = -O2 -Z7 -MD -W3 -nologo -D_X86_ -DXP_PC -UDEBUG -U_DEBUG -DNDEBUG \
++CFLAGS = -O2 -Ot -Oi -Ob2 -Oy -Gy -GF -GS- -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -Gw -Qpar -GL -Z7 -MD -W3 -nologo -D_X86_ -DXP_PC -UDEBUG -U_DEBUG -DNDEBUG \
+  -DWIN32 -D_WINDOWS -DWIN95 $(MPICMN)
+ ASFLAGS = -Cp -Sn -Zi -coff -I. 
+ endif

@@ -1,0 +1,29 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1411411987 -28800
+#      Tue Sep 23 02:53:07 2014 +0800
+# Branch GECKO350b6_2014122222_RELBRANCH
+# Node ID 0b543550f38bb48bca049868cbd1e8207b7f4492
+# Parent  b5246c973efd28c9f68eececcc47a25c3f2d7411
+avx2-fix
+
+diff -r b5246c973efd -r 0b543550f38b media/libvpx/moz.build
+--- a/media/libvpx/moz.build	Thu Dec 25 22:53:19 2014 +0800
++++ b/media/libvpx/moz.build	Tue Sep 23 02:53:07 2014 +0800
+@@ -102,6 +102,16 @@
+             if 'avx2' in f:
+                 SOURCES[f].flags += ['-mavx2']
+ 
++if CONFIG['_MSC_VER']:
++    for f in SOURCES:
++        if f.endswith('.c'):
++            if 'sse2' in f:
++                SOURCES[f].flags += ['-arch:SSE2']
++            if 'ssse3' in f:
++                SOURCES[f].flags += ['-arch:SSE2']
++            if 'avx2' in f:
++                SOURCES[f].flags += ['-arch:AVX2']
++
+ # Suppress warnings in third-party code.
+ if CONFIG['GNU_CC']:
+     CFLAGS += ['-Wno-sign-compare']

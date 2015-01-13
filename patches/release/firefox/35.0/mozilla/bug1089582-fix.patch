@@ -1,0 +1,21 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1419528548 -28800
+#      Fri Dec 26 01:29:08 2014 +0800
+# Branch GECKO350b6_2014122222_RELBRANCH
+# Node ID a36fc97a8ba443a3bc6f2edc9f82baae351eee3c
+# Parent  922d176485d0460f66793182f469e5169b17ab18
+Bug 1089582 fix
+
+diff -r 922d176485d0 -r a36fc97a8ba4 js/src/gc/GCRuntime.h
+--- a/js/src/gc/GCRuntime.h	Fri Dec 26 00:19:47 2014 +0800
++++ b/js/src/gc/GCRuntime.h	Fri Dec 26 01:29:08 2014 +0800
+@@ -281,7 +281,7 @@
+     void minorGC(JS::gcreason::Reason reason);
+     void minorGC(JSContext *cx, JS::gcreason::Reason reason);
+     void evictNursery(JS::gcreason::Reason reason = JS::gcreason::EVICT_NURSERY) { minorGC(reason); }
+-    void gcIfNeeded(JSContext *cx = nullptr);
++    bool gcIfNeeded(JSContext *cx = nullptr);
+     void gc(JSGCInvocationKind gckind, JS::gcreason::Reason reason);
+     void gcSlice(JSGCInvocationKind gckind, JS::gcreason::Reason reason, int64_t millis = 0);
+     void gcFinalSlice(JSGCInvocationKind gckind, JS::gcreason::Reason reason);

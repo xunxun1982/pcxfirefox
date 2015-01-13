@@ -1,0 +1,33 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1419524387 -28800
+#      Fri Dec 26 00:19:47 2014 +0800
+# Branch GECKO350b6_2014122222_RELBRANCH
+# Node ID 922d176485d0460f66793182f469e5169b17ab18
+# Parent  b2f03a190ce8e2a7b0f9b2d0b304ed5c12baeacc
+Bug 1112709 - CreateFileW isn't hooking properly on Windows 8/8.1. r=ehsan
+
+diff -r b2f03a190ce8 -r 922d176485d0 toolkit/xre/test/win/TestDllInterceptor.cpp
+--- a/toolkit/xre/test/win/TestDllInterceptor.cpp	Fri Dec 26 00:15:23 2014 +0800
++++ b/toolkit/xre/test/win/TestDllInterceptor.cpp	Fri Dec 26 00:19:47 2014 +0800
+@@ -157,6 +157,7 @@
+       TestHook("kernel32.dll", "VirtualAlloc") &&
+       TestHook("kernel32.dll", "MapViewOfFile") &&
+       TestHook("gdi32.dll", "CreateDIBSection") &&
++      TestHook("kernel32.dll", "CreateFileW") &&
+ #endif
+       TestDetour("ntdll.dll", "LdrLoadDll")) {
+     printf("TEST-PASS | WindowsDllInterceptor | all checks passed\n");
+diff -r b2f03a190ce8 -r 922d176485d0 xpcom/build/nsWindowsDllInterceptor.h
+--- a/xpcom/build/nsWindowsDllInterceptor.h	Fri Dec 26 00:15:23 2014 +0800
++++ b/xpcom/build/nsWindowsDllInterceptor.h	Fri Dec 26 00:19:47 2014 +0800
+@@ -397,6 +397,9 @@
+         pJmp32 = nBytes;
+         // jmp 32bit offset
+         nBytes += 5;
++      } else if (origBytes[nBytes] == 0xff && origBytes[nBytes + 1] == 0x25) {
++        // jmp [disp32]
++        nBytes += 6;
+       } else {
+         //printf ("Unknown x86 instruction byte 0x%02x, aborting trampoline\n", origBytes[nBytes]);
+         return;

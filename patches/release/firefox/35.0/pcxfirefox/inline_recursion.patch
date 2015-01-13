@@ -1,0 +1,47 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1420528740 -28800
+#      Tue Jan 06 15:19:00 2015 +0800
+# Branch GECKO350b6_2014122222_RELBRANCH
+# Node ID 1ee5f7a89ea4f9c2c83f02fb4f2cb03ba4fa75c6
+# Parent  a36fc97a8ba443a3bc6f2edc9f82baae351eee3c
+inline_recursion
+
+diff -r a36fc97a8ba4 -r 1ee5f7a89ea4 content/base/src/nsContentUtils.cpp
+--- a/content/base/src/nsContentUtils.cpp	Fri Dec 26 01:29:08 2014 +0800
++++ b/content/base/src/nsContentUtils.cpp	Tue Jan 06 15:19:00 2015 +0800
+@@ -3700,6 +3700,9 @@
+ }
+ 
+ /* static */
++#ifdef _MSC_VER
++#pragma inline_recursion(on)
++#endif
+ Element*
+ nsContentUtils::MatchElementId(nsIContent *aContent, const nsIAtom* aId)
+ {
+@@ -3713,8 +3716,14 @@
+ 
+   return nullptr;
+ }
++#ifdef _MSC_VER
++#pragma inline_recursion(off)
++#endif
+ 
+ /* static */
++#ifdef _MSC_VER
++#pragma inline_recursion(on)
++#endif
+ Element *
+ nsContentUtils::MatchElementId(nsIContent *aContent, const nsAString& aId)
+ {
+@@ -3729,6 +3738,9 @@
+ 
+   return MatchElementId(aContent, id);
+ }
++#ifdef _MSC_VER
++#pragma inline_recursion(off)
++#endif
+ 
+ // Convert the string from the given encoding to Unicode.
+ /* static */

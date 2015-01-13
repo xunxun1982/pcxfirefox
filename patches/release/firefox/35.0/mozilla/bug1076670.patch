@@ -1,0 +1,25 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1419517825 -28800
+#      Thu Dec 25 22:30:25 2014 +0800
+# Branch GECKO350b6_2014122222_RELBRANCH
+# Node ID a47315362041526b00dadfc81b798ebf02fe7ca5
+# Parent  9257001377a7b1e60099df519ae00f7c02682722
+Bug 1076670 - VS2013 Win64 jit-test failure: Math.sin(-0) returns +0
+
+diff -r 9257001377a7 -r a47315362041 js/src/asmjs/AsmJSModule.cpp
+--- a/js/src/asmjs/AsmJSModule.cpp	Thu Sep 11 18:00:15 2014 +0900
++++ b/js/src/asmjs/AsmJSModule.cpp	Thu Dec 25 22:30:25 2014 +0800
+@@ -654,7 +654,12 @@
+       case AsmJSImm_ModD:
+         return RedirectCall(FuncCast(NumberMod), Args_Double_DoubleDouble);
+       case AsmJSImm_SinD:
++#ifdef _WIN64
++        // Workaround a VS 2013 sin issue, see math_sin_uncached.
++        return RedirectCall(FuncCast<double (double)>(js::math_sin_uncached), Args_Double_Double);
++#else
+         return RedirectCall(FuncCast<double (double)>(sin), Args_Double_Double);
++#endif
+       case AsmJSImm_CosD:
+         return RedirectCall(FuncCast<double (double)>(cos), Args_Double_Double);
+       case AsmJSImm_TanD:

@@ -1,0 +1,94 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1416072877 -28800
+#      Sun Nov 16 01:34:37 2014 +0800
+# Branch GECKO350b6_2014122222_RELBRANCH
+# Node ID 8e3036e3d93cb95bd39a0a3f4d5f886136c1a47b
+# Parent  05f247267461d7119e130d9ebc4abe90af0497e5
+Bug 1087232 - Don't atomize eval strings for the eval cache. r=luke
+
+diff -r 05f247267461 -r 8e3036e3d93c js/src/builtin/Eval.cpp
+--- a/js/src/builtin/Eval.cpp	Sun Nov 16 01:37:45 2014 +0800
++++ b/js/src/builtin/Eval.cpp	Sun Nov 16 01:34:37 2014 +0800
+@@ -65,11 +65,7 @@
+ 
+     MOZ_ASSERT(IsEvalCacheCandidate(script));
+ 
+-    // Get the source string passed for safekeeping in the atom map
+-    // by the prior eval to frontend::CompileScript.
+-    JSAtom *keyStr = script->atoms[0];
+-
+-    return EqualStrings(keyStr, l.str) &&
++    return EqualStrings(cacheEntry.str, l.str) &&
+            cacheEntry.callerScript == l.callerScript &&
+            script->getVersion() == l.version &&
+            cacheEntry.pc == l.pc;
+@@ -94,7 +90,7 @@
+     ~EvalScriptGuard() {
+         if (script_) {
+             script_->cacheForEval();
+-            EvalCacheEntry cacheEntry = {script_, lookup_.callerScript, lookup_.pc};
++            EvalCacheEntry cacheEntry = {lookupStr_, script_, lookup_.callerScript, lookup_.pc};
+             lookup_.str = lookupStr_;
+             if (lookup_.str && IsEvalCacheCandidate(script_))
+                 cx_->runtime()->evalCache.relookupOrAdd(p_, lookup_, cacheEntry);
+diff -r 05f247267461 -r 8e3036e3d93c js/src/frontend/BytecodeCompiler.cpp
+--- a/js/src/frontend/BytecodeCompiler.cpp	Sun Nov 16 01:37:45 2014 +0800
++++ b/js/src/frontend/BytecodeCompiler.cpp	Sun Nov 16 01:34:37 2014 +0800
+@@ -312,32 +312,19 @@
+     if (evalCaller && evalCaller->strict())
+         globalsc.strict = true;
+ 
+-    if (options.compileAndGo) {
+-        if (source) {
+-            /*
+-             * Save eval program source in script->atoms[0] for the
+-             * eval cache (see EvalCacheLookup in jsobj.cpp).
+-             */
+-            JSAtom *atom = AtomizeString(cx, source);
+-            jsatomid _;
+-            if (!atom || !bce.makeAtomIndex(atom, &_))
+-                return nullptr;
+-        }
+-
+-        if (evalCaller && evalCaller->functionOrCallerFunction()) {
+-            /*
+-             * An eval script in a caller frame needs to have its enclosing
+-             * function captured in case it refers to an upvar, and someone
+-             * wishes to decompile it while it's running.
+-             */
+-            JSFunction *fun = evalCaller->functionOrCallerFunction();
+-            Directives directives(/* strict = */ fun->strict());
+-            ObjectBox *funbox = parser.newFunctionBox(/* fn = */ nullptr, fun, pc.ptr(),
+-                                                      directives, fun->generatorKind());
+-            if (!funbox)
+-                return nullptr;
+-            bce.objectList.add(funbox);
+-        }
++    if (options.compileAndGo && evalCaller && evalCaller->functionOrCallerFunction()) {
++        /*
++         * An eval script in a caller frame needs to have its enclosing
++         * function captured in case it refers to an upvar, and someone
++         * wishes to decompile it while it's running.
++         */
++        JSFunction *fun = evalCaller->functionOrCallerFunction();
++        Directives directives(/* strict = */ fun->strict());
++        ObjectBox *funbox = parser.newFunctionBox(/* fn = */ nullptr, fun, pc.ptr(),
++                                                  directives, fun->generatorKind());
++        if (!funbox)
++            return nullptr;
++        bce.objectList.add(funbox);
+     }
+ 
+     bool canHaveDirectives = true;
+diff -r 05f247267461 -r 8e3036e3d93c js/src/vm/Runtime.h
+--- a/js/src/vm/Runtime.h	Sun Nov 16 01:37:45 2014 +0800
++++ b/js/src/vm/Runtime.h	Sun Nov 16 01:34:37 2014 +0800
+@@ -130,6 +130,7 @@
+ 
+ struct EvalCacheEntry
+ {
++    JSLinearString *str;
+     JSScript *script;
+     JSScript *callerScript;
+     jsbytecode *pc;

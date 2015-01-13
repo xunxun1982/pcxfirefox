@@ -1,0 +1,29 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1419523122 -28800
+#      Thu Dec 25 23:58:42 2014 +0800
+# Branch GECKO350b6_2014122222_RELBRANCH
+# Node ID 7234fdec0d92f9059cb8502a1b0c31f98251cea6
+# Parent  d88b2b34a543cf53286e86ce5ef21724f85482b8
+Bug 1090518. Fix crash during webgl-depth-texture.html conformance test. r=jrmuizel
+
+diff -r d88b2b34a543 -r 7234fdec0d92 dom/canvas/WebGLTexture.cpp
+--- a/dom/canvas/WebGLTexture.cpp	Thu Dec 25 23:53:16 2014 +0800
++++ b/dom/canvas/WebGLTexture.cpp	Thu Dec 25 23:58:42 2014 +0800
+@@ -478,12 +478,16 @@
+                                   texImageTarget.get(), tex, level);
+         break;
+ 
++    case LOCAL_GL_DEPTH_COMPONENT32_OES:
++    case LOCAL_GL_DEPTH_COMPONENT24_OES:
++    case LOCAL_GL_DEPTH_COMPONENT16:
+     case LOCAL_GL_DEPTH_COMPONENT:
+         mask = LOCAL_GL_DEPTH_BUFFER_BIT;
+         gl->fFramebufferTexture2D(LOCAL_GL_FRAMEBUFFER, LOCAL_GL_DEPTH_ATTACHMENT,
+                                   texImageTarget.get(), tex, level);
+         break;
+ 
++    case LOCAL_GL_DEPTH24_STENCIL8:
+     case LOCAL_GL_DEPTH_STENCIL:
+         mask = LOCAL_GL_DEPTH_BUFFER_BIT |
+                LOCAL_GL_STENCIL_BUFFER_BIT;

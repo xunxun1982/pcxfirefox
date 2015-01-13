@@ -1,0 +1,21 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1411495294 -28800
+#      Wed Sep 24 02:01:34 2014 +0800
+# Branch GECKO350b6_2014122222_RELBRANCH
+# Node ID 03967ad981d7c374987f10a4a24587cd50cecc53
+# Parent  9daff1be8974c1f18ace6b0190ff2fa937ba8497
+slim-little
+
+diff -r 9daff1be8974 -r 03967ad981d7 configure.in
+--- a/configure.in	Sun Nov 16 18:02:30 2014 +0800
++++ b/configure.in	Wed Sep 24 02:01:34 2014 +0800
+@@ -1700,7 +1700,7 @@
+ dnl ========================================================
+ dnl SPS Profiler
+ dnl ========================================================
+-MOZ_ENABLE_PROFILER_SPS=1
++MOZ_ENABLE_PROFILER_SPS=
+ 
+ case "${OS_TARGET}" in
+ Android)

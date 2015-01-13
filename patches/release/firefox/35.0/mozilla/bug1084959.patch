@@ -1,0 +1,21 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1416073065 -28800
+#      Sun Nov 16 01:37:45 2014 +0800
+# Branch GECKO350b6_2014122222_RELBRANCH
+# Node ID 05f247267461d7119e130d9ebc4abe90af0497e5
+# Parent  e5cd4154f1cc1c02dadf82273187cdef2d7bd85e
+Bug 1084959 - Don't abort syntax parser for (a) = ...; r=bhackett
+
+diff -r e5cd4154f1cc -r 05f247267461 js/src/frontend/SyntaxParseHandler.h
+--- a/js/src/frontend/SyntaxParseHandler.h	Sun Nov 16 02:02:33 2014 +0800
++++ b/js/src/frontend/SyntaxParseHandler.h	Sun Nov 16 01:37:45 2014 +0800
+@@ -226,7 +226,7 @@
+     Node setInParens(Node pn) {
+         // String literals enclosed by parentheses are ignored during
+         // strict mode parsing.
+-        return NodeGeneric;
++        return (pn == NodeString) ? NodeGeneric : pn;
+     }
+     void setPrologue(Node pn) {}
+ 

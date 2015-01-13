@@ -1,0 +1,24 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1416074847 -28800
+#      Sun Nov 16 02:07:27 2014 +0800
+# Branch GECKO350b6_2014122222_RELBRANCH
+# Node ID 6cebd51467dce397cd688fa5272470a2bc738825
+# Parent  a47315362041526b00dadfc81b798ebf02fe7ca5
+Bug 1078005 - Skip sending MozAfterPaint events to hidden PresShells. r=roc
+
+diff -r a47315362041 -r 6cebd51467dc layout/base/nsPresContext.cpp
+--- a/layout/base/nsPresContext.cpp	Thu Dec 25 22:30:25 2014 +0800
++++ b/layout/base/nsPresContext.cpp	Sun Nov 16 02:07:27 2014 +0800
+@@ -2519,6 +2519,11 @@
+       return;
+     }
+   }
++
++  if (!PresShell()->IsVisible() && !mFireAfterPaintEvents) {
++    return;
++  }
++
+   // Non-root prescontexts fire MozAfterPaint to all their descendants
+   // unconditionally, even if no invalidations have been collected. This is
+   // because we don't want to eat the cost of collecting invalidations for
