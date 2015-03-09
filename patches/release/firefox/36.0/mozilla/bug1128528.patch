@@ -1,0 +1,331 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1424592590 -28800
+#      Sun Feb 22 16:09:50 2015 +0800
+# Node ID f9fd56eb87c96a7b527936da9cb885301d5eae20
+# Parent  19c74406721459bd0a9d613db382ac3962815794
+Bug 1128528 - Don't unnecessarily require flat strings, to avoid wasting a ton of memory in pathological cases. r=luke
+
+diff -r 19c744067214 -r f9fd56eb87c9 js/src/builtin/Eval.cpp
+--- a/js/src/builtin/Eval.cpp	Thu Feb 12 14:00:00 2015 -0500
++++ b/js/src/builtin/Eval.cpp	Sun Feb 22 16:09:50 2015 +0800
+@@ -191,7 +191,7 @@
+ }
+ 
+ static EvalJSONResult
+-TryEvalJSON(JSContext *cx, JSFlatString *str, MutableHandleValue rval)
++TryEvalJSON(JSContext *cx, JSLinearString *str, MutableHandleValue rval)
+ {
+     if (str->hasLatin1Chars()) {
+         AutoCheckCannotGC nogc;
+@@ -203,13 +203,13 @@
+             return EvalJSON_NotJSON;
+     }
+ 
+-    AutoStableStringChars flatChars(cx);
+-    if (!flatChars.init(cx, str))
++    AutoStableStringChars linearChars(cx);
++    if (!linearChars.init(cx, str))
+         return EvalJSON_Failure;
+ 
+-    return flatChars.isLatin1()
+-           ? ParseEvalStringAsJSON(cx, flatChars.latin1Range(), rval)
+-           : ParseEvalStringAsJSON(cx, flatChars.twoByteRange(), rval);
++    return linearChars.isLatin1()
++           ? ParseEvalStringAsJSON(cx, linearChars.latin1Range(), rval)
++           : ParseEvalStringAsJSON(cx, linearChars.twoByteRange(), rval);
+ }
+ 
+ // Define subset of ExecuteType so that casting performs the injection.
+@@ -277,19 +277,19 @@
+         thisv = ObjectValue(*thisobj);
+     }
+ 
+-    Rooted<JSFlatString*> flatStr(cx, str->ensureFlat(cx));
+-    if (!flatStr)
++    RootedLinearString linearStr(cx, str->ensureLinear(cx));
++    if (!linearStr)
+         return false;
+ 
+     RootedScript callerScript(cx, caller ? caller.script() : nullptr);
+-    EvalJSONResult ejr = TryEvalJSON(cx, flatStr, args.rval());
++    EvalJSONResult ejr = TryEvalJSON(cx, linearStr, args.rval());
+     if (ejr != EvalJSON_NotJSON)
+         return ejr == EvalJSON_Success;
+ 
+     EvalScriptGuard esg(cx);
+ 
+     if (evalType == DIRECT_EVAL && caller.isNonEvalFunctionFrame())
+-        esg.lookupInEvalCache(flatStr, callerScript, pc);
++        esg.lookupInEvalCache(linearStr, callerScript, pc);
+ 
+     if (!esg.foundScript()) {
+         RootedScript maybeScript(cx);
+@@ -316,18 +316,18 @@
+                .setIntroductionInfo(introducerFilename, "eval", lineno, maybeScript, pcOffset)
+                .maybeMakeStrictMode(evalType == DIRECT_EVAL && IsStrictEvalPC(pc));
+ 
+-        AutoStableStringChars flatChars(cx);
+-        if (!flatChars.initTwoByte(cx, flatStr))
++        AutoStableStringChars linearChars(cx);
++        if (!linearChars.initTwoByte(cx, linearStr))
+             return false;
+ 
+-        const char16_t *chars = flatChars.twoByteRange().start().get();
+-        SourceBufferHolder::Ownership ownership = flatChars.maybeGiveOwnershipToCaller()
++        const char16_t *chars = linearChars.twoByteRange().start().get();
++        SourceBufferHolder::Ownership ownership = linearChars.maybeGiveOwnershipToCaller()
+                                                   ? SourceBufferHolder::GiveOwnership
+                                                   : SourceBufferHolder::NoOwnership;
+-        SourceBufferHolder srcBuf(chars, flatStr->length(), ownership);
++        SourceBufferHolder srcBuf(chars, linearStr->length(), ownership);
+         JSScript *compiled = frontend::CompileScript(cx, &cx->tempLifoAlloc(),
+                                                      scopeobj, callerScript, options,
+-                                                     srcBuf, flatStr, staticLevel);
++                                                     srcBuf, linearStr, staticLevel);
+         if (!compiled)
+             return false;
+ 
+@@ -356,17 +356,17 @@
+ 
+     unsigned staticLevel = callerScript->staticLevel() + 1;
+ 
+-    Rooted<JSFlatString*> flatStr(cx, str->ensureFlat(cx));
+-    if (!flatStr)
++    RootedLinearString linearStr(cx, str->ensureLinear(cx));
++    if (!linearStr)
+         return false;
+ 
+-    EvalJSONResult ejr = TryEvalJSON(cx, flatStr, vp);
++    EvalJSONResult ejr = TryEvalJSON(cx, linearStr, vp);
+     if (ejr != EvalJSON_NotJSON)
+         return ejr == EvalJSON_Success;
+ 
+     EvalScriptGuard esg(cx);
+ 
+-    esg.lookupInEvalCache(flatStr, callerScript, pc);
++    esg.lookupInEvalCache(linearStr, callerScript, pc);
+ 
+     if (!esg.foundScript()) {
+         RootedScript maybeScript(cx);
+@@ -390,18 +390,18 @@
+                .setIntroductionInfo(introducerFilename, "eval", lineno, maybeScript, pcOffset)
+                .maybeMakeStrictMode(IsStrictEvalPC(pc));
+ 
+-        AutoStableStringChars flatChars(cx);
+-        if (!flatChars.initTwoByte(cx, flatStr))
++        AutoStableStringChars linearChars(cx);
++        if (!linearChars.initTwoByte(cx, linearStr))
+             return false;
+ 
+-        const char16_t *chars = flatChars.twoByteRange().start().get();
+-        SourceBufferHolder::Ownership ownership = flatChars.maybeGiveOwnershipToCaller()
++        const char16_t *chars = linearChars.twoByteRange().start().get();
++        SourceBufferHolder::Ownership ownership = linearChars.maybeGiveOwnershipToCaller()
+                                                   ? SourceBufferHolder::GiveOwnership
+                                                   : SourceBufferHolder::NoOwnership;
+-        SourceBufferHolder srcBuf(chars, flatStr->length(), ownership);
++        SourceBufferHolder srcBuf(chars, linearStr->length(), ownership);
+         JSScript *compiled = frontend::CompileScript(cx, &cx->tempLifoAlloc(),
+                                                      scopeobj, callerScript, options,
+-                                                     srcBuf, flatStr, staticLevel);
++                                                     srcBuf, linearStr, staticLevel);
+         if (!compiled)
+             return false;
+ 
+diff -r 19c744067214 -r f9fd56eb87c9 js/src/json.cpp
+--- a/js/src/json.cpp	Thu Feb 12 14:00:00 2015 -0500
++++ b/js/src/json.cpp	Sun Feb 22 16:09:50 2015 +0800
+@@ -846,20 +846,20 @@
+     if (!str)
+         return false;
+ 
+-    JSFlatString *flat = str->ensureFlat(cx);
+-    if (!flat)
++    JSLinearString *linear = str->ensureLinear(cx);
++    if (!linear)
+         return false;
+ 
+-    AutoStableStringChars flatChars(cx);
+-    if (!flatChars.init(cx, flat))
++    AutoStableStringChars linearChars(cx);
++    if (!linearChars.init(cx, linear))
+         return false;
+ 
+-    RootedValue reviver(cx, args.get(1));
++    HandleValue reviver = args.get(1);
+ 
+     /* Steps 2-5. */
+-    return flatChars.isLatin1()
+-           ? ParseJSONWithReviver(cx, flatChars.latin1Range(), reviver, args.rval())
+-           : ParseJSONWithReviver(cx, flatChars.twoByteRange(), reviver, args.rval());
++    return linearChars.isLatin1()
++           ? ParseJSONWithReviver(cx, linearChars.latin1Range(), reviver, args.rval())
++           : ParseJSONWithReviver(cx, linearChars.twoByteRange(), reviver, args.rval());
+ }
+ 
+ /* ES5 15.12.3. */
+diff -r 19c744067214 -r f9fd56eb87c9 js/src/jsreflect.cpp
+--- a/js/src/jsreflect.cpp	Thu Feb 12 14:00:00 2015 -0500
++++ b/js/src/jsreflect.cpp	Sun Feb 22 16:09:50 2015 +0800
+@@ -3493,18 +3493,18 @@
+     if (!serialize.init(builder))
+         return false;
+ 
+-    JSFlatString *flat = src->ensureFlat(cx);
+-    if (!flat)
++    JSLinearString *linear = src->ensureLinear(cx);
++    if (!linear)
+         return false;
+ 
+-    AutoStableStringChars flatChars(cx);
+-    if (!flatChars.initTwoByte(cx, flat))
++    AutoStableStringChars linearChars(cx);
++    if (!linearChars.initTwoByte(cx, linear))
+         return false;
+ 
+     CompileOptions options(cx);
+     options.setFileAndLine(filename, lineno);
+     options.setCanLazilyParse(false);
+-    mozilla::Range<const char16_t> chars = flatChars.twoByteRange();
++    mozilla::Range<const char16_t> chars = linearChars.twoByteRange();
+     Parser<FullParseHandler> parser(cx, &cx->tempLifoAlloc(), options, chars.start().get(),
+                                     chars.length(), /* foldConstants = */ false, nullptr, nullptr);
+     if (!parser.checkOptions())
+diff -r 19c744067214 -r f9fd56eb87c9 js/src/jsstr.cpp
+--- a/js/src/jsstr.cpp	Thu Feb 12 14:00:00 2015 -0500
++++ b/js/src/jsstr.cpp	Sun Feb 22 16:09:50 2015 +0800
+@@ -3109,32 +3109,32 @@
+ }
+ 
+ static inline JSFatInlineString *
+-FlattenSubstrings(JSContext *cx, Handle<JSFlatString*> flatStr, const StringRange *ranges,
++FlattenSubstrings(JSContext *cx, HandleLinearString str, const StringRange *ranges,
+                   size_t rangesLen, size_t outputLen)
+ {
+-    JSFatInlineString *str = NewGCFatInlineString<CanGC>(cx);
+-    if (!str)
++    JSFatInlineString *result = NewGCFatInlineString<CanGC>(cx);
++    if (!result)
+         return nullptr;
+ 
+     AutoCheckCannotGC nogc;
+-    if (flatStr->hasLatin1Chars())
+-        CopySubstringsToFatInline(str, flatStr->latin1Chars(nogc), ranges, rangesLen, outputLen);
++    if (str->hasLatin1Chars())
++        CopySubstringsToFatInline(result, str->latin1Chars(nogc), ranges, rangesLen, outputLen);
+     else
+-        CopySubstringsToFatInline(str, flatStr->twoByteChars(nogc), ranges, rangesLen, outputLen);
+-    return str;
++        CopySubstringsToFatInline(result, str->twoByteChars(nogc), ranges, rangesLen, outputLen);
++    return result;
+ }
+ 
+ static JSString *
+-AppendSubstrings(JSContext *cx, Handle<JSFlatString*> flatStr,
+-                 const StringRange *ranges, size_t rangesLen)
++AppendSubstrings(JSContext *cx, HandleLinearString str, const StringRange *ranges,
++                 size_t rangesLen)
+ {
+     MOZ_ASSERT(rangesLen);
+ 
+     /* For single substrings, construct a dependent string. */
+     if (rangesLen == 1)
+-        return NewDependentString(cx, flatStr, ranges[0].start, ranges[0].length);
+-
+-    bool isLatin1 = flatStr->hasLatin1Chars();
++        return NewDependentString(cx, str, ranges[0].start, ranges[0].length);
++
++    bool isLatin1 = str->hasLatin1Chars();
+     uint32_t fatInlineMaxLength = JSFatInlineString::MAX_LENGTH_TWO_BYTE;
+     if (isLatin1)
+         fatInlineMaxLength = JSFatInlineString::MAX_LENGTH_LATIN1;
+@@ -3157,10 +3157,10 @@
+         if (i == end) {
+             /* Not even one range fits JSFatInlineString, use DependentString */
+             const StringRange &sr = ranges[i++];
+-            part = NewDependentString(cx, flatStr, sr.start, sr.length);
++            part = NewDependentString(cx, str, sr.start, sr.length);
+         } else {
+             /* Copy the ranges (linearly) into a JSFatInlineString */
+-            part = FlattenSubstrings(cx, flatStr, ranges + i, end - i, substrLen);
++            part = FlattenSubstrings(cx, str, ranges + i, end - i, substrLen);
+             i = end;
+         }
+ 
+@@ -3178,13 +3178,13 @@
+ static bool
+ StrReplaceRegexpRemove(JSContext *cx, HandleString str, RegExpShared &re, MutableHandleValue rval)
+ {
+-    Rooted<JSFlatString*> flatStr(cx, str->ensureFlat(cx));
+-    if (!flatStr)
++    RootedLinearString linearStr(cx, str->ensureLinear(cx));
++    if (!linearStr)
+         return false;
+ 
+     Vector<StringRange, 16, SystemAllocPolicy> ranges;
+ 
+-    size_t charsLen = flatStr->length();
++    size_t charsLen = linearStr->length();
+ 
+     ScopedMatchPairs matches(&cx->tempLifoAlloc());
+     size_t startIndex = 0; /* Index used for iterating through the string. */
+@@ -3196,7 +3196,7 @@
+         if (!CheckForInterrupt(cx))
+             return false;
+ 
+-        RegExpRunStatus status = re.execute(cx, flatStr, startIndex, &matches);
++        RegExpRunStatus status = re.execute(cx, linearStr, startIndex, &matches);
+         if (status == RegExpRunStatus_Error)
+             return false;
+         if (status == RegExpRunStatus_Success_NotFound)
+@@ -3227,7 +3227,7 @@
+             res = cx->global()->getRegExpStatics(cx);
+             if (!res)
+                 return false;
+-            res->updateLazily(cx, flatStr, &re, lazyIndex);
++            res->updateLazily(cx, linearStr, &re, lazyIndex);
+         }
+         rval.setString(str);
+         return true;
+@@ -3238,7 +3238,7 @@
+     if (!res)
+         return false;
+ 
+-    res->updateLazily(cx, flatStr, &re, lazyIndex);
++    res->updateLazily(cx, linearStr, &re, lazyIndex);
+ 
+     /* Include any remaining part of the string. */
+     if (lastIndex < charsLen) {
+@@ -3252,7 +3252,7 @@
+         return true;
+     }
+ 
+-    JSString *result = AppendSubstrings(cx, flatStr, ranges.begin(), ranges.length());
++    JSString *result = AppendSubstrings(cx, linearStr, ranges.begin(), ranges.length());
+     if (!result)
+         return false;
+ 
+diff -r 19c744067214 -r f9fd56eb87c9 js/src/vm/Debugger.cpp
+--- a/js/src/vm/Debugger.cpp	Thu Feb 12 14:00:00 2015 -0500
++++ b/js/src/vm/Debugger.cpp	Sun Feb 22 16:09:50 2015 +0800
+@@ -5679,8 +5679,8 @@
+                              fullMethodName, "string", InformalValueTypeName(code));
+         return false;
+     }
+-    Rooted<JSFlatString *> flat(cx, code.toString()->ensureFlat(cx));
+-    if (!flat)
++    RootedLinearString linear(cx, code.toString()->ensureLinear(cx));
++    if (!linear)
+         return false;
+ 
+     /*
+@@ -5791,7 +5791,7 @@
+     RootedValue rval(cx);
+     AbstractFramePtr frame = iter ? iter->abstractFramePtr() : NullFramePtr();
+     AutoStableStringChars stableChars(cx);
+-    if (!stableChars.initTwoByte(cx, flat))
++    if (!stableChars.initTwoByte(cx, linear))
+         return false;
+ 
+     mozilla::Range<const char16_t> chars = stableChars.twoByteRange();

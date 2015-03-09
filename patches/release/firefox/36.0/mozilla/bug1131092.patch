@@ -1,0 +1,27 @@
+# HG changeset patch
+# User Honza Bambas <honzab.moz@firemni.cz>
+# Date 1423832280 18000
+#      Fri Feb 13 07:58:00 2015 -0500
+# Node ID 82add103d070e3ef2e1e9912c44571735880b1f4
+# Parent  938192c9aa2890d6dc8a9d8bfcca1898b7733d26
+Bug 1131092 - Place mFileStatus=NS_OK after CacheFile.Init() call in CacheEntry::Load(). r=michal
+
+diff -r 938192c9aa28 -r 82add103d070 netwerk/cache2/CacheEntry.cpp
+--- a/netwerk/cache2/CacheEntry.cpp	Fri Feb 13 07:55:00 2015 -0500
++++ b/netwerk/cache2/CacheEntry.cpp	Fri Feb 13 07:58:00 2015 -0500
+@@ -368,7 +368,6 @@
+ 
+   bool directLoad = aTruncate || !mUseDisk;
+   if (directLoad) {
+-    mFileStatus = NS_OK;
+     // mLoadStart will be used to calculate telemetry of life-time of this entry.
+     // Low resulution is then enough.
+     mLoadStart = TimeStamp::NowLoRes();
+@@ -397,6 +396,7 @@
+ 
+   if (directLoad) {
+     // Just fake the load has already been done as "new".
++    mFileStatus = NS_OK;
+     mState = EMPTY;
+   }
+ 

@@ -1,0 +1,77 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1425180529 -28800
+#      Sun Mar 01 11:28:49 2015 +0800
+# Node ID 41765a5efda09e5acf45fecc254b07b52c86bc6e
+# Parent  027ab91b4b40bde7adb5b225a3401fa3cd3f8efe
+pcx-fpprecise-fix
+
+diff -r 027ab91b4b40 -r 41765a5efda0 js/ductwork/debugger/moz.build
+--- a/js/ductwork/debugger/moz.build	Sun Mar 01 11:26:30 2015 +0800
++++ b/js/ductwork/debugger/moz.build	Sun Mar 01 11:28:49 2015 +0800
+@@ -23,3 +23,8 @@
+ FINAL_LIBRARY = 'xul'
+ 
+ FAIL_ON_WARNINGS = True
++
++if CONFIG['_MSC_VER']:
++    CFLAGS += ['-fp:precise -Qfast_transcendentals']
++    CXXFLAGS += ['-fp:precise -Qfast_transcendentals']
++
+diff -r 027ab91b4b40 -r 41765a5efda0 js/ipc/moz.build
+--- a/js/ipc/moz.build	Sun Mar 01 11:26:30 2015 +0800
++++ b/js/ipc/moz.build	Sun Mar 01 11:28:49 2015 +0800
+@@ -34,3 +34,7 @@
+     '/js/xpconnect/wrappers',
+ ]
+ 
++if CONFIG['_MSC_VER']:
++    CFLAGS += ['-fp:precise -Qfast_transcendentals']
++    CXXFLAGS += ['-fp:precise -Qfast_transcendentals']
++
+diff -r 027ab91b4b40 -r 41765a5efda0 js/xpconnect/loader/moz.build
+--- a/js/xpconnect/loader/moz.build	Sun Mar 01 11:26:30 2015 +0800
++++ b/js/xpconnect/loader/moz.build	Sun Mar 01 11:28:49 2015 +0800
+@@ -28,3 +28,7 @@
+     '/dom/base',
+ ]
+ 
++if CONFIG['_MSC_VER']:
++    CFLAGS += ['-fp:precise -Qfast_transcendentals']
++    CXXFLAGS += ['-fp:precise -Qfast_transcendentals']
++
+diff -r 027ab91b4b40 -r 41765a5efda0 js/xpconnect/shell/moz.build
+--- a/js/xpconnect/shell/moz.build	Sun Mar 01 11:26:30 2015 +0800
++++ b/js/xpconnect/shell/moz.build	Sun Mar 01 11:28:49 2015 +0800
+@@ -37,3 +37,8 @@
+     RCINCLUDE = 'xpcshell.rc'
+ 
+ FAIL_ON_WARNINGS = True
++
++if CONFIG['_MSC_VER']:
++    CFLAGS += ['-fp:precise -Qfast_transcendentals']
++    CXXFLAGS += ['-fp:precise -Qfast_transcendentals']
++
+diff -r 027ab91b4b40 -r 41765a5efda0 js/xpconnect/src/moz.build
+--- a/js/xpconnect/src/moz.build	Sun Mar 01 11:26:30 2015 +0800
++++ b/js/xpconnect/src/moz.build	Sun Mar 01 11:28:49 2015 +0800
+@@ -76,3 +76,8 @@
+     LOCAL_INCLUDES += [
+         '/dom/bluetooth',
+     ]
++
++if CONFIG['_MSC_VER']:
++    CFLAGS += ['-fp:precise -Qfast_transcendentals']
++    CXXFLAGS += ['-fp:precise -Qfast_transcendentals']
++
+diff -r 027ab91b4b40 -r 41765a5efda0 js/xpconnect/wrappers/moz.build
+--- a/js/xpconnect/wrappers/moz.build	Sun Mar 01 11:26:30 2015 +0800
++++ b/js/xpconnect/wrappers/moz.build	Sun Mar 01 11:28:49 2015 +0800
+@@ -42,3 +42,7 @@
+     '/js/ipc',
+ ]
+ 
++if CONFIG['_MSC_VER']:
++    CFLAGS += ['-fp:precise -Qfast_transcendentals']
++    CXXFLAGS += ['-fp:precise -Qfast_transcendentals']
++

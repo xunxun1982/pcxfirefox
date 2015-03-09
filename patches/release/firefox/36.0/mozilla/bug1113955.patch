@@ -1,0 +1,45 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1419523575 -28800
+#      Fri Dec 26 00:06:15 2014 +0800
+# Node ID 4163a835fc7b2cb426ac2022422a4633780d54b1
+# Parent  6b4361b66e4d5fa0395827383d3675693a288cac
+Bug 1113955: Still generate regexp jitcode when doing string matching, r=jandem
+
+diff -r 6b4361b66e4d -r 4163a835fc7b js/src/vm/RegExpObject.cpp
+--- a/js/src/vm/RegExpObject.cpp	Thu Dec 25 23:53:16 2014 +0800
++++ b/js/src/vm/RegExpObject.cpp	Fri Dec 26 00:06:15 2014 +0800
+@@ -493,11 +493,8 @@
+ RegExpShared::compile(JSContext *cx, HandleAtom pattern, HandleLinearString input,
+                       CompilationMode mode, ForceByteCodeEnum force)
+ {
+-    if (!ignoreCase() && !StringHasRegExpMetaChars(pattern)) {
++    if (!ignoreCase() && !StringHasRegExpMetaChars(pattern))
+         canStringMatch = true;
+-        parenCount = 0;
+-        return true;
+-    }
+ 
+     CompileOptions options(cx);
+     TokenStream dummyTokenStream(cx, options, nullptr, 0, nullptr);
+@@ -539,7 +536,7 @@
+ RegExpShared::compileIfNecessary(JSContext *cx, HandleLinearString input,
+                                  CompilationMode mode, ForceByteCodeEnum force)
+ {
+-    if (isCompiled(mode, input->hasLatin1Chars(), force) || canStringMatch)
++    if (isCompiled(mode, input->hasLatin1Chars(), force))
+         return true;
+     return compile(cx, input, mode, force);
+ }
+diff -r 6b4361b66e4d -r 4163a835fc7b js/src/vm/RegExpObject.h
+--- a/js/src/vm/RegExpObject.h	Thu Dec 25 23:53:16 2014 +0800
++++ b/js/src/vm/RegExpObject.h	Fri Dec 26 00:06:15 2014 +0800
+@@ -185,7 +185,7 @@
+     /* Accessors */
+ 
+     size_t getParenCount() const {
+-        MOZ_ASSERT(isCompiled() || canStringMatch);
++        MOZ_ASSERT(isCompiled());
+         return parenCount;
+     }
+ 

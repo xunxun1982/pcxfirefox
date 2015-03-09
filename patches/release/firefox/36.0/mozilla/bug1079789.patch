@@ -1,0 +1,27 @@
+# HG changeset patch
+# User Honza Bambas <honzab.moz@firemni.cz>
+# Date 1423767600 18000
+#      Thu Feb 12 14:00:00 2015 -0500
+# Node ID 19c74406721459bd0a9d613db382ac3962815794
+# Parent  2b059b35d5c08ff3200206343bcd34af79c7c2e7
+Bug 1079789 - Don't doom expired entries in the HTTP cache intermediate memory pool. r=michal
+CLOSED TREE
+
+diff -r 2b059b35d5c0 -r 19c744067214 netwerk/cache2/CacheStorageService.cpp
+--- a/netwerk/cache2/CacheStorageService.cpp	Thu Feb 12 15:21:00 2015 +0100
++++ b/netwerk/cache2/CacheStorageService.cpp	Thu Feb 12 14:00:00 2015 -0500
+@@ -1261,11 +1261,10 @@
+     nsRefPtr<CacheEntry> entry = mExpirationArray[i];
+ 
+     uint32_t expirationTime = entry->GetExpirationTime();
+-    if (expirationTime > 0 && expirationTime <= now) {
+-      LOG(("  dooming expired entry=%p, exptime=%u (now=%u)",
++    if (expirationTime > 0 && expirationTime <= now &&
++        entry->Purge(CacheEntry::PURGE_WHOLE)) {
++      LOG(("  purged expired, entry=%p, exptime=%u (now=%u)",
+         entry.get(), entry->GetExpirationTime(), now));
+-
+-      entry->PurgeAndDoom();
+       continue;
+     }
+ 

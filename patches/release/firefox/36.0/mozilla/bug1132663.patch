@@ -1,0 +1,47 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1424770423 -28800
+#      Tue Feb 24 17:33:43 2015 +0800
+# Node ID 929a8c2c861c6d1adac1abae050637d35fcaeada
+# Parent  0bbe7f8d7261959d041ddae77d48d89159e1161a
+Bug 1132663
+
+Part 1: Use the DLL blocklist in plugin-container processes. r=bsmedberg
+Part 2: Block rndlnpshimswf.dll and rndlmainbrowserrecordplugin.dll. r=bsmedberg
+
+diff -r 0bbe7f8d7261 -r 929a8c2c861c mozglue/build/WindowsDllBlocklist.cpp
+--- a/mozglue/build/WindowsDllBlocklist.cpp	Fri Feb 13 07:54:00 2015 -0500
++++ b/mozglue/build/WindowsDllBlocklist.cpp	Tue Feb 24 17:33:43 2015 +0800
+@@ -165,6 +165,10 @@
+   { "windowsapihookdll32.dll", UNVERSIONED },
+   { "windowsapihookdll64.dll", UNVERSIONED },
+ 
++  // Flash crashes with RealNetworks RealDownloader, bug 1132663
++  { "rndlnpshimswf.dll", ALL_VERSIONS },
++  { "rndlmainbrowserrecordplugin.dll", ALL_VERSIONS },
++
+   { nullptr, 0 }
+ };
+ 
+diff -r 0bbe7f8d7261 -r 929a8c2c861c toolkit/xre/nsEmbedFunctions.cpp
+--- a/toolkit/xre/nsEmbedFunctions.cpp	Fri Feb 13 07:54:00 2015 -0500
++++ b/toolkit/xre/nsEmbedFunctions.cpp	Tue Feb 24 17:33:43 2015 +0800
+@@ -69,6 +69,7 @@
+ 
+ #include "mozilla/ipc/TestShellParent.h"
+ #include "mozilla/ipc/XPCShellEnvironment.h"
++#include "mozilla/WindowsDllBlocklist.h"
+ 
+ #include "GMPProcessChild.h"
+ #include "GMPLoader.h"
+@@ -300,6 +301,10 @@
+   NS_ENSURE_ARG_POINTER(aArgv);
+   NS_ENSURE_ARG_POINTER(aArgv[0]);
+ 
++#ifdef HAS_DLL_BLOCKLIST
++  DllBlocklist_Initialize();
++#endif
++
+ #if !defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_WIDGET_GONK)
+   // On non-Fennec Gecko, the GMPLoader code resides in plugin-container,
+   // and we must forward it through to the GMP code here.

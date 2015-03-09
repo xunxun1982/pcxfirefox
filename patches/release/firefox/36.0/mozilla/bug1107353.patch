@@ -1,0 +1,28 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1419522796 -28800
+#      Thu Dec 25 23:53:16 2014 +0800
+# Node ID 6b4361b66e4d5fa0395827383d3675693a288cac
+# Parent  fc9c54b396396cd7b6165c7ba65c5d7347c4bbed
+Bug 1107353 - Wallpaper a null-pointer crash in AsyncScrollCallback for now.  r=kip
+
+diff -r fc9c54b39639 -r 6b4361b66e4d layout/generic/nsGfxScrollFrame.cpp
+--- a/layout/generic/nsGfxScrollFrame.cpp	Fri Dec 26 00:10:03 2014 +0800
++++ b/layout/generic/nsGfxScrollFrame.cpp	Thu Dec 25 23:53:16 2014 +0800
+@@ -1965,10 +1965,14 @@
+ ScrollFrameHelper::AsyncScrollCallback(ScrollFrameHelper* aInstance,
+                                        mozilla::TimeStamp aTime)
+ {
+-  NS_ASSERTION(aInstance != nullptr, "aInstance must not be null");
+-  NS_ASSERTION(aInstance->mAsyncScroll,
++  MOZ_ASSERT(aInstance != nullptr, "aInstance must not be null");
++  MOZ_ASSERT(aInstance->mAsyncScroll,
+     "Did not expect AsyncScrollCallback without an active async scroll.");
+ 
++  if (!aInstance || !aInstance->mAsyncScroll) {
++    return;  // XXX wallpaper bug 1107353 for now.
++  }
++
+   nsRect range = aInstance->mAsyncScroll->mRange;
+   if (aInstance->mAsyncScroll->mIsSmoothScroll) {
+     if (!aInstance->mAsyncScroll->IsFinished(aTime)) {

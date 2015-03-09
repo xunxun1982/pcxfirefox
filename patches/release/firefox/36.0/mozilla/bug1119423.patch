@@ -1,0 +1,26 @@
+# HG changeset patch
+# User Jonathan Kew <jkew@mozilla.com>
+# Date 1420804676 0
+#      Fri Jan 09 11:57:56 2015 +0000
+# Node ID 76d0903984c4e98ebc1cb8b0c9302978458e9d71
+# Parent  e5c8fd6fda38c15d53c067d01105856707ca1555
+Bug 1119423 - Fix reversed test of aMatchData->mStyle in gfxFontFamily::FindFontForChar. r=jdaggett
+
+diff -r e5c8fd6fda38 -r 76d0903984c4 gfx/thebes/gfxFontEntry.cpp
+--- a/gfx/thebes/gfxFontEntry.cpp	Tue Jan 13 21:03:11 2015 -0800
++++ b/gfx/thebes/gfxFontEntry.cpp	Fri Jan 09 11:57:56 2015 +0000
+@@ -1461,10 +1461,10 @@
+     }
+ 
+     bool needsBold;
+-    gfxFontStyle normal;
+-    gfxFontEntry *fe = FindFontForStyle(
+-                  (aMatchData->mStyle == nullptr) ? *aMatchData->mStyle : normal,
+-                  needsBold);
++    gfxFontEntry *fe =
++        FindFontForStyle(aMatchData->mStyle ? *aMatchData->mStyle
++                                            : gfxFontStyle(),
++                         needsBold);
+ 
+     if (fe && !fe->SkipDuringSystemFallback()) {
+         int32_t rank = 0;

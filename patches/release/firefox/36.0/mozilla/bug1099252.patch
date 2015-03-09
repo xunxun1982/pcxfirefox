@@ -1,0 +1,24 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1419523803 -28800
+#      Fri Dec 26 00:10:03 2014 +0800
+# Node ID fc9c54b396396cd7b6165c7ba65c5d7347c4bbed
+# Parent  2c0d69e8d746c5c5d64ff36d7e335966a3c7d0f3
+Bug 1099252 - Blocklist ATI graphics driver version 8.832.0.0. r=Bas
+
+diff -r 2c0d69e8d746 -r fc9c54b39639 widget/windows/GfxInfo.cpp
+--- a/widget/windows/GfxInfo.cpp	Wed Sep 24 00:56:22 2014 +0800
++++ b/widget/windows/GfxInfo.cpp	Fri Dec 26 00:10:03 2014 +0800
+@@ -857,6 +857,12 @@
+       GfxDriverInfo::allFeatures, nsIGfxInfo::FEATURE_BLOCKED_DRIVER_VERSION,
+       DRIVER_LESS_THAN, V(8,62,0,0), "9.6" );
+ 
++    // Bug 1099252
++    APPEND_TO_DRIVER_BLOCKLIST2( DRIVER_OS_WINDOWS_7,
++      (nsAString&) GfxDriverInfo::GetDeviceVendor(VendorATI), GfxDriverInfo::allDevices,
++      GfxDriverInfo::allFeatures, nsIGfxInfo::FEATURE_BLOCKED_DRIVER_VERSION,
++      DRIVER_EQUAL, V(8,832,0,0));
++
+     /*
+      * Bug 783517 - crashes in AMD driver on Windows 8
+      */

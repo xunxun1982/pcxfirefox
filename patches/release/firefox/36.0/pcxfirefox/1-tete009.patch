@@ -1,0 +1,4499 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1424800620 -28800
+#      Wed Feb 25 01:57:00 2015 +0800
+# Node ID 67316c16375044b66708cdde960310cea68e76e2
+# Parent  a2ffa9047bf4e7d2658ab017acc154c7b7acfe9c
+tete009-1
+
+diff -r a2ffa9047bf4 -r 67316c163750 browser/branding/aurora/configure.sh
+--- a/browser/branding/aurora/configure.sh	Thu Feb 19 19:54:14 2015 -0500
++++ b/browser/branding/aurora/configure.sh	Wed Feb 25 01:57:00 2015 +0800
+@@ -5,3 +5,4 @@
+ MOZ_APP_DISPLAYNAME=FirefoxDeveloperEdition
+ MOZ_APP_REMOTINGNAME=firefox-dev
+ MOZ_DEV_EDITION=1
++MOZ_UA_BUILDID=20100101
+diff -r a2ffa9047bf4 -r 67316c163750 browser/branding/nightly/configure.sh
+--- a/browser/branding/nightly/configure.sh	Thu Feb 19 19:54:14 2015 -0500
++++ b/browser/branding/nightly/configure.sh	Wed Feb 25 01:57:00 2015 +0800
+@@ -3,3 +3,4 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ MOZ_APP_DISPLAYNAME=Nightly
++MOZ_UA_BUILDID=20100101
+diff -r a2ffa9047bf4 -r 67316c163750 browser/installer/removed-files.in
+--- a/browser/installer/removed-files.in	Thu Feb 19 19:54:14 2015 -0500
++++ b/browser/installer/removed-files.in	Wed Feb 25 01:57:00 2015 +0800
+@@ -73,7 +73,6 @@
+ # causes updates to break badly, see bug 1063052. Removing the toplevel
+ # chrome.manifest causes us to use the updated omni.ja.
+ #ifndef MOZ_GTK
+-  @DIR_MACOS@chrome.manifest
+   #ifdef XP_MACOSX
+     @DIR_RESOURCES@chrome.manifest
+   #endif
+diff -r a2ffa9047bf4 -r 67316c163750 configure.in
+--- a/configure.in	Thu Feb 19 19:54:14 2015 -0500
++++ b/configure.in	Wed Feb 25 01:57:00 2015 +0800
+@@ -2223,11 +2223,6 @@
+         _DEFINES_CXXFLAGS='-FI $(DEPTH)/dist/include/mozilla-config.h -DMOZILLA_CLIENT'
+         CFLAGS="$CFLAGS -W3 -Gy"
+         CXXFLAGS="$CXXFLAGS -W3 -Gy"
+-        if test "$_CC_SUITE" -ge "11" -a "$CPU_ARCH" = "x86"; then
+-            dnl VS2012+ defaults to -arch:SSE2.
+-            CFLAGS="$CFLAGS -arch:IA32"
+-            CXXFLAGS="$CXXFLAGS -arch:IA32"
+-        fi
+         if test "$_CC_SUITE" -ge "12"; then
+             dnl VS2013+ requires -FS when parallel building by make -jN.
+             dnl If nothing, compiler sometimes causes C1041 error.
+@@ -2277,8 +2272,12 @@
+             fi
+         fi
+         dnl For profile-guided optimization
+-        PROFILE_GEN_CFLAGS="-GL"
++        PROFILE_GEN_CFLAGS="-GL -DMSVC_PGO_ENABLED"
+         PROFILE_GEN_LDFLAGS="-LTCG:PGINSTRUMENT"
++        if test "$_CC_SUITE" -ge "12"; then
++            dnl Run PGO profiling in safe mode
++            PROFILE_GEN_LDFLAGS="$PROFILE_GEN_LDFLAGS -PogoSafeMode"
++        fi
+         dnl XXX: PGO builds can fail with warnings treated as errors,
+         dnl specifically "no profile data available" appears to be
+         dnl treated as an error sometimes. This might be a consequence
+@@ -2286,7 +2285,7 @@
+         dnl with the linker doing most of the work in the whole-program
+         dnl optimization/PGO case. I think it's probably a compiler bug,
+         dnl but we work around it here.
+-        PROFILE_USE_CFLAGS="-GL -wd4624 -wd4952"
++        PROFILE_USE_CFLAGS="-GL -wd4624 -wd4952 -DMSVC_PGO_ENABLED"
+         dnl XXX: should be -LTCG:PGOPTIMIZE, but that fails on libxul.
+         dnl Probably also a compiler bug, but what can you do?
+         PROFILE_USE_LDFLAGS="-LTCG:PGUPDATE"
+diff -r a2ffa9047bf4 -r 67316c163750 dom/base/Element.h
+--- a/dom/base/Element.h	Thu Feb 19 19:54:14 2015 -0500
++++ b/dom/base/Element.h	Wed Feb 25 01:57:00 2015 +0800
+@@ -361,6 +361,18 @@
+ 
+   Directionality GetComputedDirectionality() const;
+ 
++  void PrefetchAttrsAndChildren()
++  {
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++    _mm_prefetch((char *)&mAttrsAndChildren, _MM_HINT_NTA);
++#endif
++  }
++
++  void PrefetchAttrAndChildArrayImpl()
++  {
++    mAttrsAndChildren.PrefetchImpl();
++  }
++
+ protected:
+   /**
+    * Method to get the _intrinsic_ content state of this element.  This is the
+diff -r a2ffa9047bf4 -r 67316c163750 dom/base/nsAttrAndChildArray.h
+--- a/dom/base/nsAttrAndChildArray.h	Thu Feb 19 19:54:14 2015 -0500
++++ b/dom/base/nsAttrAndChildArray.h	Wed Feb 25 01:57:00 2015 +0800
+@@ -11,6 +11,10 @@
+ #ifndef nsAttrAndChildArray_h___
+ #define nsAttrAndChildArray_h___
+ 
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++#include <xmmintrin.h>
++#endif
++
+ #include "mozilla/Attributes.h"
+ #include "mozilla/MemoryReporting.h"
+ 
+@@ -128,6 +132,13 @@
+     return MappedAttrCount();
+   }
+ 
++  void PrefetchImpl()
++  {
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++    _mm_prefetch((char *)mImpl, _MM_HINT_NTA);
++#endif
++  }
++
+ private:
+   nsAttrAndChildArray(const nsAttrAndChildArray& aOther) MOZ_DELETE;
+   nsAttrAndChildArray& operator=(const nsAttrAndChildArray& aOther) MOZ_DELETE;
+diff -r a2ffa9047bf4 -r 67316c163750 dom/canvas/CanvasRenderingContext2D.cpp
+--- a/dom/canvas/CanvasRenderingContext2D.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/dom/canvas/CanvasRenderingContext2D.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -4917,53 +4917,7 @@
+   // inherited from Thebes canvas and is no longer true
+   uint8_t* dst = data + dstWriteRect.y * (aWidth * 4) + dstWriteRect.x * 4;
+ 
+-  if (mOpaque) {
+-    for (int32_t j = 0; j < dstWriteRect.height; ++j) {
+-      for (int32_t i = 0; i < dstWriteRect.width; ++i) {
+-        // XXX Is there some useful swizzle MMX we can use here?
+-#if MOZ_LITTLE_ENDIAN
+-        uint8_t b = *src++;
+-        uint8_t g = *src++;
+-        uint8_t r = *src++;
+-        src++;
+-#else
+-        src++;
+-        uint8_t r = *src++;
+-        uint8_t g = *src++;
+-        uint8_t b = *src++;
+-#endif
+-        *dst++ = r;
+-        *dst++ = g;
+-        *dst++ = b;
+-        *dst++ = 255;
+-      }
+-      src += srcStride - (dstWriteRect.width * 4);
+-      dst += (aWidth * 4) - (dstWriteRect.width * 4);
+-    }
+-  } else
+-  for (int32_t j = 0; j < dstWriteRect.height; ++j) {
+-    for (int32_t i = 0; i < dstWriteRect.width; ++i) {
+-      // XXX Is there some useful swizzle MMX we can use here?
+-#if MOZ_LITTLE_ENDIAN
+-      uint8_t b = *src++;
+-      uint8_t g = *src++;
+-      uint8_t r = *src++;
+-      uint8_t a = *src++;
+-#else
+-      uint8_t a = *src++;
+-      uint8_t r = *src++;
+-      uint8_t g = *src++;
+-      uint8_t b = *src++;
+-#endif
+-      // Convert to non-premultiplied color
+-      *dst++ = gfxUtils::sUnpremultiplyTable[a * 256 + r];
+-      *dst++ = gfxUtils::sUnpremultiplyTable[a * 256 + g];
+-      *dst++ = gfxUtils::sUnpremultiplyTable[a * 256 + b];
+-      *dst++ = a;
+-    }
+-    src += srcStride - (dstWriteRect.width * 4);
+-    dst += (aWidth * 4) - (dstWriteRect.width * 4);
+-  }
++  GetImageData_component(src, dst, dstWriteRect.width, dstWriteRect.height, srcStride, aWidth * 4);
+ 
+   *aRetval = darray;
+   return NS_OK;
+@@ -5106,27 +5060,7 @@
+   uint8_t *src = aArray->Data();
+   uint8_t *dst = imgsurf->Data();
+ 
+-  for (uint32_t j = 0; j < h; j++) {
+-    for (uint32_t i = 0; i < w; i++) {
+-      uint8_t r = *src++;
+-      uint8_t g = *src++;
+-      uint8_t b = *src++;
+-      uint8_t a = *src++;
+-
+-      // Convert to premultiplied color (losslessly if the input came from getImageData)
+-#if MOZ_LITTLE_ENDIAN
+-      *dst++ = gfxUtils::sPremultiplyTable[a * 256 + b];
+-      *dst++ = gfxUtils::sPremultiplyTable[a * 256 + g];
+-      *dst++ = gfxUtils::sPremultiplyTable[a * 256 + r];
+-      *dst++ = a;
+-#else
+-      *dst++ = a;
+-      *dst++ = gfxUtils::sPremultiplyTable[a * 256 + r];
+-      *dst++ = gfxUtils::sPremultiplyTable[a * 256 + g];
+-      *dst++ = gfxUtils::sPremultiplyTable[a * 256 + b];
+-#endif
+-    }
+-  }
++  PutImageData_component(src, dst, w, h, w * 4, w * 4);
+ 
+   EnsureTarget();
+   if (!IsTargetValid()) {
+diff -r a2ffa9047bf4 -r 67316c163750 dom/canvas/CanvasUtils.cpp
+--- a/dom/canvas/CanvasUtils.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/dom/canvas/CanvasUtils.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -3,6 +3,14 @@
+  * License, v. 2.0. If a copy of the MPL was not distributed with this
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
++#if defined(TT_MEMUTIL) && defined(_MSC_VER)
++#include <omp.h>
++#endif
++
++#include <tmmintrin.h>
++#include "mozilla/SSE.h"
++#include "gfxUtils.h"
++
+ #include <stdlib.h>
+ #include <stdarg.h>
+ 
+@@ -79,5 +87,255 @@
+     return true;
+ }
+ 
++void
++GetImageData_component(uint8_t* _src, uint8_t* _dst,
++                       int32_t width, int32_t height,
++                       uint32_t srcStride, uint32_t dstStride)
++{
++    uint8_t *srcFirst = _src;
++    uint8_t *dstFirst = _dst;
++
++#if defined(TT_MEMUTIL) && defined(_MSC_VER)
++    int omp_thread_counts = omp_get_max_threads();
++
++#pragma omp parallel for schedule(guided) default(none) \
++shared(srcFirst, dstFirst, width, height, srcStride, dstStride, gfxUtils::sUnpremultiplyTable) \
++if (omp_thread_counts >= 2 && \
++    height >= (int32_t)omp_thread_counts && \
++    width * height >= 4096)
++#endif // defined(TT_MEMUTIL) && defined(_MSC_VER)
++    for (int32_t j = 0; j < height; ++j) {
++        uint8_t *src = srcFirst + (srcStride * j);
++        uint8_t *dst = dstFirst + (dstStride * j);
++
++        for (int32_t i = 0; i < width; ++i) {
++            // XXX Is there some useful swizzle MMX we can use here?
++#ifdef IS_LITTLE_ENDIAN
++            uint8_t b = *src++;
++            uint8_t g = *src++;
++            uint8_t r = *src++;
++            uint8_t a = *src++;
++#else
++            uint8_t a = *src++;
++            uint8_t r = *src++;
++            uint8_t g = *src++;
++            uint8_t b = *src++;
++#endif
++            // Convert to non-premultiplied color
++            *dst++ = gfxUtils::sUnpremultiplyTable[a * 256 + r];
++            *dst++ = gfxUtils::sUnpremultiplyTable[a * 256 + g];
++            *dst++ = gfxUtils::sUnpremultiplyTable[a * 256 + b];
++            *dst++ = a;
++        }
++    }
++}
++
++void
++PutImageData_component(uint8_t* _src, uint8_t* _dst,
++                       int32_t width, int32_t height,
++                       uint32_t srcStride, uint32_t dstStride)
++{
++    uint8_t *srcFirst = _src;
++    uint8_t *dstFirst = _dst;
++
++    if (mozilla::supports_ssse3()) {
++        static const __m128i msk_alpha = _mm_set1_epi32(0xFF000000);
++        static const __m128i sfl_alphaLo = _mm_set_epi8(0x80, 7, 0x80, 7, 0x80, 7, 0x80, 7, 0x80, 3, 0x80, 3, 0x80, 3, 0x80, 3);
++        static const __m128i sfl_alphaHi = _mm_set_epi8(0x80, 15, 0x80, 15, 0x80, 15, 0x80, 15, 0x80, 11, 0x80, 11, 0x80, 11, 0x80, 11);
++        static const __m128i word_add = _mm_set1_epi16(0x00FF);
++        static const __m128i word_mul = _mm_set_epi16(0, 257, 257, 257, 0, 257, 257, 257);
++        static const __m128i sfl_bgra = _mm_set_epi8(15, 12, 13, 14, 11, 8, 9, 10, 7, 4, 5, 6, 3, 0, 1, 2);
++
++#if defined(TT_MEMUTIL) && defined(_MSC_VER)
++        int omp_thread_counts = omp_get_max_threads();
++
++#pragma omp parallel for schedule(guided) default(none) \
++shared(srcFirst, dstFirst, width, height, srcStride, dstStride, gfxUtils::sPremultiplyTable) \
++if (omp_thread_counts >= 2 && \
++    height >= (int32_t)omp_thread_counts && \
++    width * height >= 12000)
++#endif // defined(TT_MEMUTIL) && defined(_MSC_VER)
++        for (int j = 0; j < height; j++) {
++            uint8_t *src = srcFirst + (srcStride * j);
++            uint8_t *dst = dstFirst + (dstStride * j);
++            int32_t i = width;
++
++            while (i >= 1 && ((unsigned)dst & 15)) {
++                uint8_t r = *src++;
++                uint8_t g = *src++;
++                uint8_t b = *src++;
++                uint8_t a = *src++;
++
++                // Convert to premultiplied color (losslessly if the input came from getImageData)
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + b];
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + g];
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + r];
++                *dst++ = a;
++                i -= 1;
++            }
++
++            const int srcMissalignedBytes = ((unsigned)src & 15);
++
++            if (srcMissalignedBytes == 0) {
++                while (i >= 4) {
++                    __m128i xmb = _mm_load_si128((__m128i*)src);
++                    __m128i xmwLo = _mm_unpacklo_epi8(xmb, _mm_setzero_si128());
++                    __m128i xmwHi = _mm_unpackhi_epi8(xmb, _mm_setzero_si128());
++
++                    __m128i xmwAlpha = _mm_and_si128(xmb, msk_alpha);
++                    __m128i xmwAlphaLo = _mm_shuffle_epi8(xmb, sfl_alphaLo);
++                    __m128i xmwAlphaHi = _mm_shuffle_epi8(xmb, sfl_alphaHi);
++
++                    xmwLo = _mm_mullo_epi16(xmwLo, xmwAlphaLo);
++                    xmwLo = _mm_adds_epu16(xmwLo, word_add);
++                    xmwLo = _mm_mulhi_epu16(xmwLo, word_mul);
++
++                    xmwHi = _mm_mullo_epi16(xmwHi, xmwAlphaHi);
++                    xmwHi = _mm_adds_epu16(xmwHi, word_add);
++                    xmwHi = _mm_mulhi_epu16(xmwHi, word_mul);
++
++                    __m128i xmRes = _mm_packus_epi16(xmwLo, xmwHi);
++                    xmRes = _mm_or_si128(xmRes, xmwAlpha);
++                    xmRes = _mm_shuffle_epi8(xmRes, sfl_bgra);
++                    _mm_store_si128((__m128i*)dst, xmRes);
++
++                    src += 16;
++                    dst += 16;
++                    i -= 4;
++                }
++            } else {
++                __m128i xmLoadPre = _mm_load_si128((__m128i*)(src - srcMissalignedBytes));
++
++                while (i >= 4) {
++                    __m128i xmLoadNext = _mm_load_si128((__m128i*)(src - srcMissalignedBytes + 16));
++                    __m128i xmb;
++
++                    switch (srcMissalignedBytes) {
++                    case 1:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 1);
++                        break;
++                    case 2:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 2);
++                        break;
++                    case 3:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 3);
++                        break;
++                    case 4:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 4);
++                        break;
++                    case 5:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 5);
++                        break;
++                    case 6:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 6);
++                        break;
++                    case 7:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 7);
++                        break;
++                    case 8:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 8);
++                        break;
++                    case 9:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 9);
++                        break;
++                    case 10:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 10);
++                        break;
++                    case 11:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 11);
++                        break;
++                    case 12:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 12);
++                        break;
++                    case 13:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 13);
++                        break;
++                    case 14:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 14);
++                        break;
++                    case 15:
++                        xmb = _mm_alignr_epi8(xmLoadNext, xmLoadPre, 15);
++                        break;
++                    }
++                    xmLoadPre = xmLoadNext;
++
++                    __m128i xmwLo = _mm_unpacklo_epi8(xmb, _mm_setzero_si128());
++                    __m128i xmwHi = _mm_unpackhi_epi8(xmb, _mm_setzero_si128());
++
++                    __m128i xmwAlpha = _mm_and_si128(xmb, msk_alpha);
++                    __m128i xmwAlphaLo = _mm_shuffle_epi8(xmb, sfl_alphaLo);
++                    __m128i xmwAlphaHi = _mm_shuffle_epi8(xmb, sfl_alphaHi);
++
++                    xmwLo = _mm_mullo_epi16(xmwLo, xmwAlphaLo);
++                    xmwLo = _mm_adds_epu16(xmwLo, word_add);
++                    xmwLo = _mm_mulhi_epu16(xmwLo, word_mul);
++
++                    xmwHi = _mm_mullo_epi16(xmwHi, xmwAlphaHi);
++                    xmwHi = _mm_adds_epu16(xmwHi, word_add);
++                    xmwHi = _mm_mulhi_epu16(xmwHi, word_mul);
++
++                    __m128i xmRes = _mm_packus_epi16(xmwLo, xmwHi);
++                    xmRes = _mm_or_si128(xmRes, xmwAlpha);
++                    xmRes = _mm_shuffle_epi8(xmRes, sfl_bgra);
++                    _mm_store_si128((__m128i*)dst, xmRes);
++
++                    src += 16;
++                    dst += 16;
++                    i -= 4;
++                }
++            }
++
++            while (i >= 1) {
++                uint8_t r = *src++;
++                uint8_t g = *src++;
++                uint8_t b = *src++;
++                uint8_t a = *src++;
++
++                // Convert to premultiplied color (losslessly if the input came from getImageData)
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + b];
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + g];
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + r];
++                *dst++ = a;
++                i -= 1;
++            }
++        }
++    } else {
++#if defined(TT_MEMUTIL) && defined(_MSC_VER)
++        int omp_thread_counts = omp_get_max_threads();
++
++#pragma omp parallel for schedule(guided) default(none) \
++shared(srcFirst, dstFirst, width, height, srcStride, dstStride, gfxUtils::sPremultiplyTable) \
++if (omp_thread_counts >= 2 && \
++    height >= (int32_t)omp_thread_counts && \
++    width * height >= 4096)
++#endif // defined(TT_MEMUTIL) && defined(_MSC_VER)
++        for (int64_t j = 0; j < height; j++) {
++            uint8_t *src = srcFirst + (srcStride * j);
++            uint8_t *dst = dstFirst + (dstStride * j);
++
++            for (int32_t i = 0; i < width; i++) {
++                // XXX Is there some useful swizzle MMX we can use here?
++                uint8_t r = *src++;
++                uint8_t g = *src++;
++                uint8_t b = *src++;
++                uint8_t a = *src++;
++
++                // Convert to premultiplied color (losslessly if the input came from getImageData)
++#ifdef IS_LITTLE_ENDIAN
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + b];
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + g];
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + r];
++                *dst++ = a;
++#else
++                *dst++ = a;
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + r];
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + g];
++                *dst++ = gfxUtils::sPremultiplyTable[a * 256 + b];
++#endif
++            }
++        }
++    }
++}
++
+ } // namespace CanvasUtils
+ } // namespace mozilla
+diff -r a2ffa9047bf4 -r 67316c163750 dom/canvas/CanvasUtils.h
+--- a/dom/canvas/CanvasUtils.h	Thu Feb 19 19:54:14 2015 -0500
++++ b/dom/canvas/CanvasUtils.h	Wed Feb 25 01:57:00 2015 +0800
+@@ -26,6 +26,14 @@
+ namespace CanvasUtils {
+ 
+ 
++void GetImageData_component(uint8_t* _src, uint8_t* _dst,
++                            int32_t width, int32_t height,
++                            uint32_t srcStride, uint32_t dstStride);
++
++void PutImageData_component(uint8_t* _src, uint8_t* _dst,
++                            int32_t width, int32_t height,
++                            uint32_t srcStride, uint32_t dstStride);
++
+ // Check that the rectangle [x,y,w,h] is a subrectangle of [0,0,realWidth,realHeight]
+ 
+ inline bool CheckSaneSubrectSize(int32_t x, int32_t y, int32_t w, int32_t h,
+diff -r a2ffa9047bf4 -r 67316c163750 dom/canvas/moz.build
+--- a/dom/canvas/moz.build	Thu Feb 19 19:54:14 2015 -0500
++++ b/dom/canvas/moz.build	Wed Feb 25 01:57:00 2015 +0800
+@@ -32,12 +32,13 @@
+ UNIFIED_SOURCES += [
+     'CanvasImageCache.cpp',
+     'CanvasRenderingContext2D.cpp',
+-    'CanvasUtils.cpp',
+     'DocumentRendererChild.cpp',
+     'DocumentRendererParent.cpp',
+     'ImageData.cpp',
+ ]
+ 
++SOURCES += ['CanvasUtils.cpp']
++
+ # WebGL Sources
+ UNIFIED_SOURCES += [
+     'MurmurHash3.cpp',
+@@ -141,3 +142,10 @@
+ 
+ CXXFLAGS += CONFIG['MOZ_CAIRO_CFLAGS']
+ CXXFLAGS += CONFIG['TK_CFLAGS']
++
++if CONFIG['_MSC_VER']:
++    if '-DTT_MEMUTIL' in CONFIG['MOZ_OPTIMIZE_FLAGS']:
++        SOURCES['CanvasUtils.cpp'].flags += [
++            '-GL-',
++            '-openmp',
++        ]
+diff -r a2ffa9047bf4 -r 67316c163750 dom/plugins/base/nsPluginNativeWindowWin.cpp
+--- a/dom/plugins/base/nsPluginNativeWindowWin.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/dom/plugins/base/nsPluginNativeWindowWin.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -36,7 +36,18 @@
+    && nsMinorVersion(suppliedV) >= nsMinorVersion(requiredV))
+ 
+ 
+-#define NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION TEXT("MozillaPluginWindowPropertyAssociation")
++class CAtom_MozillaPluginWindowPropertyAssociation {
++public:
++  CAtom_MozillaPluginWindowPropertyAssociation() {
++    atom = ::GlobalAddAtomW(L"MozillaPluginWindowPropertyAssociation");
++  }
++  ~CAtom_MozillaPluginWindowPropertyAssociation() {
++    ::GlobalDeleteAtom(atom);
++  }
++  ATOM atom;
++};
++static CAtom_MozillaPluginWindowPropertyAssociation gaMpwpa;
++#define NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION ((LPCWSTR)(DWORD)gaMpwpa.atom)
+ #define NS_PLUGIN_CUSTOM_MSG_ID TEXT("MozFlashUserRelay")
+ #define WM_USER_FLASH WM_USER+1
+ static UINT sWM_FLASHBOUNCEMSG = 0;
+@@ -200,7 +211,7 @@
+  */
+ static LRESULT CALLBACK PluginWndProcInternal(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+ {
+-  nsPluginNativeWindowWin * win = (nsPluginNativeWindowWin *)::GetProp(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
++  nsPluginNativeWindowWin * win = (nsPluginNativeWindowWin *)::GetPropW(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
+   if (!win)
+     return TRUE;
+ 
+@@ -402,7 +413,7 @@
+                        LONG_PTR newLong)
+ {
+   nsPluginNativeWindowWin * win =
+-    (nsPluginNativeWindowWin *)GetProp(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
++    (nsPluginNativeWindowWin *)GetPropW(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
+   if (!win || (win && win->mPluginType != nsPluginType_Flash) ||
+       (nIndex == GWLP_WNDPROC &&
+        newLong == reinterpret_cast<LONG_PTR>(PluginWndProc)))
+@@ -430,7 +441,7 @@
+ 
+   // We already checked this in SetWindowLongHookCheck
+   nsPluginNativeWindowWin * win =
+-    (nsPluginNativeWindowWin *)GetProp(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
++    (nsPluginNativeWindowWin *)GetPropW(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
+ 
+   // Hook our subclass back up, just like we do on setwindow.
+   win->SetPrevWindowProc(
+@@ -459,7 +470,7 @@
+ 
+   // We already checked this in SetWindowLongHookCheck
+   nsPluginNativeWindowWin * win =
+-    (nsPluginNativeWindowWin *)GetProp(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
++    (nsPluginNativeWindowWin *)GetPropW(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
+ 
+   // Hook our subclass back up, just like we do on setwindow.   
+   win->SetPrevWindowProc(
+@@ -712,10 +723,10 @@
+   if (!mPluginWinProc)
+     return NS_ERROR_FAILURE;
+ 
+-  DebugOnly<nsPluginNativeWindowWin *> win = (nsPluginNativeWindowWin *)::GetProp(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
++  DebugOnly<nsPluginNativeWindowWin *> win = (nsPluginNativeWindowWin *)::GetPropW(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
+   NS_ASSERTION(!win || (win == this), "plugin window already has property and this is not us");
+   
+-  if (!::SetProp(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION, (HANDLE)this))
++  if (!::SetPropW(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION, (HANDLE)this))
+     return NS_ERROR_FAILURE;
+ 
+   return NS_OK;
+@@ -726,7 +737,7 @@
+   // remove window property
+   HWND hWnd = (HWND)window;
+   if (IsWindow(hWnd))
+-    ::RemoveProp(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
++    ::RemovePropW(hWnd, NS_PLUGIN_WINDOW_PROPERTY_ASSOCIATION);
+ 
+   // restore the original win proc
+   // but only do this if this were us last time
+diff -r a2ffa9047bf4 -r 67316c163750 gfx/2d/2D.h
+--- a/gfx/2d/2D.h	Thu Feb 19 19:54:14 2015 -0500
++++ b/gfx/2d/2D.h	Wed Feb 25 01:57:00 2015 +0800
+@@ -25,6 +25,10 @@
+ 
+ #include "mozilla/DebugOnly.h"
+ 
++#include "mozilla/SSE.h"
++
++#include <string.h>
++
+ #ifdef MOZ_ENABLE_FREETYPE
+ #include <string>
+ #endif
+@@ -988,8 +992,12 @@
+    * FillRect, try to integrate the translation into FillRect's aRect
+    * argument's x/y offset.
+    */
+-  virtual void SetTransform(const Matrix &aTransform)
+-    { mTransform = aTransform; mTransformDirty = true; }
++  virtual void SetTransform(const Matrix &aTransform) {
++    if (memcmp(&mTransform, &aTransform, sizeof(Matrix)) != 0) {
++      mTransform = aTransform;
++      mTransformDirty = true;
++    }
++  }
+ 
+   inline void ConcatTransform(const Matrix &aTransform)
+     { SetTransform(aTransform * Matrix(GetTransform())); }
+@@ -1081,7 +1089,7 @@
+ class GFX2D_API Factory
+ {
+ public:
+-  static bool HasSSE2();
++  static bool HasSSE2() { return supports_sse2(); }
+ 
+   /** Make sure that the given dimensions don't overflow a 32-bit signed int
+    * using 4 bytes per pixel; optionally, make sure that either dimension
+diff -r a2ffa9047bf4 -r 67316c163750 gfx/2d/BaseRect.h
+--- a/gfx/2d/BaseRect.h	Thu Feb 19 19:54:14 2015 -0500
++++ b/gfx/2d/BaseRect.h	Wed Feb 25 01:57:00 2015 +0800
+@@ -10,6 +10,9 @@
+ #include <cmath>
+ #include <ostream>
+ 
++#include <stddef.h>
++#include <emmintrin.h>
++
+ #include "mozilla/Assertions.h"
+ #include "mozilla/FloatingPoint.h"
+ #include "mozilla/TypeTraits.h"
+@@ -55,6 +58,45 @@
+       x(aX), y(aY), width(aWidth), height(aHeight)
+   {
+   }
++  BaseRect(const __m128i& a128i)
++  {
++    _mm_storeu_si128((__m128i *)&x, a128i);
++  }
++
++  bool IsInt32x4() const {
++    return _is_int32<T>::value &&
++           offsetof(Sub, x) == offsetof(Sub, y) - 4 &&
++           offsetof(Sub, x) == offsetof(Sub, width) - 8 &&
++           offsetof(Sub, x) == offsetof(Sub, height) - 12;
++  }
++  template <typename T>
++  struct _is_int32 {
++    enum { value = false };
++  };
++  template <>
++  struct _is_int32<long> {
++    enum { value = (sizeof(long) == 4) };
++  };
++  template <>
++  struct _is_int32<long const> {
++    enum { value = (sizeof(long) == 4) };
++  };
++  template <>
++  struct _is_int32<int> {
++    enum { value = (sizeof(int) == 4) };
++  };
++  template <>
++  struct _is_int32<int const> {
++    enum { value = (sizeof(int) == 4) };
++  };
++  template <>
++  struct _is_int32<long long> {
++    enum { value = (sizeof(long long) == 4) };
++  };
++  template <>
++  struct _is_int32<long long const> {
++    enum { value = (sizeof(long long) == 4) };
++  };
+ 
+   // Emptiness. An empty rect is one that has no area, i.e. its height or width
+   // is <= 0
+diff -r a2ffa9047bf4 -r 67316c163750 gfx/2d/Blur.cpp
+--- a/gfx/2d/Blur.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/gfx/2d/Blur.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -12,6 +12,7 @@
+ 
+ #include "mozilla/CheckedInt.h"
+ #include "mozilla/Constants.h"
++#include "nsAutoPtr.h"
+ 
+ #include "2D.h"
+ #include "DataSurfaceHelpers.h"
+@@ -35,13 +36,15 @@
+  * XXX shouldn't we pass stride in separately here?
+  */
+ static void
+-BoxBlurHorizontal(unsigned char* aInput,
+-                  unsigned char* aOutput,
++BoxBlurHorizontal(unsigned char* TT_RESTRICTED_PTR aInput,
++                  unsigned char* TT_RESTRICTED_PTR aOutput,
+                   int32_t aLeftLobe,
+                   int32_t aRightLobe,
+                   int32_t aWidth,
+                   int32_t aRows,
+-                  const IntRect& aSkipRect)
++                  const IntRect& aSkipRect,
++                  int32_t* TT_RESTRICTED_PTR aLasts,
++                  int32_t* TT_RESTRICTED_PTR aNexts)
+ {
+     MOZ_ASSERT(aWidth > 0);
+ 
+@@ -54,6 +57,12 @@
+     }
+     uint32_t reciprocal = uint32_t((uint64_t(1) << 32) / boxSize);
+ 
++    for (int32_t x = 0; x < aWidth; x++) {
++        int32_t tmp = x - aLeftLobe;
++        aLasts[x] = max(tmp, 0);
++        aNexts[x] = min(tmp + boxSize, aWidth - 1);
++    }
++
+     for (int32_t y = 0; y < aRows; y++) {
+         // Check whether the skip rect intersects this row. If the skip
+         // rect covers the whole surface in this row, we can avoid
+@@ -95,14 +104,11 @@
+                     alphaSum += aInput[aWidth * y + pos];
+                 }
+             }
+-            int32_t tmp = x - aLeftLobe;
+-            int32_t last = max(tmp, 0);
+-            int32_t next = min(tmp + boxSize, aWidth - 1);
+ 
+             aOutput[aWidth * y + x] = (uint64_t(alphaSum) * reciprocal) >> 32;
+ 
+-            alphaSum += aInput[aWidth * y + next] -
+-                        aInput[aWidth * y + last];
++            alphaSum += aInput[aWidth * y + aNexts[x]] -
++                        aInput[aWidth * y + aLasts[x]];
+         }
+     }
+ }
+@@ -113,13 +119,15 @@
+  * XXX shouldn't we pass stride in separately here?
+  */
+ static void
+-BoxBlurVertical(unsigned char* aInput,
+-                unsigned char* aOutput,
++BoxBlurVertical(unsigned char* TT_RESTRICTED_PTR aInput,
++                unsigned char* TT_RESTRICTED_PTR aOutput,
+                 int32_t aTopLobe,
+                 int32_t aBottomLobe,
+                 int32_t aWidth,
+                 int32_t aRows,
+-                const IntRect& aSkipRect)
++                const IntRect& aSkipRect,
++                int32_t* TT_RESTRICTED_PTR aLasts,
++                int32_t* TT_RESTRICTED_PTR aNexts)
+ {
+     MOZ_ASSERT(aRows > 0);
+ 
+@@ -132,6 +140,12 @@
+     }
+     uint32_t reciprocal = uint32_t((uint64_t(1) << 32) / boxSize);
+ 
++    for (int32_t y = 0; y < aRows; y++) {
++        int32_t tmp = y - aTopLobe;
++        aLasts[y] = max(tmp, 0);
++        aNexts[y] = min(tmp + boxSize, aRows - 1);
++    }
++
+     for (int32_t x = 0; x < aWidth; x++) {
+         bool inSkipRectX = x >= aSkipRect.x &&
+                            x < aSkipRect.XMost();
+@@ -166,14 +180,11 @@
+                     alphaSum += aInput[aWidth * pos + x];
+                 }
+             }
+-            int32_t tmp = y - aTopLobe;
+-            int32_t last = max(tmp, 0);
+-            int32_t next = min(tmp + boxSize, aRows - 1);
+ 
+             aOutput[aWidth * y + x] = (uint64_t(alphaSum) * reciprocal) >> 32;
+ 
+-            alphaSum += aInput[aWidth * next + x] -
+-                        aInput[aWidth * last + x];
++            alphaSum += aInput[aWidth * aNexts[y] + x] -
++                        aInput[aWidth * aLasts[y] + x];
+         }
+     }
+ }
+@@ -505,21 +516,31 @@
+ 
+       memset(tmpData, 0, szB);
+ 
++      size_t szLastsNexts = 0;
++      if (mBlurRadius.width > 0) {
++        szLastsNexts = stride;
++      }
++      if (mBlurRadius.height > 0) {
++        szLastsNexts = max<size_t>(szLastsNexts, GetSize().height);
++      }
++      nsAutoArrayPtr<int32_t> tmpLasts(new int32_t[szLastsNexts]);
++      nsAutoArrayPtr<int32_t> tmpNexts(new int32_t[szLastsNexts]);
++
+       uint8_t* a = aData;
+       uint8_t* b = tmpData;
+       if (mBlurRadius.width > 0) {
+-        BoxBlurHorizontal(a, b, horizontalLobes[0][0], horizontalLobes[0][1], stride, GetSize().height, mSkipRect);
+-        BoxBlurHorizontal(b, a, horizontalLobes[1][0], horizontalLobes[1][1], stride, GetSize().height, mSkipRect);
+-        BoxBlurHorizontal(a, b, horizontalLobes[2][0], horizontalLobes[2][1], stride, GetSize().height, mSkipRect);
++        BoxBlurHorizontal(a, b, horizontalLobes[0][0], horizontalLobes[0][1], stride, GetSize().height, mSkipRect, tmpLasts, tmpNexts);
++        BoxBlurHorizontal(b, a, horizontalLobes[1][0], horizontalLobes[1][1], stride, GetSize().height, mSkipRect, tmpLasts, tmpNexts);
++        BoxBlurHorizontal(a, b, horizontalLobes[2][0], horizontalLobes[2][1], stride, GetSize().height, mSkipRect, tmpLasts, tmpNexts);
+       } else {
+         a = tmpData;
+         b = aData;
+       }
+       // The result is in 'b' here.
+       if (mBlurRadius.height > 0) {
+-        BoxBlurVertical(b, a, verticalLobes[0][0], verticalLobes[0][1], stride, GetSize().height, mSkipRect);
+-        BoxBlurVertical(a, b, verticalLobes[1][0], verticalLobes[1][1], stride, GetSize().height, mSkipRect);
+-        BoxBlurVertical(b, a, verticalLobes[2][0], verticalLobes[2][1], stride, GetSize().height, mSkipRect);
++        BoxBlurVertical(b, a, verticalLobes[0][0], verticalLobes[0][1], stride, GetSize().height, mSkipRect, tmpLasts, tmpNexts);
++        BoxBlurVertical(a, b, verticalLobes[1][0], verticalLobes[1][1], stride, GetSize().height, mSkipRect, tmpLasts, tmpNexts);
++        BoxBlurVertical(b, a, verticalLobes[2][0], verticalLobes[2][1], stride, GetSize().height, mSkipRect, tmpLasts, tmpNexts);
+       } else {
+         a = b;
+       }
+diff -r a2ffa9047bf4 -r 67316c163750 gfx/2d/DrawTargetD2D.cpp
+--- a/gfx/2d/DrawTargetD2D.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/gfx/2d/DrawTargetD2D.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -26,6 +26,8 @@
+ #endif
+ 
+ #include <dwrite.h>
++#include <tmmintrin.h>
++#include "mozilla/SSE.h"
+ 
+ // decltype is not usable for overloaded functions.
+ typedef HRESULT (WINAPI*D2D1CreateFactoryFunc)(
+@@ -2439,6 +2441,12 @@
+   return nullptr;
+ }
+ 
++static const float f_zero = 0;
++static const float f_one = 1.0f;
++static const __m128 xm_4095_rcp_mul = _mm_set_ss(1.0f / 4095);
++static const __m128 xm_255x4 = _mm_set1_ps(255.0f);
++static const __m128i sfl_pack4 = _mm_set_epi8(0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 12, 0, 4, 8);
++
+ TemporaryRef<ID3D10Texture2D>
+ DrawTargetD2D::CreateGradientTexture(const GradientStopsD2D *aStops)
+ {
+@@ -2448,10 +2456,67 @@
+   rawStops.resize(aStops->mStopCollection->GetGradientStopCount());
+   aStops->mStopCollection->GetGradientStops(&rawStops.front(), rawStops.size());
+ 
+-  std::vector<unsigned char> textureData;
+-  textureData.resize(4096 * 4);
+-  unsigned char *texData = &textureData.front();
+-
++  unsigned char *textureData = new unsigned char [4096 * 4];
++  unsigned char *texData = textureData;
++
++if (mozilla::supports_sse2())
++{
++  bool has_ssse3 = mozilla::supports_ssse3();
++  __m128 prevColorPos = _mm_load_ss(&f_zero);
++  __m128 nextColorPos = _mm_load_ss(&f_one);
++  __m128 prevColor = _mm_loadu_ps((float*)&rawStops[0].color);
++  __m128 nextColor = prevColor;
++
++  if (rawStops.size() >= 2) {
++    nextColor = _mm_loadu_ps((float*)&rawStops[1].color);
++    nextColorPos = _mm_load_ss(&rawStops[1].position);
++  }
++
++  uint32_t stopPosition = 2;
++  __m128 interp_rcp_mul = _mm_div_ss(_mm_load_ss(&f_one), _mm_sub_ss(nextColorPos, prevColorPos));
++
++  // Not the most optimized way but this will do for now.
++  for (int i = 0; i < 4096; i++) {
++    // The 4095 seems a little counter intuitive, but we want the gradient
++    // color at offset 0 at the first pixel, and at offset 1.0f at the last
++    // pixel.
++    __m128 pos;
++    pos = _mm_cvtsi32_ss(pos, i);
++    pos = _mm_mul_ss(pos, xm_4095_rcp_mul);
++
++    if (_mm_comigt_ss(pos, nextColorPos)) {
++      prevColor = nextColor;
++      prevColorPos = nextColorPos;
++      if (rawStops.size() > stopPosition) {
++        nextColor = _mm_loadu_ps((float*)&rawStops[stopPosition].color);
++        nextColorPos = _mm_load_ss(&rawStops[stopPosition++].position);
++      } else {
++        nextColorPos = _mm_load_ss(&f_one);
++      }
++      interp_rcp_mul = _mm_div_ss(_mm_load_ss(&f_one), _mm_sub_ss(nextColorPos, prevColorPos));
++    }
++
++    __m128 interp = _mm_mul_ss(_mm_sub_ss(pos, prevColorPos), interp_rcp_mul);
++    interp = _mm_shuffle_ps(interp, interp, _MM_SHUFFLE(0, 0, 0, 0));
++
++    __m128 newColor = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(nextColor, prevColor), interp), prevColor);
++    newColor = _mm_mul_ps(newColor, xm_255x4);
++
++    if (has_ssse3) {
++      __m128i xmResult = _mm_cvttps_epi32(newColor);
++      xmResult = _mm_shuffle_epi8(xmResult, sfl_pack4);
++      *((uint32_t*)&texData[i * 4]) = _mm_cvtsi128_si32(xmResult);
++    } else {
++      newColor = _mm_shuffle_ps(newColor, newColor, _MM_SHUFFLE(3, 0, 1, 2));
++      __m128i xmResult = _mm_cvttps_epi32(newColor);
++      xmResult = _mm_packs_epi32(xmResult, _mm_setzero_si128());
++      xmResult = _mm_packus_epi16(xmResult, _mm_setzero_si128());
++      *((uint32_t*)&texData[i * 4]) = _mm_cvtsi128_si32(xmResult);
++    }
++  }
++}
++else
++{
+   float prevColorPos = 0;
+   float nextColorPos = 1.0f;
+   D2D1_COLOR_F prevColor = rawStops[0].color;
+@@ -2500,14 +2565,17 @@
+     texData[i * 4 + 2] = (char)(255.0f * newColor.r);
+     texData[i * 4 + 3] = (char)(255.0f * newColor.a);
+   }
++}
+ 
+   D3D10_SUBRESOURCE_DATA data;
+-  data.pSysMem = &textureData.front();
++  data.pSysMem = textureData;
+   data.SysMemPitch = 4096 * 4;
+ 
+   RefPtr<ID3D10Texture2D> tex;
+   mDevice->CreateTexture2D(&desc, &data, byRef(tex));
+ 
++  delete [] textureData;
++
+   return tex.forget();
+ }
+ 
+diff -r a2ffa9047bf4 -r 67316c163750 gfx/2d/Factory.cpp
+--- a/gfx/2d/Factory.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/gfx/2d/Factory.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -193,30 +193,6 @@
+ DrawEventRecorder *Factory::mRecorder;
+ 
+ bool
+-Factory::HasSSE2()
+-{
+-#if defined(__SSE2__) || defined(_M_X64) || \
+-    (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
+-  // gcc with -msse2 (default on OSX and x86-64)
+-  // cl.exe with -arch:SSE2 (default on x64 compiler)
+-  return true;
+-#elif defined(HAVE_CPU_DETECTION)
+-  static enum {
+-    UNINITIALIZED,
+-    NO_SSE2,
+-    HAS_SSE2
+-  } sDetectionState = UNINITIALIZED;
+-
+-  if (sDetectionState == UNINITIALIZED) {
+-    sDetectionState = HasCPUIDBit(1u, edx, (1u<<26)) ? HAS_SSE2 : NO_SSE2;
+-  }
+-  return sDetectionState == HAS_SSE2;
+-#else
+-  return false;
+-#endif
+-}
+-
+-bool
+ Factory::CheckSurfaceSize(const IntSize &sz, int32_t limit)
+ {
+   if (sz.width < 0 || sz.height < 0) {
+diff -r a2ffa9047bf4 -r 67316c163750 gfx/angle/src/libEGL/Surface.cpp
+--- a/gfx/angle/src/libEGL/Surface.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/gfx/angle/src/libEGL/Surface.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -8,6 +8,7 @@
+ // such as the client area of a window, including any back buffers.
+ // Implements EGLSurface and related functionality. [EGL 1.4] section 2.2 page 3.
+ 
++#include <algorithm>
+ #include <tchar.h>
+ 
+ #include <algorithm>
+diff -r a2ffa9047bf4 -r 67316c163750 gfx/cairo/cairo/src/cairo-d2d-private.h
+--- a/gfx/cairo/cairo/src/cairo-d2d-private.h	Thu Feb 19 19:54:14 2015 -0500
++++ b/gfx/cairo/cairo/src/cairo-d2d-private.h	Wed Feb 25 01:57:00 2015 +0800
+@@ -42,6 +42,7 @@
+ #include <d2d1.h>
+ #include <d3d10.h>
+ #include <dxgi.h>
++#include <list>
+ 
+ #include "cairoint.h"
+ #include "cairo-surface-clipper-private.h"
+@@ -73,6 +74,18 @@
+     int mVRAMUsage;
+ };
+ 
++typedef struct
++{
++    RefPtr<ID2D1RadialGradientBrush> radialGradientBrush;
++    RefPtr<ID2D1GradientStopCollection> radialGradientStopCollection;
++} radial_gradient;
++
++typedef struct
++{
++    RefPtr<ID2D1LinearGradientBrush> linearGradientBrush;
++    RefPtr<ID2D1GradientStopCollection> linearGradientStopCollection;
++} linear_gradient;
++
+ const unsigned int TEXT_TEXTURE_WIDTH = 2048;
+ const unsigned int TEXT_TEXTURE_HEIGHT = 512;
+ typedef struct _cairo_d2d_device cairo_d2d_device_t;
+@@ -130,6 +143,12 @@
+     RefPtr<ID2D1BitmapBrush> bitmapBrush;
+     /** Brush used for solid colors */
+     RefPtr<ID2D1SolidColorBrush> solidColorBrush;
++
++    /** Brush used for radial gradients */
++    std::list<radial_gradient> mRadialGradientCache;
++    /** Brush used for linear gradients */
++    std::list<linear_gradient> mLinearGradientCache;
++
+     /** Indicates if our render target is currently in drawing mode */
+     bool isDrawing;
+     /** Indicates if text rendering is initialized */
+diff -r a2ffa9047bf4 -r 67316c163750 gfx/cairo/cairo/src/cairo-d2d-surface.cpp
+--- a/gfx/cairo/cairo/src/cairo-d2d-surface.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/gfx/cairo/cairo/src/cairo-d2d-surface.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -1541,19 +1541,54 @@
+ 	return NULL;
+     }
+ 
+-    RefPtr<ID2D1GradientStopCollection> stopCollection;
+-    d2dsurf->rt->CreateGradientStopCollection(stops, num_stops, &stopCollection);
+-    RefPtr<ID2D1RadialGradientBrush> brush;
+-
+-    d2dsurf->rt->CreateRadialGradientBrush(D2D1::RadialGradientBrushProperties(center,
+-									       origin,
+-									       outer_radius,
+-									       outer_radius),
+-					   brushProps,
+-					   stopCollection,
+-					   &brush);
++    std::list<radial_gradient>::iterator iterRadialGradient = d2dsurf->mRadialGradientCache.end();
++
++    if (d2dsurf->mRadialGradientCache.size() > 0) {
++        for (std::list<radial_gradient>::iterator iter = d2dsurf->mRadialGradientCache.begin();
++             iter != d2dsurf->mRadialGradientCache.end(); iter++) {
++            UINT32 nCount = (*iter).radialGradientStopCollection->GetGradientStopCount();
++
++            if (nCount == num_stops &&
++                nCount > 0) {
++                D2D1_GRADIENT_STOP *gradientStopsOld = new D2D1_GRADIENT_STOP[nCount];
++
++                (*iter).radialGradientStopCollection->GetGradientStops(gradientStopsOld, nCount);
++                bool stopCollectionEqual = (memcmp(gradientStopsOld, stops, sizeof(D2D1_GRADIENT_STOP) * nCount) == 0);
++                delete [] gradientStopsOld;
++                if (stopCollectionEqual) {
++                    iterRadialGradient = iter;
++                    break;
++                }
++            }
++        }
++    }
++
++    if (iterRadialGradient != d2dsurf->mRadialGradientCache.end()) {
++        (*iterRadialGradient).radialGradientBrush->SetOpacity(brushProps.opacity);
++        (*iterRadialGradient).radialGradientBrush->SetTransform(&brushProps.transform);
++        (*iterRadialGradient).radialGradientBrush->SetCenter(center);
++        (*iterRadialGradient).radialGradientBrush->SetGradientOriginOffset(origin);
++        (*iterRadialGradient).radialGradientBrush->SetRadiusX(outer_radius);
++        (*iterRadialGradient).radialGradientBrush->SetRadiusY(outer_radius);
++    } else {
++        radial_gradient rg;
++
++        d2dsurf->rt->CreateGradientStopCollection(stops, num_stops, &rg.radialGradientStopCollection);
++        d2dsurf->rt->CreateRadialGradientBrush(D2D1::RadialGradientBrushProperties(center,
++            origin,
++            outer_radius,
++            outer_radius),
++            brushProps,
++            rg.radialGradientStopCollection,
++            &rg.radialGradientBrush);
++
++        iterRadialGradient = d2dsurf->mRadialGradientCache.insert(d2dsurf->mRadialGradientCache.begin(), rg);
++        if (d2dsurf->mRadialGradientCache.size() > 50) {
++            d2dsurf->mRadialGradientCache.pop_back();
++        }
++    }
+     delete [] stops;
+-    return brush;
++    return (*iterRadialGradient).radialGradientBrush;
+ }
+ 
+ static RefPtr<ID2D1Brush>
+@@ -1718,16 +1753,50 @@
+ 	stops[source_pattern->base.n_stops + 1].position = 1.0f;
+ 	stops[source_pattern->base.n_stops + 1].color = D2D1::ColorF(0, 0);
+     }
+-    RefPtr<ID2D1GradientStopCollection> stopCollection;
+-    d2dsurf->rt->CreateGradientStopCollection(stops, num_stops, &stopCollection);
+-    RefPtr<ID2D1LinearGradientBrush> brush;
+-    d2dsurf->rt->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(D2D1::Point2F((FLOAT)p1.x, (FLOAT)p1.y),
+-									       D2D1::Point2F((FLOAT)p2.x, (FLOAT)p2.y)),
+-					   brushProps,
+-					   stopCollection,
+-					   &brush);
++
++    std::list<linear_gradient>::iterator iterLinearGradient = d2dsurf->mLinearGradientCache.end();
++
++    if (d2dsurf->mLinearGradientCache.size() > 0) {
++        for (std::list<linear_gradient>::iterator iter = d2dsurf->mLinearGradientCache.begin();
++             iter != d2dsurf->mLinearGradientCache.end(); iter++) {
++            UINT32 nCount = (*iter).linearGradientStopCollection->GetGradientStopCount();
++
++            if (nCount == num_stops &&
++                nCount > 0) {
++                D2D1_GRADIENT_STOP *gradientStopsOld = new D2D1_GRADIENT_STOP[nCount];
++
++                (*iter).linearGradientStopCollection->GetGradientStops(gradientStopsOld, nCount);
++                bool stopCollectionEqual = (memcmp(gradientStopsOld, stops, sizeof(D2D1_GRADIENT_STOP) * nCount) == 0);
++                delete [] gradientStopsOld;
++                if (stopCollectionEqual) {
++                    iterLinearGradient = iter;
++                    break;
++                }
++            }
++        }
++    }
++
++    if (iterLinearGradient != d2dsurf->mLinearGradientCache.end()) {
++        (*iterLinearGradient).linearGradientBrush->SetOpacity(brushProps.opacity);
++        (*iterLinearGradient).linearGradientBrush->SetTransform(&brushProps.transform);
++        (*iterLinearGradient).linearGradientBrush->SetStartPoint(D2D1::Point2F((FLOAT)p1.x, (FLOAT)p1.y));
++        (*iterLinearGradient).linearGradientBrush->SetEndPoint(D2D1::Point2F((FLOAT)p2.x, (FLOAT)p2.y));
++    } else {
++        linear_gradient lg;
++
++        d2dsurf->rt->CreateGradientStopCollection(stops, num_stops, &lg.linearGradientStopCollection);
++        d2dsurf->rt->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(D2D1::Point2F((FLOAT)p1.x, (FLOAT)p1.y), D2D1::Point2F((FLOAT)p2.x, (FLOAT)p2.y)),
++            brushProps,
++            lg.linearGradientStopCollection,
++            &lg.linearGradientBrush);
++
++        iterLinearGradient = d2dsurf->mLinearGradientCache.insert(d2dsurf->mLinearGradientCache.begin(), lg);
++        if (d2dsurf->mLinearGradientCache.size() > 100) {
++            d2dsurf->mLinearGradientCache.pop_back();
++        }
++    }
+     delete [] stops;
+-    return brush;
++    return (*iterLinearGradient).linearGradientBrush;
+ }
+ 
+ /**
+diff -r a2ffa9047bf4 -r 67316c163750 gfx/cairo/libpixman/src/moz.build
+--- a/gfx/cairo/libpixman/src/moz.build	Thu Feb 19 19:54:14 2015 -0500
++++ b/gfx/cairo/libpixman/src/moz.build	Wed Feb 25 01:57:00 2015 +0800
+@@ -153,3 +153,22 @@
+             '-Wno-tautological-compare',
+             '-Wno-tautological-constant-out-of-range-compare',
+         ]
++
++if CONFIG['_MSC_VER']:
++    if '-DTT_MEMUTIL' in CONFIG['MOZ_OPTIMIZE_FLAGS']:
++        SOURCES['pixman-implementation.c'].flags += [
++            '-GL-',
++            '-openmp',
++        ]
++        SOURCES['pixman-general.c'].flags += [
++            '-GL-',
++            '-openmp',
++        ]
++        SOURCES['pixman-trap.c'].flags += [
++            '-GL-',
++            '-openmp',
++        ]
++        SOURCES['pixman-sse2.c'].flags += [
++            '-GL-',
++            '-openmp',
++        ]
+diff -r a2ffa9047bf4 -r 67316c163750 gfx/cairo/libpixman/src/pixman-edge.c
+--- a/gfx/cairo/libpixman/src/pixman-edge.c	Thu Feb 19 19:54:14 2015 -0500
++++ b/gfx/cairo/libpixman/src/pixman-edge.c	Wed Feb 25 01:57:00 2015 +0800
+@@ -166,6 +166,8 @@
+     uint32_t *buf = (image)->bits.bits;
+     int stride = (image)->bits.rowstride;
+     int width = (image)->bits.width;
++    pixman_fixed_t rx_old = 0;
++    int rxs_old = 0, rxi_old = 0;
+ 
+     line = buf + pixman_fixed_to_int (y) * stride;
+ 
+@@ -197,12 +199,29 @@
+             int lxs, rxs;
+ 
+             /* Find pixel bounds for span. */
+-            lxi = pixman_fixed_to_int (lx);
+-            rxi = pixman_fixed_to_int (rx);
++            /* Sample coverage for edge pixels */
++            if (lx == 0)
++            {
++                lxi = 0;
++                lxs = 0;
++            }
++            else
++            {
++                lxi = pixman_fixed_to_int (lx);
++                lxs = RENDER_SAMPLES_X (lx, 8);
++            }
+ 
+-            /* Sample coverage for edge pixels */
+-            lxs = RENDER_SAMPLES_X (lx, 8);
+-            rxs = RENDER_SAMPLES_X (rx, 8);
++            if (rx == rx_old)
++            {
++                rxi = rxi_old;
++                rxs = rxs_old;
++            }
++            else
++            {
++                rxi_old = rxi = pixman_fixed_to_int (rx);
++                rxs_old = rxs = RENDER_SAMPLES_X (rx, 8);
++                rx_old = rx;
++            }
+ 
+             /* Add coverage across row */
+             if (lxi == rxi)
+diff -r a2ffa9047bf4 -r 67316c163750 gfx/cairo/libpixman/src/pixman-implementation.c
+--- a/gfx/cairo/libpixman/src/pixman-implementation.c	Thu Feb 19 19:54:14 2015 -0500
++++ b/gfx/cairo/libpixman/src/pixman-implementation.c	Wed Feb 25 01:57:00 2015 +0800
+@@ -27,6 +27,14 @@
+ #include <stdlib.h>
+ #include "pixman-private.h"
+ 
++#if defined(TT_MEMUTIL) && defined(_MSC_VER)
++#include <omp.h>
++#endif
++
++#ifdef _MSC_VER
++#include <windows.h>
++#endif
++
+ pixman_implementation_t *
+ _pixman_implementation_create (pixman_implementation_t *fallback,
+ 			       const pixman_fast_path_t *fast_paths)
+@@ -376,11 +384,184 @@
+     return FALSE;
+ }
+ 
++#ifdef _MSC_VER
++
++#ifdef TT_MEMUTIL
++uint32_t dwNonTemporalDataSizeMin = NON_TEMPORAL_STORES_NOT_SUPPORTED;
++uint32_t dwNonTemporalMemcpySizeMin = NON_TEMPORAL_STORES_NOT_SUPPORTED;
++#endif
++typedef BOOL (WINAPI *LPFN_GLPI)(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION, PDWORD);
++
++int Initialize_TT()
++{
++#ifdef TT_MEMUTIL
++    int omp_thread_counts = 0;
++    DWORD pam, sam;
++
++    long env_omp_num_threads = 0;
++    wchar_t *lpwz_env = _wgetenv(L"OMP_NUM_THREADS");
++    if (lpwz_env)
++    {
++      env_omp_num_threads = _wtol(lpwz_env);
++    }
++
++    omp_set_dynamic(0);
++    omp_set_num_threads(1);
++
++    if (GetProcessAffinityMask(GetCurrentProcess(), &pam, &sam))
++    {
++        LPFN_GLPI glpi =
++            (LPFN_GLPI)GetProcAddress(GetModuleHandle("kernel32.dll"),
++            "GetLogicalProcessorInformation");
++        DWORD returnLength = 0;
++        int *pThreadBindIndex = NULL;
++
++        if (NULL != glpi &&
++            !glpi(NULL, &returnLength) &&
++            GetLastError() == ERROR_INSUFFICIENT_BUFFER)
++        {
++            PSYSTEM_LOGICAL_PROCESSOR_INFORMATION buffer =
++                (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION)malloc(returnLength);
++
++            if (glpi(buffer, &returnLength))
++            {
++                DWORD byteOffset;
++                PSYSTEM_LOGICAL_PROCESSOR_INFORMATION ptr;
++                int i;
++                size_t threadBindIndexSize;
++
++                byteOffset = 0;
++                ptr = buffer;
++                while (byteOffset < returnLength)
++                {
++                    if (RelationProcessorCore == ptr->Relationship)
++                    {
++                        omp_thread_counts++;
++                    }
++                    byteOffset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
++                    ptr++;
++                }
++
++                threadBindIndexSize = sizeof(int) * omp_thread_counts;
++                pThreadBindIndex = (int *)malloc(threadBindIndexSize);
++                memset(pThreadBindIndex, 0xFF, threadBindIndexSize);
++
++                i = 0;
++                byteOffset = 0;
++                ptr = buffer;
++                while (byteOffset < returnLength)
++                {
++                    if (RelationProcessorCore == ptr->Relationship)
++                    {
++                        if (i < omp_thread_counts)
++                        {
++                            int b;
++
++                            for (b = 0; b <= 31; b++)
++                            {
++                                if ((pam & ptr->ProcessorMask) & (1 << b))
++                                {
++                                    pThreadBindIndex[i++] = b;
++                                    break;
++                                }
++                            }
++                        }
++                        else
++                        {
++                            break;
++                        }
++                    }
++                    byteOffset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
++                    ptr++;
++                }
++            }
++            free(buffer);
++        }
++
++        if (NULL == pThreadBindIndex)
++        {
++            int b;
++            int i;
++            size_t threadBindIndexSize;
++
++            for (b = 0; b <= 31; b++)
++            {
++                if (pam & (1 << b)) omp_thread_counts++;
++            }
++
++            threadBindIndexSize = sizeof(int) * omp_thread_counts;
++            pThreadBindIndex = (int *)malloc(threadBindIndexSize);
++            memset(pThreadBindIndex, 0xFF, threadBindIndexSize);
++
++            for (i = 0; i < omp_thread_counts; i++)
++            {
++                pThreadBindIndex[i] = i;
++            }
++        }
++
++        if (NULL != pThreadBindIndex)
++        {
++            if (omp_thread_counts >= 1)
++            {
++                OSVERSIONINFO osvi = { sizeof(OSVERSIONINFO) };
++                BOOL bIsWindows7orLater = FALSE;
++
++                omp_set_dynamic(0);
++                if (0 != env_omp_num_threads)
++                {
++                    omp_thread_counts = env_omp_num_threads;
++                }
++                omp_set_num_threads(omp_thread_counts);
++                omp_thread_counts = omp_get_max_threads();
++
++                GetVersionEx(&osvi);
++                bIsWindows7orLater =
++                    (VER_PLATFORM_WIN32_NT == osvi.dwPlatformId) &&
++                    ((6 == osvi.dwMajorVersion && osvi.dwMinorVersion >= 1) || (osvi.dwMajorVersion >= 7));
++                if (!bIsWindows7orLater)
++                {
++#pragma omp parallel
++                    {
++                        SetThreadIdealProcessor(GetCurrentThread(),
++                            pThreadBindIndex[omp_get_thread_num()]);
++                    }
++                }
++            }
++            free(pThreadBindIndex);
++        }
++    }
++#endif /* TT_MEMUTIL */
++
++#ifdef TT_MEMUTIL
++    dwNonTemporalMemcpySizeMin = dwNonTemporalDataSizeMin = GetNonTemporalDataSizeMin_tt();
++    if (dwNonTemporalMemcpySizeMin != NON_TEMPORAL_STORES_NOT_SUPPORTED)
++    {
++        dwNonTemporalMemcpySizeMin = dwNonTemporalDataSizeMin / 2;
++    }
++#endif
++
++    return 0;
++}
++
++#endif /* _MSC_VER */
++
+ pixman_implementation_t *
+ _pixman_choose_implementation (void)
+ {
+     pixman_implementation_t *imp;
+ 
++#ifdef _MSC_VER
++    {
++        static pixman_bool_t initialized = FALSE;
++
++        if (!initialized)
++        {
++            Initialize_TT();
++            initialized = TRUE;
++        }
++    }
++#endif
++
+     imp = _pixman_implementation_create_general();
+ 
+     if (!_pixman_disabled ("fast"))
+diff -r a2ffa9047bf4 -r 67316c163750 gfx/cairo/libpixman/src/pixman-private.h
+--- a/gfx/cairo/libpixman/src/pixman-private.h	Thu Feb 19 19:54:14 2015 -0500
++++ b/gfx/cairo/libpixman/src/pixman-private.h	Wed Feb 25 01:57:00 2015 +0800
+@@ -1184,4 +1184,11 @@
+ 
+ #endif /* __ASSEMBLER__ */
+ 
++#ifdef TT_MEMUTIL
++extern pixman_bool_t nt_initialized;
++extern uint32_t dwNonTemporalDataSizeMin;
++extern uint32_t dwNonTemporalMemcpySizeMin;
++void InitializeNonTemporalData();
++#endif /* TT_MEMUTIL */
++
+ #endif /* PIXMAN_PRIVATE_H */
+diff -r a2ffa9047bf4 -r 67316c163750 gfx/cairo/libpixman/src/pixman-sse2.c
+--- a/gfx/cairo/libpixman/src/pixman-sse2.c	Thu Feb 19 19:54:14 2015 -0500
++++ b/gfx/cairo/libpixman/src/pixman-sse2.c	Wed Feb 25 01:57:00 2015 +0800
+@@ -380,6 +380,13 @@
+     _mm_stream_si128 (dst, data);
+ }
+ 
++/* save 1 pixels using Write Combining memory */
++static force_inline void
++save_32_write_combining (int* dst, int data)
++{
++    _mm_stream_si32 (dst, data);
++}
++
+ /* save 4 pixels on a 16-byte boundary aligned address */
+ static force_inline void
+ save_128_aligned (__m128i* dst,
+@@ -4682,6 +4689,10 @@
+     }
+ }
+ 
++#ifdef TT_MEMUTIL
++extern uint32_t dwNonTemporalMemcpySizeMin;
++#endif
++
+ static pixman_bool_t
+ sse2_blt (pixman_implementation_t *imp,
+           uint32_t *               src_bits,
+@@ -4700,6 +4711,9 @@
+     uint8_t *   src_bytes;
+     uint8_t *   dst_bytes;
+     int byte_width;
++#ifdef TT_MEMUTIL
++    pixman_bool_t use_nontemporal_copy;
++#endif
+ 
+     if (src_bpp != dst_bpp)
+ 	return FALSE;
+@@ -4729,6 +4743,10 @@
+ 	return FALSE;
+     }
+ 
++#ifdef TT_MEMUTIL
++    use_nontemporal_copy = ((uint32_t)(byte_width * height) > dwNonTemporalMemcpySizeMin);
++#endif
++
+     while (height--)
+     {
+ 	int w;
+@@ -4746,9 +4764,12 @@
+ 	    d += 2;
+ 	}
+ 
++#ifdef TT_MEMUTIL
++if (use_nontemporal_copy)
++{
+ 	while (w >= 4 && ((uintptr_t)d & 15))
+ 	{
+-	    *(uint32_t *)d = *(uint32_t *)s;
++	    save_32_write_combining ((int*)d, *(int*)s);
+ 
+ 	    w -= 4;
+ 	    s += 4;
+@@ -4759,11 +4780,62 @@
+ 	{
+ 	    __m128i xmm0, xmm1, xmm2, xmm3;
+ 
++	    _mm_prefetch((char const *)s + (200*64/34+192), _MM_HINT_NTA);
++
+ 	    xmm0 = load_128_unaligned ((__m128i*)(s));
+ 	    xmm1 = load_128_unaligned ((__m128i*)(s + 16));
+ 	    xmm2 = load_128_unaligned ((__m128i*)(s + 32));
+ 	    xmm3 = load_128_unaligned ((__m128i*)(s + 48));
+ 
++	    save_128_write_combining ((__m128i*)(d),    xmm0);
++	    save_128_write_combining ((__m128i*)(d + 16), xmm1);
++	    save_128_write_combining ((__m128i*)(d + 32), xmm2);
++	    save_128_write_combining ((__m128i*)(d + 48), xmm3);
++
++	    s += 64;
++	    d += 64;
++	    w -= 64;
++	}
++
++	while (w >= 16)
++	{
++	    save_128_write_combining ((__m128i*)d, load_128_unaligned ((__m128i*)s) );
++
++	    w -= 16;
++	    d += 16;
++	    s += 16;
++	}
++
++	while (w >= 4)
++	{
++	    save_32_write_combining ((int*)d, *(int*)s);
++
++	    w -= 4;
++	    s += 4;
++	    d += 4;
++	}
++}
++else
++#endif
++{
++	while (w >= 4 && ((uintptr_t)d & 15))
++	{
++	    *(uint32_t *)d = *(uint32_t *)s;
++
++	    w -= 4;
++	    s += 4;
++	    d += 4;
++	}
++
++	while (w >= 64)
++	{
++	    __m128i xmm0, xmm1, xmm2, xmm3;
++
++	    xmm0 = load_128_unaligned ((__m128i*)(s));
++	    xmm1 = load_128_unaligned ((__m128i*)(s + 16));
++	    xmm2 = load_128_unaligned ((__m128i*)(s + 32));
++	    xmm3 = load_128_unaligned ((__m128i*)(s + 48));
++
+ 	    save_128_aligned ((__m128i*)(d),    xmm0);
+ 	    save_128_aligned ((__m128i*)(d + 16), xmm1);
+ 	    save_128_aligned ((__m128i*)(d + 32), xmm2);
+@@ -4791,6 +4863,7 @@
+ 	    s += 4;
+ 	    d += 4;
+ 	}
++}
+ 
+ 	if (w >= 2)
+ 	{
+@@ -4801,6 +4874,13 @@
+ 	}
+     }
+ 
++#ifdef TT_MEMUTIL
++    if (use_nontemporal_copy)
++    {
++        _mm_sfence();
++    }
++#endif
++
+     return TRUE;
+ }
+ 
+diff -r a2ffa9047bf4 -r 67316c163750 gfx/cairo/libpixman/src/pixman-trap.c
+--- a/gfx/cairo/libpixman/src/pixman-trap.c	Thu Feb 19 19:54:14 2015 -0500
++++ b/gfx/cairo/libpixman/src/pixman-trap.c	Wed Feb 25 01:57:00 2015 +0800
+@@ -25,6 +25,11 @@
+ #include <config.h>
+ #endif
+ 
++#if defined(TT_MEMUTIL) && defined(_MSC_VER)
++#include <omp.h>
++#endif
++#include <limits.h>
++
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include "pixman-private.h"
+@@ -40,6 +45,26 @@
+     pixman_fixed_t f = pixman_fixed_frac (y);
+     pixman_fixed_t i = pixman_fixed_floor (y);
+ 
++if (8 == n)
++{
++    f = DIV (f - Y_FRAC_FIRST (8) + (STEP_Y_SMALL (8) - pixman_fixed_e), STEP_Y_SMALL (8)) * STEP_Y_SMALL (8) +
++	Y_FRAC_FIRST (8);
++    
++    if (f > Y_FRAC_LAST (8))
++    {
++	if (pixman_fixed_to_int (i) == 0x7fff)
++	{
++	    f = 0xffff; /* saturate */
++	}
++	else
++	{
++	    f = Y_FRAC_FIRST (8);
++	    i += pixman_fixed_1;
++	}
++    }
++}
++else
++{
+     f = DIV (f - Y_FRAC_FIRST (n) + (STEP_Y_SMALL (n) - pixman_fixed_e), STEP_Y_SMALL (n)) * STEP_Y_SMALL (n) +
+ 	Y_FRAC_FIRST (n);
+     
+@@ -55,6 +80,7 @@
+ 	    i += pixman_fixed_1;
+ 	}
+     }
++}
+     return (i | f);
+ }
+ 
+@@ -69,6 +95,26 @@
+     pixman_fixed_t f = pixman_fixed_frac (y);
+     pixman_fixed_t i = pixman_fixed_floor (y);
+ 
++if (8 == n)
++{
++    f = DIV (f - pixman_fixed_e - Y_FRAC_FIRST (8), STEP_Y_SMALL (8)) * STEP_Y_SMALL (8) +
++	Y_FRAC_FIRST (8);
++
++    if (f < Y_FRAC_FIRST (8))
++    {
++	if (pixman_fixed_to_int (i) == 0x8000)
++	{
++	    f = 0; /* saturate */
++	}
++	else
++	{
++	    f = Y_FRAC_LAST (8);
++	    i -= pixman_fixed_1;
++	}
++    }
++}
++else
++{
+     f = DIV (f - pixman_fixed_e - Y_FRAC_FIRST (n), STEP_Y_SMALL (n)) * STEP_Y_SMALL (n) +
+ 	Y_FRAC_FIRST (n);
+ 
+@@ -84,6 +130,8 @@
+ 	    i -= pixman_fixed_1;
+ 	}
+     }
++}
++
+     return (i | f);
+ }
+ 
+@@ -186,11 +234,22 @@
+ 	    e->e = 0;
+ 	}
+ 
++if (8 == n)
++{
++	_pixman_edge_multi_init (e, STEP_Y_SMALL (8),
++				 &e->stepx_small, &e->dx_small);
++
++	_pixman_edge_multi_init (e, STEP_Y_BIG (8),
++				 &e->stepx_big, &e->dx_big);
++}
++else
++{
+ 	_pixman_edge_multi_init (e, STEP_Y_SMALL (n),
+ 				 &e->stepx_small, &e->dx_small);
+ 
+ 	_pixman_edge_multi_init (e, STEP_Y_BIG (n),
+ 				 &e->stepx_big, &e->dx_big);
++}
+     }
+     pixman_edge_step (e, y_start - y_top);
+ }
+@@ -327,6 +386,27 @@
+     dump_image (image, "before");
+ #endif
+ 
++#if defined(TT_MEMUTIL) && defined(_MSC_VER)
++int omp_thread_counts = omp_get_max_threads();
++if (omp_thread_counts >= 2 &&
++    ntraps >= omp_thread_counts &&
++    ntraps >= 160)
++{
++#pragma omp parallel for schedule(guided) default(none) \
++shared(ntraps, traps, image, x_off, y_off)
++    for (i = 0; i < ntraps; ++i)
++    {
++	const pixman_trapezoid_t *trap = &(traps[i]);
++
++	if (pixman_trapezoid_valid (trap))
++	{
++		pixman_rasterize_trapezoid (image, trap, x_off, y_off);
++	}
++    }
++}
++else
++#endif
++{
+     for (i = 0; i < ntraps; ++i)
+     {
+ 	const pixman_trapezoid_t *trap = &(traps[i]);
+@@ -336,6 +416,7 @@
+ 
+ 	pixman_rasterize_trapezoid (image, trap, x_off, y_off);
+     }
++}
+ 
+ #if 0
+     dump_image (image, "after");
+diff -r a2ffa9047bf4 -r 67316c163750 gfx/qcms/moz.build
+--- a/gfx/qcms/moz.build	Thu Feb 19 19:54:14 2015 -0500
++++ b/gfx/qcms/moz.build	Wed Feb 25 01:57:00 2015 +0800
+@@ -63,3 +63,10 @@
+ if use_altivec:
+     SOURCES += ['transform-altivec.c']
+     SOURCES['transform-altivec.c'].flags += ['-maltivec']
++
++if CONFIG['_MSC_VER']:
++    if '-DTT_MEMUTIL' in CONFIG['MOZ_OPTIMIZE_FLAGS']:
++        SOURCES['transform-sse2.c'].flags += [
++            '-GL-',
++            '-openmp',
++        ]
+diff -r a2ffa9047bf4 -r 67316c163750 gfx/qcms/transform-sse2.c
+--- a/gfx/qcms/transform-sse2.c	Thu Feb 19 19:54:14 2015 -0500
++++ b/gfx/qcms/transform-sse2.c	Wed Feb 25 01:57:00 2015 +0800
+@@ -1,3 +1,7 @@
++#if defined(TT_MEMUTIL) && defined(_MSC_VER)
++#include <omp.h>
++#endif
++
+ #include <emmintrin.h>
+ 
+ #include "qcmsint.h"
+@@ -15,17 +19,8 @@
+                                           unsigned char *dest,
+                                           size_t length)
+ {
+-    unsigned int i;
++    int i;
+     float (*mat)[4] = transform->matrix;
+-    char input_back[32];
+-    /* Ensure we have a buffer that's 16 byte aligned regardless of the original
+-     * stack alignment. We can't use __attribute__((aligned(16))) or __declspec(align(32))
+-     * because they don't work on stack variables. gcc 4.4 does do the right thing
+-     * on x86 but that's too new for us right now. For more info: gcc bug #16660 */
+-    float const * input = (float*)(((uintptr_t)&input_back[16]) & ~0xf);
+-    /* share input and output locations to save having to keep the
+-     * locations in separate registers */
+-    uint32_t const * output = (uint32_t*)input;
+ 
+     /* deref *transform now to avoid it in loop */
+     const float *igtbl_r = transform->input_gamma_table_r;
+@@ -47,26 +42,32 @@
+     const __m128 min   = _mm_setzero_ps();
+     const __m128 scale = _mm_load_ps(floatScaleX4);
+ 
+-    /* working variables */
+-    __m128 vec_r, vec_g, vec_b, result;
++#if defined(TT_MEMUTIL) && defined(_MSC_VER)
++    int omp_thread_counts;
++#endif
+ 
+     /* CYA */
+     if (!length)
+         return;
+ 
+-    /* one pixel is handled outside of the loop */
+-    length--;
+-
+-    /* setup for transforming 1st pixel */
+-    vec_r = _mm_load_ss(&igtbl_r[src[0]]);
+-    vec_g = _mm_load_ss(&igtbl_g[src[1]]);
+-    vec_b = _mm_load_ss(&igtbl_b[src[2]]);
+-    src += 3;
+-
+-    /* transform all but final pixel */
+-
++#if defined(TT_MEMUTIL) && defined(_MSC_VER)
++    omp_thread_counts = omp_get_max_threads();
++#pragma omp parallel for schedule(static) default(none) num_threads(2) \
++shared(length, igtbl_r, igtbl_g, igtbl_b, src, dest, otdata_r, otdata_g, otdata_b) \
++if (omp_thread_counts >= 2 && \
++    length >= (int32_t)omp_thread_counts && \
++    length >= 700)
++#endif // defined(TT_MEMUTIL) && defined(_MSC_VER)
+     for (i=0; i<length; i++)
+     {
++        __m128 vec_r, vec_g, vec_b;
++        __m128i result;
++
++        /* load */
++        vec_r = _mm_load_ss(&igtbl_r[src[i * 3 + 0]]);
++        vec_g = _mm_load_ss(&igtbl_g[src[i * 3 + 1]]);
++        vec_b = _mm_load_ss(&igtbl_b[src[i * 3 + 2]]);
++
+         /* position values from gamma tables */
+         vec_r = _mm_shuffle_ps(vec_r, vec_r, 0);
+         vec_g = _mm_shuffle_ps(vec_g, vec_g, 0);
+@@ -81,44 +82,15 @@
+         vec_r  = _mm_add_ps(vec_r, _mm_add_ps(vec_g, vec_b));
+         vec_r  = _mm_max_ps(min, vec_r);
+         vec_r  = _mm_min_ps(max, vec_r);
+-        result = _mm_mul_ps(vec_r, scale);
+-
+-        /* store calc'd output tables indices */
+-        _mm_store_si128((__m128i*)output, _mm_cvtps_epi32(result));
+-
+-        /* load for next loop while store completes */
+-        vec_r = _mm_load_ss(&igtbl_r[src[0]]);
+-        vec_g = _mm_load_ss(&igtbl_g[src[1]]);
+-        vec_b = _mm_load_ss(&igtbl_b[src[2]]);
+-        src += 3;
++        result = _mm_cvtps_epi32(_mm_mul_ps(vec_r, scale));
+ 
+         /* use calc'd indices to output RGB values */
+-        dest[OUTPUT_R_INDEX] = otdata_r[output[0]];
+-        dest[OUTPUT_G_INDEX] = otdata_g[output[1]];
+-        dest[OUTPUT_B_INDEX] = otdata_b[output[2]];
+-        dest += RGB_OUTPUT_COMPONENTS;
++        dest[i * RGB_OUTPUT_COMPONENTS + OUTPUT_R_INDEX] = otdata_r[_mm_cvtsi128_si32(result)];
++        result = _mm_srli_si128(result, 4);
++        dest[i * RGB_OUTPUT_COMPONENTS + OUTPUT_G_INDEX] = otdata_g[_mm_cvtsi128_si32(result)];
++        result = _mm_srli_si128(result, 4);
++        dest[i * RGB_OUTPUT_COMPONENTS + OUTPUT_B_INDEX] = otdata_b[_mm_cvtsi128_si32(result)];
+     }
+-
+-    /* handle final (maybe only) pixel */
+-
+-    vec_r = _mm_shuffle_ps(vec_r, vec_r, 0);
+-    vec_g = _mm_shuffle_ps(vec_g, vec_g, 0);
+-    vec_b = _mm_shuffle_ps(vec_b, vec_b, 0);
+-
+-    vec_r = _mm_mul_ps(vec_r, mat0);
+-    vec_g = _mm_mul_ps(vec_g, mat1);
+-    vec_b = _mm_mul_ps(vec_b, mat2);
+-
+-    vec_r  = _mm_add_ps(vec_r, _mm_add_ps(vec_g, vec_b));
+-    vec_r  = _mm_max_ps(min, vec_r);
+-    vec_r  = _mm_min_ps(max, vec_r);
+-    result = _mm_mul_ps(vec_r, scale);
+-
+-    _mm_store_si128((__m128i*)output, _mm_cvtps_epi32(result));
+-
+-    dest[OUTPUT_R_INDEX] = otdata_r[output[0]];
+-    dest[OUTPUT_G_INDEX] = otdata_g[output[1]];
+-    dest[OUTPUT_B_INDEX] = otdata_b[output[2]];
+ }
+ 
+ void qcms_transform_data_rgba_out_lut_sse2(qcms_transform *transform,
+diff -r a2ffa9047bf4 -r 67316c163750 gfx/src/nsRect.h
+--- a/gfx/src/nsRect.h	Thu Feb 19 19:54:14 2015 -0500
++++ b/gfx/src/nsRect.h	Wed Feb 25 01:57:00 2015 +0800
+@@ -20,6 +20,10 @@
+ #include "nsSize.h"                     // for nsIntSize, nsSize
+ #include "nscore.h"                     // for NS_BUILD_REFCNT_LOGGING
+ 
++#include "mozilla/Alignment.h"
++#include "mozilla/SSE.h"
++#include <smmintrin.h>
++
+ struct nsIntRect;
+ struct nsMargin;
+ struct nsIntMargin;
+@@ -48,6 +52,10 @@
+   {
+     MOZ_COUNT_CTOR(nsRect);
+   }
++  nsRect(const __m128i& a128i) : Super(a128i)
++  {
++    MOZ_COUNT_CTOR(nsRect);
++  }
+ 
+ #ifdef NS_BUILD_REFCNT_LOGGING
+   ~nsRect() {
+@@ -179,6 +187,9 @@
+       Super(aX, aY, aWidth, aHeight)
+   {
+   }
++  nsIntRect(const __m128i& a128i) : Super(a128i)
++  {
++  }
+ 
+   inline nsRect ToAppUnits(nscoord aAppUnitsPerPixel) const;
+ 
+@@ -236,11 +247,29 @@
+   return rect;
+ }
+ 
++static const MOZ_ALIGNED_DECL(double d_half[2], 16) = { 0.5, 0.5 };
++
+ // scale the rect but round to preserve centers
+ inline nsIntRect
+ nsRect::ScaleToNearestPixels(float aXScale, float aYScale,
+                              nscoord aAppUnitsPerPixel) const
+ {
++#if !defined(NS_COORD_IS_FLOAT)
++  if (IsInt32x4() && mozilla::supports_sse4_1()) {
++    __m128d appUnitsPerPixel_x2 = _mm_cvtepi32_pd(_mm_set1_epi32(aAppUnitsPerPixel));
++    __m128i src_x4 = _mm_loadu_si128((__m128i *)&x);
++    __m128d xy = _mm_cvtepi32_pd(src_x4);
++    __m128d xyMost = _mm_cvtepi32_pd(_mm_add_epi32(src_x4, _mm_srli_si128(src_x4, 8)));
++    __m128d xyScale = _mm_cvtps_pd(_mm_unpacklo_ps(_mm_load_ss(&aXScale), _mm_load_ss(&aYScale)));
++
++    __m128i rectXY = _mm_cvttpd_epi32(_mm_floor_pd(_mm_add_pd(_mm_mul_pd(_mm_div_pd(xy, appUnitsPerPixel_x2), xyScale), *(__m128d *)&d_half)));
++    __m128i rectWH = _mm_max_epi32(_mm_setzero_si128(), _mm_sub_epi32(_mm_cvttpd_epi32(_mm_floor_pd(_mm_add_pd(_mm_mul_pd(_mm_div_pd(xyMost, appUnitsPerPixel_x2), xyScale), *(__m128d *)&d_half))), rectXY));
++    __m128i rect = _mm_unpacklo_epi64(rectXY, rectWH);
++
++    return nsIntRect(rect);
++  }
++#endif
++
+   nsIntRect rect;
+   rect.x = NSToIntRoundUp(NSAppUnitsToDoublePixels(x, aAppUnitsPerPixel) * aXScale);
+   rect.y = NSToIntRoundUp(NSAppUnitsToDoublePixels(y, aAppUnitsPerPixel) * aYScale);
+@@ -257,6 +286,23 @@
+ nsRect::ScaleToOutsidePixels(float aXScale, float aYScale,
+                              nscoord aAppUnitsPerPixel) const
+ {
++#if !defined(NS_COORD_IS_FLOAT)
++  if (IsInt32x4() && mozilla::supports_sse4_1()) {
++    __m128 appUnitsPerPixel_x4 = _mm_cvtepi32_ps(_mm_set1_epi32(aAppUnitsPerPixel));
++    __m128i src_x4 = _mm_loadu_si128((__m128i *)&x);
++    __m128 xy_xyMost = _mm_cvtepi32_ps(_mm_add_epi32(src_x4, _mm_slli_si128(src_x4, 8)));
++    __m128 xyScale_x2 = _mm_unpacklo_ps(_mm_load_ss(&aXScale), _mm_load_ss(&aYScale));
++    xyScale_x2 = _mm_movelh_ps(xyScale_x2, xyScale_x2);
++
++    __m128 a = _mm_mul_ps(_mm_div_ps(xy_xyMost, appUnitsPerPixel_x4), xyScale_x2);
++    __m128i rectXY = _mm_cvttpd_epi32(_mm_floor_pd(_mm_cvtps_pd(a)));
++    __m128i rectWH = _mm_max_epi32(_mm_setzero_si128(), _mm_sub_epi32(_mm_cvttpd_epi32(_mm_ceil_pd(_mm_cvtps_pd(_mm_castsi128_ps(_mm_srli_si128(_mm_castps_si128(a), 8))))), rectXY));
++    __m128i rect = _mm_unpacklo_epi64(rectXY, rectWH);
++
++    return nsIntRect(rect);
++  }
++#endif
++
+   nsIntRect rect;
+   rect.x = NSToIntFloor(NSAppUnitsToFloatPixels(x, float(aAppUnitsPerPixel)) * aXScale);
+   rect.y = NSToIntFloor(NSAppUnitsToFloatPixels(y, float(aAppUnitsPerPixel)) * aYScale);
+@@ -273,6 +319,23 @@
+ nsRect::ScaleToInsidePixels(float aXScale, float aYScale,
+                             nscoord aAppUnitsPerPixel) const
+ {
++#if !defined(NS_COORD_IS_FLOAT)
++  if (IsInt32x4() && mozilla::supports_sse4_1()) {
++    __m128 appUnitsPerPixel_x4 = _mm_cvtepi32_ps(_mm_set1_epi32(aAppUnitsPerPixel));
++    __m128i src_x4 = _mm_loadu_si128((__m128i *)&x);
++    __m128 xy_xyMost = _mm_cvtepi32_ps(_mm_add_epi32(src_x4, _mm_slli_si128(src_x4, 8)));
++    __m128 xyScale_x2 = _mm_unpacklo_ps(_mm_load_ss(&aXScale), _mm_load_ss(&aYScale));
++    xyScale_x2 = _mm_movelh_ps(xyScale_x2, xyScale_x2);
++
++    __m128 a = _mm_mul_ps(_mm_div_ps(xy_xyMost, appUnitsPerPixel_x4), xyScale_x2);
++    __m128i rectXY = _mm_cvttpd_epi32(_mm_ceil_pd(_mm_cvtps_pd(a)));
++    __m128i rectWH = _mm_max_epi32(_mm_setzero_si128(), _mm_sub_epi32(_mm_cvttpd_epi32(_mm_floor_pd(_mm_cvtps_pd(_mm_castsi128_ps(_mm_srli_si128(_mm_castps_si128(a), 8))))), rectXY));
++    __m128i rect = _mm_unpacklo_epi64(rectXY, rectWH);
++
++    return nsIntRect(rect);
++  }
++#endif
++
+   nsIntRect rect;
+   rect.x = NSToIntCeil(NSAppUnitsToFloatPixels(x, float(aAppUnitsPerPixel)) * aXScale);
+   rect.y = NSToIntCeil(NSAppUnitsToFloatPixels(y, float(aAppUnitsPerPixel)) * aYScale);
+@@ -287,18 +350,63 @@
+ inline nsIntRect
+ nsRect::ToNearestPixels(nscoord aAppUnitsPerPixel) const
+ {
++#if !defined(NS_COORD_IS_FLOAT)
++  if (IsInt32x4() && mozilla::supports_sse4_1()) {
++    __m128d appUnitsPerPixel_x2 = _mm_cvtepi32_pd(_mm_set1_epi32(aAppUnitsPerPixel));
++    __m128i src_x4 = _mm_loadu_si128((__m128i *)&x);
++    __m128d xy = _mm_cvtepi32_pd(src_x4);
++    __m128d xyMost = _mm_cvtepi32_pd(_mm_add_epi32(src_x4, _mm_srli_si128(src_x4, 8)));
++
++    __m128i rectXY = _mm_cvttpd_epi32(_mm_floor_pd(_mm_add_pd(_mm_div_pd(xy, appUnitsPerPixel_x2), *(__m128d *)&d_half)));
++    __m128i rectWH = _mm_max_epi32(_mm_setzero_si128(), _mm_sub_epi32(_mm_cvttpd_epi32(_mm_floor_pd(_mm_add_pd(_mm_div_pd(xyMost, appUnitsPerPixel_x2), *(__m128d *)&d_half))), rectXY));
++    __m128i rect = _mm_unpacklo_epi64(rectXY, rectWH);
++
++    return nsIntRect(rect);
++  }
++#endif
++
+   return ScaleToNearestPixels(1.0f, 1.0f, aAppUnitsPerPixel);
+ }
+ 
+ inline nsIntRect
+ nsRect::ToOutsidePixels(nscoord aAppUnitsPerPixel) const
+ {
++#if !defined(NS_COORD_IS_FLOAT)
++  if (IsInt32x4() && mozilla::supports_sse4_1()) {
++    __m128 appUnitsPerPixel_x4 = _mm_cvtepi32_ps(_mm_set1_epi32(aAppUnitsPerPixel));
++    __m128i src_x4 = _mm_loadu_si128((__m128i *)&x);
++    __m128 xy_xyMost = _mm_cvtepi32_ps(_mm_add_epi32(src_x4, _mm_slli_si128(src_x4, 8)));
++
++    __m128 a = _mm_div_ps(xy_xyMost, appUnitsPerPixel_x4);
++    __m128i rectXY = _mm_cvttpd_epi32(_mm_floor_pd(_mm_cvtps_pd(a)));
++    __m128i rectWH = _mm_max_epi32(_mm_setzero_si128(), _mm_sub_epi32(_mm_cvttpd_epi32(_mm_ceil_pd(_mm_cvtps_pd(_mm_castsi128_ps(_mm_srli_si128(_mm_castps_si128(a), 8))))), rectXY));
++    __m128i rect = _mm_unpacklo_epi64(rectXY, rectWH);
++
++    return nsIntRect(rect);
++  }
++#endif
++
+   return ScaleToOutsidePixels(1.0f, 1.0f, aAppUnitsPerPixel);
+ }
+ 
+ inline nsIntRect
+ nsRect::ToInsidePixels(nscoord aAppUnitsPerPixel) const
+ {
++#if !defined(NS_COORD_IS_FLOAT)
++  if (IsInt32x4() && mozilla::supports_sse4_1()) {
++    __m128 appUnitsPerPixel_x4 = _mm_cvtepi32_ps(_mm_set1_epi32(aAppUnitsPerPixel));
++    __m128i src_x4 = _mm_loadu_si128((__m128i *)&x);
++    __m128 xy_xyMost = _mm_cvtepi32_ps(_mm_add_epi32(src_x4, _mm_slli_si128(src_x4, 8)));
++
++    __m128 a = _mm_div_ps(xy_xyMost, appUnitsPerPixel_x4);
++    __m128i rectXY = _mm_cvttpd_epi32(_mm_ceil_pd(_mm_cvtps_pd(a)));
++    __m128i rectWH = _mm_max_epi32(_mm_setzero_si128(), _mm_sub_epi32(_mm_cvttpd_epi32(_mm_floor_pd(_mm_cvtps_pd(_mm_castsi128_ps(_mm_srli_si128(_mm_castps_si128(a), 8))))), rectXY));
++    __m128i rect = _mm_unpacklo_epi64(rectXY, rectWH);
++
++    return nsIntRect(rect);
++  }
++#endif
++
+   return ScaleToInsidePixels(1.0f, 1.0f, aAppUnitsPerPixel);
+ }
+ 
+diff -r a2ffa9047bf4 -r 67316c163750 gfx/src/nsRegion.cpp
+--- a/gfx/src/nsRegion.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/gfx/src/nsRegion.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -9,6 +9,10 @@
+ #include "gfx3DMatrix.h"
+ #include "gfxUtils.h"
+ 
++#if !defined(NS_COORD_IS_FLOAT) && defined(_MSC_VER) && defined(_M_IX86)
++#include <intrin.h>
++#endif
++
+ bool nsRegion::Contains(const nsRegion& aRgn) const
+ {
+   // XXX this could be made faster
+@@ -550,7 +554,11 @@
+   nsRegionRectIterator iter(*this);
+   const nsRect* r;
+   while ((r = iter.Next()) != nullptr) {
++#if !defined(NS_COORD_IS_FLOAT) && defined(_MSC_VER) && defined(_M_IX86)
++    area += __emul(r->width, r->height);
++#else
+     area += uint64_t(r->width)*r->height;
++#endif
+   }
+   return area;
+ }
+diff -r a2ffa9047bf4 -r 67316c163750 image/src/imgLoader.cpp
+--- a/image/src/imgLoader.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/image/src/imgLoader.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -1414,13 +1414,15 @@
+     NS_ASSERTION(entry, "imgLoader::CheckCacheLimits -- NULL entry pointer");
+ 
+ #if defined(PR_LOGGING)
+-    nsRefPtr<imgRequest> req(entry->GetRequest());
+-    if (req) {
+-      nsRefPtr<ImageURL> uri;
+-      req->GetURI(getter_AddRefs(uri));
+-      nsAutoCString spec;
+-      uri->GetSpec(spec);
+-      LOG_STATIC_FUNC_WITH_PARAM(GetImgLog(), "imgLoader::CheckCacheLimits", "entry", spec.get());
++    if (entry) {
++      nsRefPtr<imgRequest> req(entry->GetRequest());
++      if (req) {
++        nsRefPtr<ImageURL> uri;
++        req->GetURI(getter_AddRefs(uri));
++        nsAutoCString spec;
++        uri->GetSpec(spec);
++        LOG_STATIC_FUNC_WITH_PARAM(GetImgLog(), "imgLoader::CheckCacheLimits", "entry", spec.get());
++      }
+     }
+ #endif
+ 
+diff -r a2ffa9047bf4 -r 67316c163750 js/src/configure.in
+--- a/js/src/configure.in	Thu Feb 19 19:54:14 2015 -0500
++++ b/js/src/configure.in	Wed Feb 25 01:57:00 2015 +0800
+@@ -1780,11 +1780,6 @@
+         _DEFINES_CXXFLAGS='-FI $(DEPTH)/js/src/js-confdefs.h -DMOZILLA_CLIENT'
+         CFLAGS="$CFLAGS -W3 -Gy"
+         CXXFLAGS="$CXXFLAGS -W3 -Gy"
+-        if test "$_CC_SUITE" -ge "11" -a "$CPU_ARCH" = "x86"; then
+-            dnl VS2012+ defaults to -arch:SSE2.
+-            CFLAGS="$CFLAGS -arch:IA32"
+-            CXXFLAGS="$CXXFLAGS -arch:IA32"
+-        fi
+         if test "$_CC_SUITE" -ge "12"; then
+             dnl VS2013+ requires -FS when parallel building by make -jN.
+             dnl If nothing, compiler sometimes causes C1041 error.
+@@ -1818,8 +1813,12 @@
+             fi
+         fi
+         dnl For profile-guided optimization
+-        PROFILE_GEN_CFLAGS="-GL"
++        PROFILE_GEN_CFLAGS="-GL -DMSVC_PGO_ENABLED"
+         PROFILE_GEN_LDFLAGS="-LTCG:PGINSTRUMENT"
++        if test "$_CC_SUITE" -ge "12"; then
++            dnl Run PGO profiling in safe mode
++            PROFILE_GEN_LDFLAGS="$PROFILE_GEN_LDFLAGS -PogoSafeMode"
++        fi
+         dnl XXX: PGO builds can fail with warnings treated as errors,
+         dnl specifically "no profile data available" appears to be
+         dnl treated as an error sometimes. This might be a consequence
+@@ -1827,7 +1826,7 @@
+         dnl with the linker doing most of the work in the whole-program
+         dnl optimization/PGO case. I think it's probably a compiler bug,
+         dnl but we work around it here.
+-        PROFILE_USE_CFLAGS="-GL -wd4624 -wd4952"
++        PROFILE_USE_CFLAGS="-GL -wd4624 -wd4952 -DMSVC_PGO_ENABLED"
+         dnl XXX: should be -LTCG:PGOPTIMIZE, but that fails on libxul.
+         dnl Probably also a compiler bug, but what can you do?
+         PROFILE_USE_LDFLAGS="-LTCG:PGUPDATE"
+diff -r a2ffa9047bf4 -r 67316c163750 js/src/jit/CodeGenerator.cpp
+--- a/js/src/jit/CodeGenerator.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/js/src/jit/CodeGenerator.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -5318,45 +5318,80 @@
+     FloatRegister input = ToFloatRegister(ins->input());
+     MOZ_ASSERT(ToFloatRegister(ins->output()) == ReturnDoubleReg);
+ 
++    bool vectorcall = false;
++#ifndef JS_NO_VECTORCALL
++    switch (ins->mir()->function()) {
++      case MMathFunction::Log:
++      case MMathFunction::Sin:
++      case MMathFunction::Cos:
++      case MMathFunction::Exp:
++      case MMathFunction::Tan:
++      case MMathFunction::ATan:
++      case MMathFunction::ASin:
++      case MMathFunction::ACos:
++      case MMathFunction::Log10:
++        vectorcall = true;
++        break;
++    }
++#endif
++
+     const MathCache *mathCache = ins->mir()->cache();
+ 
+-    masm.setupUnalignedABICall(mathCache ? 2 : 1, temp);
+-    if (mathCache) {
+-        masm.movePtr(ImmPtr(mathCache), temp);
+-        masm.passABIArg(temp);
+-    }
+-    masm.passABIArg(input, MoveOp::DOUBLE);
++    if (!vectorcall) {
++        masm.setupUnalignedABICall(mathCache ? 2 : 1, temp);
++        if (mathCache) {
++            masm.movePtr(ImmPtr(mathCache), temp);
++            masm.passABIArg(temp);
++        }
++        masm.passABIArg(input, MoveOp::DOUBLE);
++    }
++#ifndef JS_NO_VECTORCALL
++    else {
++        masm.setupAlignedVecCall(mathCache ? 2 : 1);
++        if (mathCache) {
++            masm.movePtr(ImmPtr(mathCache), temp);
++            masm.passVecArg(temp);
++        }
++        masm.passVecArg(input, MoveOp::DOUBLE);
++    }
++#endif
+ 
+ #   define MAYBE_CACHED(fcn) (mathCache ? (void*)fcn ## _impl : (void*)fcn ## _uncached)
++    typedef double (JS_VECTORCALL* VECFUNC_IMPL)(MathCache*, double);
++    typedef double (JS_VECTORCALL* VECFUNC_UNCACHED)(double);
++    VECFUNC_IMPL fnImpl = nullptr;
++    VECFUNC_UNCACHED fnUncached = nullptr;
++#   define MAYBE_CACHED_VEC(fcn) (mathCache ? (void*)(fnImpl = fcn ## _impl) : \
++                                              (void*)(fnUncached = fcn ## _uncached))
+ 
+     void *funptr = nullptr;
+     switch (ins->mir()->function()) {
+       case MMathFunction::Log:
+-        funptr = JS_FUNC_TO_DATA_PTR(void *, MAYBE_CACHED(js::math_log));
++        funptr = JS_FUNC_TO_DATA_PTR(void *, MAYBE_CACHED_VEC(js::math_log));
+         break;
+       case MMathFunction::Sin:
+-        funptr = JS_FUNC_TO_DATA_PTR(void *, MAYBE_CACHED(js::math_sin));
++        funptr = JS_FUNC_TO_DATA_PTR(void *, MAYBE_CACHED_VEC(js::math_sin));
+         break;
+       case MMathFunction::Cos:
+-        funptr = JS_FUNC_TO_DATA_PTR(void *, MAYBE_CACHED(js::math_cos));
++        funptr = JS_FUNC_TO_DATA_PTR(void *, MAYBE_CACHED_VEC(js::math_cos));
+         break;
+       case MMathFunction::Exp:
+-        funptr = JS_FUNC_TO_DATA_PTR(void *, MAYBE_CACHED(js::math_exp));
++        funptr = JS_FUNC_TO_DATA_PTR(void *, MAYBE_CACHED_VEC(js::math_exp));
+         break;
+       case MMathFunction::Tan:
+-        funptr = JS_FUNC_TO_DATA_PTR(void *, MAYBE_CACHED(js::math_tan));
++        funptr = JS_FUNC_TO_DATA_PTR(void *, MAYBE_CACHED_VEC(js::math_tan));
+         break;
+       case MMathFunction::ATan:
+-        funptr = JS_FUNC_TO_DATA_PTR(void *, MAYBE_CACHED(js::math_atan));
++        funptr = JS_FUNC_TO_DATA_PTR(void *, MAYBE_CACHED_VEC(js::math_atan));
+         break;
+       case MMathFunction::ASin:
+-        funptr = JS_FUNC_TO_DATA_PTR(void *, MAYBE_CACHED(js::math_asin));
++        funptr = JS_FUNC_TO_DATA_PTR(void *, MAYBE_CACHED_VEC(js::math_asin));
+         break;
+       case MMathFunction::ACos:
+-        funptr = JS_FUNC_TO_DATA_PTR(void *, MAYBE_CACHED(js::math_acos));
++        funptr = JS_FUNC_TO_DATA_PTR(void *, MAYBE_CACHED_VEC(js::math_acos));
+         break;
+       case MMathFunction::Log10:
+-        funptr = JS_FUNC_TO_DATA_PTR(void *, MAYBE_CACHED(js::math_log10));
++        funptr = JS_FUNC_TO_DATA_PTR(void *, MAYBE_CACHED_VEC(js::math_log10));
+         break;
+       case MMathFunction::Log2:
+         funptr = JS_FUNC_TO_DATA_PTR(void *, MAYBE_CACHED(js::math_log2));
+@@ -5409,7 +5444,13 @@
+ 
+ #   undef MAYBE_CACHED
+ 
+-    masm.callWithABI(funptr, MoveOp::DOUBLE);
++    if (!vectorcall)
++        masm.callWithABI(funptr, MoveOp::DOUBLE);
++#ifndef JS_NO_VECTORCALL
++    else
++        masm.callWithVec(funptr, MoveOp::DOUBLE);
++#endif
++
+     return true;
+ }
+ 
+diff -r a2ffa9047bf4 -r 67316c163750 js/src/jit/Lowering.cpp
+--- a/js/src/jit/Lowering.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/js/src/jit/Lowering.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -1421,7 +1421,11 @@
+     if (ins->type() == MIRType_Double) {
+         // Note: useRegisterAtStart is safe here, the temp is not a FP register.
+         LMathFunctionD *lir = new(alloc()) LMathFunctionD(useRegisterAtStart(ins->input()),
++#ifdef JS_NO_VECTORCALL
+                                                           tempFixed(CallTempReg0));
++#else
++                                                          tempFixed(VecIntArgReg0));
++#endif
+         return defineReturn(lir, ins);
+     }
+ 
+diff -r a2ffa9047bf4 -r 67316c163750 js/src/jit/x86/Assembler-x86.h
+--- a/js/src/jit/x86/Assembler-x86.h	Thu Feb 19 19:54:14 2015 -0500
++++ b/js/src/jit/x86/Assembler-x86.h	Wed Feb 25 01:57:00 2015 +0800
+@@ -72,6 +72,25 @@
+ static const uint32_t NumCallTempNonArgRegs =
+     mozilla::ArrayLength(CallTempNonArgRegs);
+ 
++// Different argument registers for MSVC __vectorcall
++#if !defined(JS_NO_VECTORCALL)
++static MOZ_CONSTEXPR_VAR Register VecIntArgReg0 = ecx;
++static MOZ_CONSTEXPR_VAR Register VecIntArgReg1 = edx;
++static MOZ_CONSTEXPR_VAR Register VecIntArgRegs[] = { ecx, edx };
++static const uint32_t NumVecIntArgRegs =
++    mozilla::ArrayLength(VecIntArgRegs);
++
++static MOZ_CONSTEXPR_VAR FloatRegister VecFloatArgReg0 = xmm0;
++static MOZ_CONSTEXPR_VAR FloatRegister VecFloatArgReg1 = xmm1;
++static MOZ_CONSTEXPR_VAR FloatRegister VecFloatArgReg2 = xmm2;
++static MOZ_CONSTEXPR_VAR FloatRegister VecFloatArgReg3 = xmm3;
++static MOZ_CONSTEXPR_VAR FloatRegister VecFloatArgReg4 = xmm4;
++static MOZ_CONSTEXPR_VAR FloatRegister VecFloatArgReg5 = xmm5;
++static MOZ_CONSTEXPR_VAR FloatRegister VecFloatArgRegs[] = { xmm0, xmm1, xmm2, xmm3, xmm4, xmm5 };
++static const uint32_t NumVecFloatArgRegs =
++    mozilla::ArrayLength(VecFloatArgRegs);
++#endif
++
+ class ABIArgGenerator
+ {
+     uint32_t stackOffset_;
+diff -r a2ffa9047bf4 -r 67316c163750 js/src/jit/x86/MacroAssembler-x86.cpp
+--- a/js/src/jit/x86/MacroAssembler-x86.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/js/src/jit/x86/MacroAssembler-x86.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -357,6 +357,184 @@
+     callWithABIPost(stackAdjust, result);
+ }
+ 
++#if !defined(JS_NO_VECTORCALL)
++
++void
++MacroAssemblerX86::setupVecCall(uint32_t args)
++{
++    MOZ_ASSERT(!inCall_);
++    inCall_ = true;
++
++    args_ = args;
++    passedIntArgs_ = 0;
++    passedFloatArgs_ = 0;
++    stackForCall_ = 0;
++}
++
++void
++MacroAssemblerX86::setupAlignedVecCall(uint32_t args)
++{
++    setupVecCall(args);
++    dynamicAlignment_ = false;
++}
++
++void
++MacroAssemblerX86::setupUnalignedVecCall(uint32_t args, Register scratch)
++{
++    setupVecCall(args);
++    dynamicAlignment_ = true;
++
++    movl(esp, scratch);
++    andl(Imm32(~(ABIStackAlignment - 1)), esp);
++    push(scratch);
++}
++
++void
++MacroAssemblerX86::passVecArg(const MoveOperand &from, MoveOp::Type type)
++{
++    MoveOperand to;
++    switch (type) {
++      case MoveOp::FLOAT32:
++      case MoveOp::DOUBLE: {
++        FloatRegister dest;
++        if (GetVecFloatArgReg(passedIntArgs_, passedFloatArgs_++, &dest)) {
++            if (from.isFloatReg() && from.floatReg() == dest) {
++                // Nothing to do; the value is in the right register already
++                return;
++            }
++            to = MoveOperand(dest);
++        } else {
++            to = MoveOperand(StackPointer, stackForCall_);
++            switch (type) {
++              case MoveOp::FLOAT32: stackForCall_ += sizeof(float);  break;
++              case MoveOp::DOUBLE:  stackForCall_ += sizeof(double); break;
++              default: MOZ_CRASH("Unexpected float register class argument type");
++            }
++        }
++        break;
++      }
++      case MoveOp::GENERAL: {
++        Register dest;
++        if (GetVecIntArgReg(passedIntArgs_++, passedFloatArgs_, &dest)) {
++            if (from.isGeneralReg() && from.reg() == dest) {
++                // Nothing to do; the value is in the right register already
++                return;
++            }
++            to = MoveOperand(dest);
++        } else {
++            to = MoveOperand(StackPointer, stackForCall_);
++            stackForCall_ += sizeof(int32_t);
++        }
++        break;
++      }
++      default:
++        MOZ_CRASH("Unexpected argument type");
++    }
++
++    enoughMemory_ = moveResolver_.addMove(from, to, type);
++}
++
++void
++MacroAssemblerX86::passVecArg(Register reg)
++{
++    passVecArg(MoveOperand(reg), MoveOp::GENERAL);
++}
++
++void
++MacroAssemblerX86::passVecArg(FloatRegister reg, MoveOp::Type type)
++{
++    passVecArg(MoveOperand(reg), type);
++}
++
++void
++MacroAssemblerX86::callWithVecPre(uint32_t *stackAdjust)
++{
++    MOZ_ASSERT(inCall_);
++    MOZ_ASSERT(args_ == passedIntArgs_ + passedFloatArgs_);
++
++    if (dynamicAlignment_) {
++        *stackAdjust = stackForCall_
++                     + ComputeByteAlignment(stackForCall_ + sizeof(intptr_t),
++                                            ABIStackAlignment);
++    } else {
++        *stackAdjust = stackForCall_
++                     + ComputeByteAlignment(stackForCall_ + framePushed_,
++                                            ABIStackAlignment);
++    }
++
++    reserveStack(*stackAdjust);
++
++    // Position all arguments.
++    {
++        enoughMemory_ &= moveResolver_.resolve();
++        if (!enoughMemory_)
++            return;
++
++        MoveEmitter emitter(*this);
++        emitter.emit(moveResolver_);
++        emitter.finish();
++    }
++
++#ifdef DEBUG
++    {
++        Label good;
++        testl(esp, Imm32(ABIStackAlignment - 1));
++        j(Equal, &good);
++        breakpoint();
++        bind(&good);
++    }
++#endif
++}
++
++void
++MacroAssemblerX86::callWithVecPost(uint32_t stackAdjust, MoveOp::Type result)
++{
++    freeStack(stackAdjust);
++    if (dynamicAlignment_)
++        pop(esp);
++
++    MOZ_ASSERT(inCall_);
++    inCall_ = false;
++}
++
++void
++MacroAssemblerX86::callWithVec(void *fun, MoveOp::Type result)
++{
++    uint32_t stackAdjust;
++    callWithVecPre(&stackAdjust);
++    call(ImmPtr(fun));
++    callWithVecPost(stackAdjust, result);
++}
++
++void
++MacroAssemblerX86::callWithVec(AsmJSImmPtr fun, MoveOp::Type result)
++{
++    uint32_t stackAdjust;
++    callWithVecPre(&stackAdjust);
++    call(fun);
++    callWithVecPost(stackAdjust, result);
++}
++
++void
++MacroAssemblerX86::callWithVec(const Address &fun, MoveOp::Type result)
++{
++    uint32_t stackAdjust;
++    callWithVecPre(&stackAdjust);
++    call(Operand(fun));
++    callWithVecPost(stackAdjust, result);
++}
++
++void
++MacroAssemblerX86::callWithVec(Register fun, MoveOp::Type result)
++{
++    uint32_t stackAdjust;
++    callWithVecPre(&stackAdjust);
++    call(Operand(fun));
++    callWithVecPost(stackAdjust, result);
++}
++
++#endif // !defined(JS_NO_VECTORCALL)
++
+ void
+ MacroAssemblerX86::handleFailureWithHandlerTail(void *handler)
+ {
+diff -r a2ffa9047bf4 -r 67316c163750 js/src/jit/x86/MacroAssembler-x86.h
+--- a/js/src/jit/x86/MacroAssembler-x86.h	Thu Feb 19 19:54:14 2015 -0500
++++ b/js/src/jit/x86/MacroAssembler-x86.h	Wed Feb 25 01:57:00 2015 +0800
+@@ -23,6 +23,10 @@
+     bool inCall_;
+     uint32_t args_;
+     uint32_t passedArgs_;
++#if !defined(JS_NO_VECTORCALL)
++    uint32_t passedIntArgs_;
++    uint32_t passedFloatArgs_;
++#endif
+     uint32_t stackForCall_;
+     bool dynamicAlignment_;
+ 
+@@ -72,6 +76,9 @@
+     }
+ 
+     void setupABICall(uint32_t args);
++#if !defined(JS_NO_VECTORCALL)
++    void setupVecCall(uint32_t args);
++#endif
+ 
+   public:
+     using MacroAssemblerX86Shared::Push;
+@@ -1126,10 +1133,16 @@
+     // manually, however, if the stack alignment were to change, the macro
+     // assembler should be notified before starting a call.
+     void setupAlignedABICall(uint32_t args);
++#if !defined(JS_NO_VECTORCALL)
++    void setupAlignedVecCall(uint32_t args);
++#endif
+ 
+     // Sets up an ABI call for when the alignment is not known. This may need a
+     // scratch register.
+     void setupUnalignedABICall(uint32_t args, Register scratch);
++#if !defined(JS_NO_VECTORCALL)
++    void setupUnalignedVecCall(uint32_t args, Register scratch);
++#endif
+ 
+     // Arguments must be assigned to a C/C++ call in order. They are moved
+     // in parallel immediately before performing the call. This process may
+@@ -1140,10 +1153,19 @@
+     void passABIArg(const MoveOperand &from, MoveOp::Type type);
+     void passABIArg(Register reg);
+     void passABIArg(FloatRegister reg, MoveOp::Type type);
++#if !defined(JS_NO_VECTORCALL)
++    void passVecArg(const MoveOperand &from, MoveOp::Type type);
++    void passVecArg(Register reg);
++    void passVecArg(FloatRegister reg, MoveOp::Type type);
++#endif
+ 
+   private:
+     void callWithABIPre(uint32_t *stackAdjust);
+     void callWithABIPost(uint32_t stackAdjust, MoveOp::Type result);
++#if !defined(JS_NO_VECTORCALL)
++    void callWithVecPre(uint32_t *stackAdjust);
++    void callWithVecPost(uint32_t stackAdjust, MoveOp::Type result);
++#endif
+ 
+   public:
+     // Emits a call to a C/C++ function, resolving all argument moves.
+@@ -1151,6 +1173,12 @@
+     void callWithABI(AsmJSImmPtr fun, MoveOp::Type result = MoveOp::GENERAL);
+     void callWithABI(const Address &fun, MoveOp::Type result = MoveOp::GENERAL);
+     void callWithABI(Register fun, MoveOp::Type result = MoveOp::GENERAL);
++#if !defined(JS_NO_VECTORCALL)
++    void callWithVec(void *fun, MoveOp::Type result = MoveOp::GENERAL);
++    void callWithVec(AsmJSImmPtr fun, MoveOp::Type result = MoveOp::GENERAL);
++    void callWithVec(const Address &fun, MoveOp::Type result = MoveOp::GENERAL);
++    void callWithVec(Register fun, MoveOp::Type result = MoveOp::GENERAL);
++#endif
+ 
+     // Used from within an Exit frame to handle a pending exception.
+     void handleFailureWithHandlerTail(void *handler);
+@@ -1175,6 +1203,30 @@
+ 
+ typedef MacroAssemblerX86 MacroAssemblerSpecific;
+ 
++#if !defined(JS_NO_VECTORCALL)
++
++static inline bool
++GetVecIntArgReg(uint32_t intArg, uint32_t floatArg, Register *out)
++{
++    uint32_t arg = intArg;
++    if (arg >= NumVecIntArgRegs)
++        return false;
++    *out = VecIntArgRegs[arg];
++    return true;
++}
++
++static inline bool
++GetVecFloatArgReg(uint32_t intArg, uint32_t floatArg, FloatRegister *out)
++{
++    uint32_t arg = floatArg;
++    if (floatArg >= NumVecFloatArgRegs)
++        return false;
++    *out = VecFloatArgRegs[arg];
++    return true;
++}
++
++#endif // !defined(JS_NO_VECTORCALL)
++
+ } // namespace jit
+ } // namespace js
+ 
+diff -r a2ffa9047bf4 -r 67316c163750 js/src/jsmath.cpp
+--- a/js/src/jsmath.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/js/src/jsmath.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -32,6 +32,16 @@
+ 
+ #include "jsobjinlines.h"
+ 
++#include "mozilla/SSE.h"
++
++#ifdef MOZILLA_MAY_SUPPORT_SSE4_1
++#include <smmintrin.h>
++#endif
++
++#if _MSC_VER < 1600 && _M_IX86_FP >= 2
++#pragma function(floor)
++#endif
++
+ using namespace js;
+ 
+ using mozilla::Abs;
+@@ -61,6 +71,22 @@
+     {0,0}
+ };
+ 
++#ifdef JS_NO_VECTORCALL
++# define MATHCACHE_MAYBE_VEC_LOOKUP(cache, func, x, id) (cache)->lookup(func, x, id);
++#else
++# define MATHCACHE_MAYBE_VEC_LOOKUP(cache, func, x, id) (cache)->lookup<UnaryVecFunType>(func##_vec, x, id);
++# define MATH_VEC_FUNC(func) MOZ_ALWAYS_INLINE double __vectorcall func##_vec(double d) { return (func)(d); }
++MATH_VEC_FUNC(log)
++MATH_VEC_FUNC(sin)
++MATH_VEC_FUNC(cos)
++MATH_VEC_FUNC(exp)
++MATH_VEC_FUNC(tan)
++MATH_VEC_FUNC(atan)
++MATH_VEC_FUNC(asin)
++MATH_VEC_FUNC(acos)
++MATH_VEC_FUNC(log10)
++#endif
++
+ MathCache::MathCache() {
+     memset(table, 0, sizeof(table));
+ 
+@@ -120,14 +146,14 @@
+ #define ACOS_IF_OUT_OF_RANGE(x)
+ #endif
+ 
+-double
++double JS_VECTORCALL
+ js::math_acos_impl(MathCache *cache, double x)
+ {
+     ACOS_IF_OUT_OF_RANGE(x);
+-    return cache->lookup(acos, x, MathCache::Acos);
++    return MATHCACHE_MAYBE_VEC_LOOKUP(cache, acos, x, MathCache::Acos);
+ }
+ 
+-double
++double JS_VECTORCALL
+ js::math_acos_uncached(double x)
+ {
+     ACOS_IF_OUT_OF_RANGE(x);
+@@ -165,14 +191,14 @@
+ #define ASIN_IF_OUT_OF_RANGE(x)
+ #endif
+ 
+-double
++double JS_VECTORCALL
+ js::math_asin_impl(MathCache *cache, double x)
+ {
+     ASIN_IF_OUT_OF_RANGE(x);
+-    return cache->lookup(asin, x, MathCache::Asin);
++    return MATHCACHE_MAYBE_VEC_LOOKUP(cache, asin, x, MathCache::Asin);
+ }
+ 
+-double
++double JS_VECTORCALL
+ js::math_asin_uncached(double x)
+ {
+     ASIN_IF_OUT_OF_RANGE(x);
+@@ -204,13 +230,13 @@
+     return true;
+ }
+ 
+-double
++double JS_VECTORCALL
+ js::math_atan_impl(MathCache *cache, double x)
+ {
+-    return cache->lookup(atan, x, MathCache::Atan);
++    return MATHCACHE_MAYBE_VEC_LOOKUP(cache, atan, x, MathCache::Atan);
+ }
+ 
+-double
++double JS_VECTORCALL
+ js::math_atan_uncached(double x)
+ {
+     return atan(x);
+@@ -293,13 +319,24 @@
+     return math_atan2_handle(cx, args.get(0), args.get(1), args.rval());
+ }
+ 
+-double
++MOZ_ALWAYS_INLINE double
+ js::math_ceil_impl(double x)
+ {
+ #ifdef __APPLE__
+     if (x < 0 && x > -1.0)
+         return js_copysign(0, -1);
+ #endif
++
++#ifdef MOZILLA_MAY_SUPPORT_SSE4_1
++    if (mozilla::supports_sse4_1()) {
++        __m128d xd = _mm_load_sd(&x);
++        xd = _mm_ceil_sd(xd, xd);
++
++        double d;
++        _mm_store_sd(&d, xd);
++        return d;
++    }
++#endif
+     return ceil(x);
+ }
+ 
+@@ -345,13 +382,13 @@
+     return true;
+ }
+ 
+-double
++double JS_VECTORCALL
+ js::math_cos_impl(MathCache *cache, double x)
+ {
+-    return cache->lookup(cos, x, MathCache::Cos);
++    return MATHCACHE_MAYBE_VEC_LOOKUP(cache, cos, x, MathCache::Cos);
+ }
+ 
+-double
++double JS_VECTORCALL
+ js::math_cos_uncached(double x)
+ {
+     return cos(x);
+@@ -392,14 +429,14 @@
+ #define EXP_IF_OUT_OF_RANGE(x)
+ #endif
+ 
+-double
++double JS_VECTORCALL
+ js::math_exp_impl(MathCache *cache, double x)
+ {
+     EXP_IF_OUT_OF_RANGE(x);
+-    return cache->lookup(exp, x, MathCache::Exp);
++    return MATHCACHE_MAYBE_VEC_LOOKUP(cache, exp, x, MathCache::Exp);
+ }
+ 
+-double
++double JS_VECTORCALL
+ js::math_exp_uncached(double x)
+ {
+     EXP_IF_OUT_OF_RANGE(x);
+@@ -431,9 +468,19 @@
+     return true;
+ }
+ 
+-double
++MOZ_ALWAYS_INLINE double
+ js::math_floor_impl(double x)
+ {
++#ifdef MOZILLA_MAY_SUPPORT_SSE4_1
++    if (mozilla::supports_sse4_1()) {
++        __m128d xd = _mm_load_sd(&x);
++        xd = _mm_floor_sd(xd, xd);
++
++        double d;
++        _mm_store_sd(&d, xd);
++        return d;
++    }
++#endif
+     return floor(x);
+ }
+ 
+@@ -526,14 +573,14 @@
+ #define LOG_IF_OUT_OF_RANGE(x)
+ #endif
+ 
+-double
++double JS_VECTORCALL
+ js::math_log_impl(MathCache *cache, double x)
+ {
+     LOG_IF_OUT_OF_RANGE(x);
+-    return cache->lookup(log, x, MathCache::Log);
++    return MATHCACHE_MAYBE_VEC_LOOKUP(cache, log, x, MathCache::Log);
+ }
+ 
+-double
++double JS_VECTORCALL
+ js::math_log_uncached(double x)
+ {
+     LOG_IF_OUT_OF_RANGE(x);
+@@ -763,7 +810,7 @@
+ /*
+  * Math.random() support, lifted from java.util.Random.java.
+  */
+-void
++MOZ_NEVER_INLINE void
+ js::random_initState(uint64_t *rngState)
+ {
+     /* Our PRNG only uses 48 bits, so squeeze our entropy into those bits. */
+@@ -772,7 +819,7 @@
+     *rngState = (seed ^ RNG_MULTIPLIER) & RNG_MASK;
+ }
+ 
+-uint64_t
++MOZ_ALWAYS_INLINE uint64_t
+ js::random_next(uint64_t *rngState, int bits)
+ {
+     MOZ_ASSERT((*rngState & 0xffff000000000000ULL) == 0, "Bad rngState");
+@@ -832,7 +879,11 @@
+ template double js::GetBiggestNumberLessThan<>(double x);
+ template float js::GetBiggestNumberLessThan<>(float x);
+ 
+-double
++#ifdef MOZILLA_MAY_SUPPORT_SSE4_1
++static const MOZ_ALIGNED_DECL(int64_t mask_sign[2], 16) = { 0x8000000000000000 };
++#endif
++
++MOZ_ALWAYS_INLINE double
+ js::math_round_impl(double x)
+ {
+     int32_t ignored;
+@@ -844,7 +895,29 @@
+         return x;
+ 
+     double add = (x >= 0) ? GetBiggestNumberLessThan(0.5) : 0.5;
+-    return js_copysign(floor(x + add), x);
++
++#ifdef MOZILLA_MAY_SUPPORT_SSE4_1
++    if (mozilla::supports_sse4_1()) {
++        __m128d xmm1d = _mm_load_sd(&x);
++        __m128d xmm0d = xmm1d;
++
++        xmm0d = _mm_add_sd(xmm0d, _mm_load_sd(&add));
++        xmm0d = _mm_floor_sd(xmm0d, xmm0d);
++
++        __m128i xmm2i = _mm_load_si128((__m128i *)mask_sign);
++        __m128i xmm1i = _mm_castpd_si128(xmm1d);
++
++        xmm1i = _mm_and_si128(xmm1i, xmm2i);
++        xmm2i = _mm_andnot_si128(xmm2i, _mm_castpd_si128(xmm0d));
++        xmm1i = _mm_or_si128(xmm1i, xmm2i);
++
++        double d;
++        _mm_store_sd(&d, _mm_castsi128_pd(xmm1i));
++        return d;
++    }
++#endif
++
++    return js_copysign(math_floor_impl(x + add), x);
+ }
+ 
+ float
+@@ -875,13 +948,13 @@
+     return math_round_handle(cx, args[0], args.rval());
+ }
+ 
+-double
++double JS_VECTORCALL
+ js::math_sin_impl(MathCache *cache, double x)
+ {
+     return cache->lookup(math_sin_uncached, x, MathCache::Sin);
+ }
+ 
+-double
++double JS_VECTORCALL
+ js::math_sin_uncached(double x)
+ {
+ #ifdef _WIN64
+@@ -890,7 +963,11 @@
+     if (IsNegativeZero(x))
+         return -0.0;
+ #endif
++#ifdef JS_NO_VECTORCALL
+     return sin(x);
++#else
++    return sin_vec(x);
++#endif
+ }
+ 
+ bool
+@@ -945,13 +1022,13 @@
+     return math_sqrt_handle(cx, args[0], args.rval());
+ }
+ 
+-double
++double JS_VECTORCALL
+ js::math_tan_impl(MathCache *cache, double x)
+ {
+-    return cache->lookup(tan, x, MathCache::Tan);
++    return MATHCACHE_MAYBE_VEC_LOOKUP(cache, tan, x, MathCache::Tan);
+ }
+ 
+-double
++double JS_VECTORCALL
+ js::math_tan_uncached(double x)
+ {
+     return tan(x);
+@@ -982,9 +1059,10 @@
+ 
+ 
+ typedef double (*UnaryMathFunctionType)(MathCache *cache, double);
++typedef double (JS_VECTORCALL *UnaryVecMathFunctionType)(MathCache *cache, double);
+ 
+ template <UnaryMathFunctionType F>
+-static bool math_function(JSContext *cx, unsigned argc, Value *vp)
++static bool math_function(JSContext *cx, unsigned argc, Value *vp, bool vectorcall = false)
+ {
+     CallArgs args = CallArgsFromVp(argc, vp);
+     if (args.length() == 0) {
+@@ -999,7 +1077,12 @@
+     MathCache *mathCache = cx->runtime()->getMathCache(cx);
+     if (!mathCache)
+         return false;
+-    double z = F(mathCache, x);
++
++    double z;
++    if (!vectorcall)
++        z = F(mathCache, x);
++    else
++        z = ((UnaryVecMathFunctionType)F)(mathCache, x);
+     args.rval().setNumber(z);
+ 
+     return true;
+@@ -1007,13 +1090,13 @@
+ 
+ 
+ 
+-double
++double JS_VECTORCALL
+ js::math_log10_impl(MathCache *cache, double x)
+ {
+-    return cache->lookup(log10, x, MathCache::Log10);
++    return MATHCACHE_MAYBE_VEC_LOOKUP(cache, log10, x, MathCache::Log10);
+ }
+ 
+-double
++double JS_VECTORCALL
+ js::math_log10_uncached(double x)
+ {
+     return log10(x);
+@@ -1022,7 +1105,7 @@
+ bool
+ js::math_log10(JSContext *cx, unsigned argc, Value *vp)
+ {
+-    return math_function<math_log10_impl>(cx, argc, vp);
++    return math_function<(UnaryMathFunctionType)math_log10_impl>(cx, argc, vp, true);
+ }
+ 
+ #if !HAVE_LOG2
+diff -r a2ffa9047bf4 -r 67316c163750 js/src/jsmath.h
+--- a/js/src/jsmath.h	Thu Feb 19 19:54:14 2015 -0500
++++ b/js/src/jsmath.h	Wed Feb 25 01:57:00 2015 +0800
+@@ -39,6 +39,7 @@
+ namespace js {
+ 
+ typedef double (*UnaryFunType)(double);
++typedef double (JS_VECTORCALL *UnaryVecFunType)(double);
+ 
+ class MathCache
+ {
+@@ -70,14 +71,15 @@
+      * N.B. lookup uses double-equality. This is only safe if hash() maps +0
+      * and -0 to different table entries, which is asserted in MathCache().
+      */
+-    double lookup(UnaryFunType f, double x, MathFuncId id) {
++    template<class T = UnaryFunType>
++    double lookup(T f, double x, MathFuncId id) {
+         unsigned index = hash(x, id);
+         Entry &e = table[index];
+         if (e.in == x && e.id == id)
+             return e.out;
+         e.in = x;
+         e.id = id;
+-        return e.out = f(x);
++        return (e.out = f(x));
+     }
+ 
+     size_t sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf);
+@@ -164,46 +166,46 @@
+ extern bool
+ math_log(JSContext *cx, unsigned argc, js::Value *vp);
+ 
+-extern double
++extern double JS_VECTORCALL
+ math_log_impl(MathCache *cache, double x);
+ 
+-extern double
++extern double JS_VECTORCALL
+ math_log_uncached(double x);
+ 
+ extern bool
+ math_sin(JSContext *cx, unsigned argc, js::Value *vp);
+ 
+-extern double
++extern double JS_VECTORCALL
+ math_sin_impl(MathCache *cache, double x);
+ 
+-extern double
++extern double JS_VECTORCALL
+ math_sin_uncached(double x);
+ 
+ extern bool
+ math_cos(JSContext *cx, unsigned argc, js::Value *vp);
+ 
+-extern double
++extern double JS_VECTORCALL
+ math_cos_impl(MathCache *cache, double x);
+ 
+-extern double
++extern double JS_VECTORCALL
+ math_cos_uncached(double x);
+ 
+ extern bool
+ math_exp(JSContext *cx, unsigned argc, js::Value *vp);
+ 
+-extern double
++extern double JS_VECTORCALL
+ math_exp_impl(MathCache *cache, double x);
+ 
+-extern double
++extern double JS_VECTORCALL
+ math_exp_uncached(double x);
+ 
+ extern bool
+ math_tan(JSContext *cx, unsigned argc, js::Value *vp);
+ 
+-extern double
++extern double JS_VECTORCALL
+ math_tan_impl(MathCache *cache, double x);
+ 
+-extern double
++extern double JS_VECTORCALL
+ math_tan_uncached(double x);
+ 
+ extern bool
+@@ -272,28 +274,28 @@
+ extern double
+ ecmaAtan2(double x, double y);
+ 
+-extern double
++extern double JS_VECTORCALL
+ math_atan_impl(MathCache *cache, double x);
+ 
+-extern double
++extern double JS_VECTORCALL
+ math_atan_uncached(double x);
+ 
+ extern bool
+ math_atan(JSContext *cx, unsigned argc, js::Value *vp);
+ 
+-extern double
++extern double JS_VECTORCALL
+ math_asin_impl(MathCache *cache, double x);
+ 
+-extern double
++extern double JS_VECTORCALL
+ math_asin_uncached(double x);
+ 
+ extern bool
+ math_asin(JSContext *cx, unsigned argc, js::Value *vp);
+ 
+-extern double
++extern double JS_VECTORCALL
+ math_acos_impl(MathCache *cache, double x);
+ 
+-extern double
++extern double JS_VECTORCALL
+ math_acos_uncached(double x);
+ 
+ extern bool
+@@ -341,10 +343,10 @@
+ extern bool
+ math_imul(JSContext *cx, unsigned argc, Value *vp);
+ 
+-extern double
++extern double JS_VECTORCALL
+ math_log10_impl(MathCache *cache, double x);
+ 
+-extern double
++extern double JS_VECTORCALL
+ math_log10_uncached(double x);
+ 
+ extern double
+diff -r a2ffa9047bf4 -r 67316c163750 js/src/jstypes.h
+--- a/js/src/jstypes.h	Thu Feb 19 19:54:14 2015 -0500
++++ b/js/src/jstypes.h	Wed Feb 25 01:57:00 2015 +0800
+@@ -95,6 +95,14 @@
+ #define JS_NO_FASTCALL
+ #endif
+ 
++#if defined(_MSC_VER) && _MSC_VER >= 1800 && \
++    defined(_M_IX86_FP) && _M_IX86_FP >= 2
++#define JS_VECTORCALL __vectorcall
++#else
++#define JS_VECTORCALL
++#define JS_NO_VECTORCALL
++#endif
++
+ /***********************************************************************
+ ** MACROS:      JS_BEGIN_MACRO
+ **              JS_END_MACRO
+diff -r a2ffa9047bf4 -r 67316c163750 layout/base/FrameLayerBuilder.cpp
+--- a/layout/base/FrameLayerBuilder.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/layout/base/FrameLayerBuilder.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -647,6 +647,10 @@
+     return aRect.ScaleToNearestPixels(mParameters.mXScale, mParameters.mYScale,
+                                       mAppUnitsPerDevPixel);
+   }
++  nsIntRect ToNearestPixels(const nsRect& aRect)
++  {
++    return aRect.ToNearestPixels(mAppUnitsPerDevPixel);
++  }
+   nsIntRegion ScaleRegionToNearestPixels(const nsRegion& aRegion)
+   {
+     return aRegion.ScaleToNearestPixels(mParameters.mXScale, mParameters.mYScale,
+@@ -660,6 +664,13 @@
+     return aRect.ScaleToOutsidePixels(mParameters.mXScale, mParameters.mYScale,
+                                       mAppUnitsPerDevPixel);
+   }
++  nsIntRect ToOutsidePixels(const nsRect& aRect, bool aSnap = false)
++  {
++    if (aSnap && mSnappingEnabled) {
++      return ToNearestPixels(aRect);
++    }
++    return aRect.ToOutsidePixels(mAppUnitsPerDevPixel);
++  }
+   nsIntRect ScaleToInsidePixels(const nsRect& aRect, bool aSnap = false)
+   {
+     if (aSnap && mSnappingEnabled) {
+@@ -668,6 +679,13 @@
+     return aRect.ScaleToInsidePixels(mParameters.mXScale, mParameters.mYScale,
+                                      mAppUnitsPerDevPixel);
+   }
++  nsIntRect ToInsidePixels(const nsRect& aRect, bool aSnap = false)
++  {
++    if (aSnap && mSnappingEnabled) {
++      return ToNearestPixels(aRect);
++    }
++    return aRect.ToInsidePixels(mAppUnitsPerDevPixel);
++  }
+ 
+   nsIntRegion ScaleRegionToInsidePixels(const nsRegion& aRegion, bool aSnap = false)
+   {
+@@ -2767,6 +2785,7 @@
+ 
+   const nsIFrame* lastAnimatedGeometryRoot = mContainerReferenceFrame;
+   nsPoint topLeft(0,0);
++  const bool scaled = mParameters.Scaled();
+ 
+   // When NO_COMPONENT_ALPHA is set, items will be flattened into a single
+   // layer, so we need to choose which active scrolled root to use for all
+@@ -2822,10 +2841,12 @@
+     }
+ 
+     nsIntRect itemVisibleRect =
+-      ScaleToOutsidePixels(item->GetVisibleRect(), false);
++      scaled ? ScaleToOutsidePixels(item->GetVisibleRect(), false) :
++               ToOutsidePixels(item->GetVisibleRect(), false);
+     bool snap;
+     nsRect itemContent = item->GetBounds(mBuilder, &snap);
+-    nsIntRect itemDrawRect = ScaleToOutsidePixels(itemContent, snap);
++    nsIntRect itemDrawRect = scaled ? ScaleToOutsidePixels(itemContent, snap) :
++                                      ToOutsidePixels(itemContent, snap);
+     nsDisplayItem::Type itemType = item->GetType();
+     bool prerenderedTransform = itemType == nsDisplayItem::TYPE_TRANSFORM &&
+         static_cast<nsDisplayTransform*>(item)->ShouldPrerender(mBuilder);
+@@ -2833,7 +2854,8 @@
+     const DisplayItemClip& itemClip = item->GetClip();
+     if (itemClip.HasClip()) {
+       itemContent.IntersectRect(itemContent, itemClip.GetClipRect());
+-      clipRect = ScaleToNearestPixels(itemClip.GetClipRect());
++      clipRect = scaled ? ScaleToNearestPixels(itemClip.GetClipRect()) :
++                          ToNearestPixels(itemClip.GetClipRect());
+       if (!prerenderedTransform) {
+         itemDrawRect.IntersectRect(itemDrawRect, clipRect);
+       }
+diff -r a2ffa9047bf4 -r 67316c163750 layout/base/FrameLayerBuilder.h
+--- a/layout/base/FrameLayerBuilder.h	Thu Feb 19 19:54:14 2015 -0500
++++ b/layout/base/FrameLayerBuilder.h	Wed Feb 25 01:57:00 2015 +0800
+@@ -83,6 +83,11 @@
+     , mDisableSubpixelAntialiasingInDescendants(aParent.mDisableSubpixelAntialiasingInDescendants)
+     , mInLowPrecisionDisplayPort(aParent.mInLowPrecisionDisplayPort)
+   {}
++  bool Scaled()
++  {
++    return (0x3f800000 != *(uint32_t *)&mXScale) ||
++           (0x3f800000 != *(uint32_t *)&mYScale);
++  }
+   float mXScale, mYScale;
+   /**
+    * If non-null, the rectangle in which BuildContainerLayerFor stores the
+diff -r a2ffa9047bf4 -r 67316c163750 layout/generic/nsBlockFrame.cpp
+--- a/layout/generic/nsBlockFrame.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/layout/generic/nsBlockFrame.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -9,6 +9,10 @@
+  * boxes, also used for various anonymous boxes
+  */
+ 
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++#include <xmmintrin.h>
++#endif
++
+ #include "nsBlockFrame.h"
+ 
+ #include "mozilla/DebugOnly.h"
+@@ -2059,6 +2063,12 @@
+ 
+   // Reflow the lines that are already ours
+   for ( ; line != line_end; ++line, aState.AdvanceToNextLine()) {
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++    if (line.next() != line_end) {
++      _mm_prefetch((char *)line.peekNext()->mFirstChild, _MM_HINT_T0);
++    }
++#endif
++
+     DumpLine(aState, line, deltaBCoord, 0);
+ #ifdef DEBUG
+     AutoNoisyIndenter indent2(gNoisyReflow);
+@@ -6240,6 +6250,9 @@
+   nsIFrame* kid = aLine->mFirstChild;
+   int32_t n = aLine->GetChildCount();
+   while (--n >= 0) {
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++    _mm_prefetch((char *)kid->GetNextSibling(), _MM_HINT_T0);
++#endif
+     aFrame->BuildDisplayListForChild(aBuilder, kid, aDirtyRect,
+                                      childLists, flags);
+     kid = kid->GetNextSibling();
+@@ -6283,8 +6296,12 @@
+   if (GetPrevInFlow()) {
+     DisplayOverflowContainers(aBuilder, aDirtyRect, aLists);
+     for (nsIFrame* f = mFloats.FirstChild(); f; f = f->GetNextSibling()) {
+-      if (f->GetStateBits() & NS_FRAME_IS_PUSHED_FLOAT)
+-         BuildDisplayListForChild(aBuilder, f, aDirtyRect, aLists);
++      if (f->GetStateBits() & NS_FRAME_IS_PUSHED_FLOAT) {
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++        _mm_prefetch((char *)f->GetNextSibling(), _MM_HINT_T0);
++#endif
++        BuildDisplayListForChild(aBuilder, f, aDirtyRect, aLists);
++      }
+     }
+   }
+ 
+@@ -6331,6 +6348,9 @@
+     for (line_iterator line = begin_lines();
+          line != line_end;
+          ++line) {
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++      _mm_prefetch((char *)line.peekNext(), _MM_HINT_T0);
++#endif
+       nsRect lineArea = line->GetVisualOverflowArea();
+       DisplayLine(aBuilder, lineArea, aDirtyRect, line, depth, drawnLines,
+                   linesDisplayListCollection, this, textOverflow);
+diff -r a2ffa9047bf4 -r 67316c163750 layout/generic/nsContainerFrame.cpp
+--- a/layout/generic/nsContainerFrame.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/layout/generic/nsContainerFrame.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -5,6 +5,10 @@
+ 
+ /* base class #1 for rendering objects that have child lists */
+ 
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++#include <xmmintrin.h>
++#endif
++
+ #include "nsContainerFrame.h"
+ 
+ #include "nsAbsoluteContainingBlock.h"
+@@ -300,6 +304,9 @@
+   nsDisplayListSet set(aLists, aLists.Content());
+   // The children should be in content order
+   while (kid) {
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++    _mm_prefetch((char *)kid->GetNextSibling(), _MM_HINT_T0);
++#endif
+     BuildDisplayListForChild(aBuilder, kid, aDirtyRect, set, aFlags);
+     kid = kid->GetNextSibling();
+   }
+@@ -1192,6 +1199,9 @@
+   if (overflowconts) {
+     for (nsIFrame* frame = overflowconts->FirstChild(); frame;
+          frame = frame->GetNextSibling()) {
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++      _mm_prefetch((char *)frame->GetNextSibling(), _MM_HINT_T0);
++#endif
+       BuildDisplayListForChild(aBuilder, frame, aDirtyRect, aLists);
+     }
+   }
+diff -r a2ffa9047bf4 -r 67316c163750 layout/generic/nsFrame.cpp
+--- a/layout/generic/nsFrame.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/layout/generic/nsFrame.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -6,6 +6,10 @@
+ 
+ /* base class of all rendering objects */
+ 
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++#include <xmmintrin.h>
++#endif
++
+ #include "nsFrame.h"
+ 
+ #include <stdarg.h>
+@@ -1076,6 +1080,12 @@
+ bool
+ nsIFrame::IsTransformed() const
+ {
++  return IsTransformed(StyleDisplay());
++}
++
++bool
++nsIFrame::IsTransformed(const nsStyleDisplay* aDisp) const
++{
+   return ((mState & NS_FRAME_MAY_BE_TRANSFORMED) &&
+           (StyleDisplay()->HasTransform(this) ||
+            IsSVGTransformed() ||
+@@ -1089,10 +1099,15 @@
+ bool
+ nsIFrame::HasOpacityInternal(float aThreshold) const
+ {
++  return HasOpacityInternal(StyleDisplay(), aThreshold);
++}
++
++bool
++nsIFrame::HasOpacityInternal(const nsStyleDisplay* aDisp, float aThreshold) const
++{
+   MOZ_ASSERT(0.0 <= aThreshold && aThreshold <= 1.0, "Invalid argument");
+-  const nsStyleDisplay* displayStyle = StyleDisplay();
+-  return StyleDisplay()->mOpacity < aThreshold ||
+-         (displayStyle->mWillChangeBitField & NS_STYLE_WILL_CHANGE_OPACITY) ||
++  return aDisp->mOpacity < aThreshold ||
++         (aDisp->mWillChangeBitField & NS_STYLE_WILL_CHANGE_OPACITY) ||
+          (mContent &&
+            nsLayoutUtils::HasAnimationsForCompositor(mContent,
+                                                      eCSSProperty_opacity) &&
+@@ -1106,11 +1121,17 @@
+   return false;
+ }
+ 
++
+ bool
+ nsIFrame::Preserves3DChildren() const
+ {
+-  const nsStyleDisplay* disp = StyleDisplay();
+-  if (disp->mTransformStyle != NS_STYLE_TRANSFORM_STYLE_PRESERVE_3D ||
++  return Preserves3DChildren(StyleDisplay());
++}
++
++bool
++nsIFrame::Preserves3DChildren(const nsStyleDisplay* aDisp) const
++{
++  if (aDisp->mTransformStyle != NS_STYLE_TRANSFORM_STYLE_PRESERVE_3D ||
+       !IsFrameOfType(nsIFrame::eSupportsCSSTransforms)) {
+     return false;
+   }
+@@ -1121,8 +1142,8 @@
+   }
+ 
+   nsRect temp;
+-  return !nsFrame::ShouldApplyOverflowClipping(this, disp) &&
+-         !GetClipPropClipRect(disp, &temp, GetSize()) &&
++  return !nsFrame::ShouldApplyOverflowClipping(this, aDisp) &&
++         !GetClipPropClipRect(aDisp, &temp, GetSize()) &&
+          !nsSVGIntegrationUtils::UsingEffectsForFrame(this);
+ }
+ 
+@@ -1132,7 +1153,19 @@
+   if (!GetParent() || !GetParent()->Preserves3DChildren()) {
+     return false;
+   }
+-  return StyleDisplay()->HasTransform(this) || StyleDisplay()->BackfaceIsHidden();
++  const nsStyleDisplay *disp = StyleDisplay();
++  return disp->HasTransform(this) || disp->BackfaceIsHidden();
++}
++
++bool
++nsIFrame::Preserves3D(const nsIFrame* aParent,
++                      const nsStyleDisplay* aParentDisp) const
++{
++  if (!aParent || !aParent->Preserves3DChildren(aParentDisp)) {
++    return false;
++  }
++  const nsStyleDisplay *disp = StyleDisplay();
++  return disp->HasTransform(this) || disp->BackfaceIsHidden();
+ }
+ 
+ bool
+@@ -1608,6 +1641,10 @@
+   if (!IsVisibleForPainting(aBuilder))
+     return;
+ 
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++  _mm_prefetch((char *)&StyleBorder()->GetComputedBorder(), _MM_HINT_NTA);
++#endif
++
+   nsCSSShadowArray* shadows = StyleBorder()->mBoxShadow;
+   if (shadows && shadows->HasShadowWithInset(false)) {
+     aLists.BorderBackground()->AppendNewToTop(new (aBuilder)
+@@ -1720,7 +1757,7 @@
+   nsRect clipRect;
+   bool haveRadii = false;
+   nscoord radii[8];
+-  if (aFrame->StyleDisplay()->mOverflowClipBox ==
++  if (aDisp->mOverflowClipBox ==
+         NS_STYLE_OVERFLOW_CLIP_BOX_PADDING_BOX) {
+     clipRect = aFrame->GetPaddingRectRelativeToSelf() +
+       aBuilder->ToReferenceFrame(aFrame);
+@@ -1995,7 +2032,7 @@
+       nsSVGIntegrationUtils::GetRequiredSourceForInvalidArea(this, dirtyRect);
+   }
+ 
+-  bool useOpacity = HasVisualOpacity() && !nsSVGUtils::CanOptimizeOpacity(this);
++  bool useOpacity = HasVisualOpacity(disp) && !nsSVGUtils::CanOptimizeOpacity(this);
+   bool useBlendMode = disp->mMixBlendMode != NS_STYLE_BLEND_NORMAL;
+   bool useStickyPosition = disp->mPosition == NS_STYLE_POSITION_STICKY &&
+     IsScrollFrameActive(aBuilder,
+@@ -2232,7 +2269,12 @@
+   nsIFrame* child = aChild;
+   if (child->GetStateBits() & NS_FRAME_TOO_DEEP_IN_FRAME_TREE)
+     return;
+-  
++
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++  nsStyleContext *childStyleContext = child->StyleContext();
++  _mm_prefetch((char *)childStyleContext, _MM_HINT_NTA);
++#endif
++
+   bool isSVG = (child->GetStateBits() & NS_FRAME_SVG_LAYOUT);
+ 
+   // true if this is a real or pseudo stacking context
+@@ -2262,6 +2304,12 @@
+     if (!child || nsLayoutUtils::IsPopup(child) ||
+         (child->GetStateBits() & NS_FRAME_IS_PUSHED_FLOAT))
+       return;
++
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++    childStyleContext = child->StyleContext();
++    _mm_prefetch((char *)childStyleContext, _MM_HINT_NTA);
++#endif
++
+     // Make sure that any attempt to use childType below is disappointed. We
+     // could call GetType again but since we don't currently need it, let's
+     // avoid the virtual call.
+@@ -2281,7 +2329,14 @@
+     }
+     pseudoStackingContext = true;
+   }
+-  if (child->Preserves3D()) {
++
++  const nsStyleDisplay* ourDisp = StyleDisplay();
++
++  nsIFrame* parent = child->GetParent();
++  const nsStyleDisplay* parentDisp =
++    parent == this ? ourDisp : parent->StyleDisplay();
++
++  if (child->Preserves3D(parent, parentDisp)) {
+     nsRect* savedDirty = static_cast<nsRect*>
+       (child->Properties().Get(nsDisplayListBuilder::Preserve3DDirtyRectProperty()));
+     if (savedDirty) {
+@@ -2299,6 +2354,10 @@
+     return;
+   }
+ 
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++  childStyleContext->PrefetchCachedResetData();
++#endif
++
+   if (aBuilder->GetIncludeAllOutOfFlows() &&
+       (child->GetStateBits() & NS_FRAME_OUT_OF_FLOW)) {
+     dirty = child->GetVisualOverflowRect();
+@@ -2329,9 +2388,15 @@
+     }
+   }
+ 
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++  nsIContent* childContent = child->GetContent();
++  if (childContent) {
++    _mm_prefetch((char *)childContent, _MM_HINT_NTA);
++  }
++#endif
++
+   // XXX need to have inline-block and inline-table set pseudoStackingContext
+   
+-  const nsStyleDisplay* ourDisp = StyleDisplay();
+   // REVIEW: Taken from nsBoxFrame::Paint
+   // Don't paint our children if the theme object is a leaf.
+   if (IsThemed(ourDisp) &&
+@@ -2342,8 +2407,8 @@
+   // SVG effects or a blend mode..
+   const nsStyleDisplay* disp = child->StyleDisplay();
+   const nsStylePosition* pos = child->StylePosition();
+-  bool isVisuallyAtomic = child->HasOpacity()
+-    || child->IsTransformed()
++  bool isVisuallyAtomic = child->HasOpacity(disp)
++    || child->IsTransformed(disp)
+     // strictly speaking, 'perspective' doesn't require visual atomicity,
+     // but the spec says it acts like the rest of these
+     || disp->mChildPerspective.GetUnit() == eStyleUnit_Coord
+@@ -2359,6 +2424,14 @@
+      disp->mIsolation != NS_STYLE_ISOLATION_AUTO ||
+      isVisuallyAtomic || (aFlags & DISPLAY_CHILD_FORCE_STACKING_CONTEXT);
+ 
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++  Element *childElement = nullptr;
++  if (childContent && childContent->IsElement()) {
++    childElement = childContent->AsElement();
++    childElement->PrefetchAttrsAndChildren();
++  }
++#endif
++
+   if (isVisuallyAtomic || isPositioned || (!isSVG && disp->IsFloating(child)) ||
+       ((disp->mClipFlags & NS_STYLE_CLIP_RECT) &&
+        IsSVGContentWithCSSClip(child)) ||
+@@ -2381,6 +2454,12 @@
+       &savedOutOfFlowData->mContainingBlockClip);
+   }
+ 
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++  if (childElement) {
++    childElement->PrefetchAttrAndChildArrayImpl();
++  }
++#endif
++
+   // Setup clipping for the parent's overflow:-moz-hidden-unscrollable,
+   // or overflow:hidden on elements that don't support scrolling (and therefore
+   // don't create nsHTML/XULScrollFrame). This clipping needs to not clip
+@@ -2389,9 +2468,6 @@
+   // Don't use overflowClip to restrict the dirty rect, since some of the
+   // descendants may not be clipped by it. Even if we end up with unnecessary
+   // display items, they'll be pruned during ComputeVisibility.
+-  nsIFrame* parent = child->GetParent();
+-  const nsStyleDisplay* parentDisp =
+-    parent == this ? ourDisp : parent->StyleDisplay();
+   ApplyOverflowClipping(aBuilder, parent, parentDisp, clipState);
+ 
+   nsDisplayList list;
+diff -r a2ffa9047bf4 -r 67316c163750 layout/generic/nsHTMLReflowState.cpp
+--- a/layout/generic/nsHTMLReflowState.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/layout/generic/nsHTMLReflowState.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -30,6 +30,7 @@
+ #include "CounterStyleManager.h"
+ #include <algorithm>
+ #include "mozilla/dom/HTMLInputElement.h"
++#include "mozilla/Attributes.h"
+ 
+ #ifdef DEBUG
+ #undef NOISY_VERTICAL_ALIGN
+@@ -1100,6 +1101,7 @@
+  * Returns true iff a pre-order traversal of the normal child
+  * frames rooted at aFrame finds no non-empty frame before aDescendant.
+  */
++MOZ_ALWAYS_INLINE
+ static bool AreAllEarlierInFlowFramesEmpty(nsIFrame* aFrame,
+   nsIFrame* aDescendant, bool* aFound) {
+   if (aFrame == aDescendant) {
+diff -r a2ffa9047bf4 -r 67316c163750 layout/generic/nsIFrame.h
+--- a/layout/generic/nsIFrame.h	Thu Feb 19 19:54:14 2015 -0500
++++ b/layout/generic/nsIFrame.h	Wed Feb 25 01:57:00 2015 +0800
+@@ -1171,6 +1171,7 @@
+    * an SVG viewBox attribute).
+    */
+   bool IsTransformed() const;
++  bool IsTransformed(const nsStyleDisplay* aDisp) const;
+ 
+   /**
+    * Returns true if the frame is translucent for the purposes of creating a
+@@ -1180,6 +1181,10 @@
+   {
+     return HasOpacityInternal(1.0f);
+   }
++  bool HasOpacity(const nsStyleDisplay* aDisp) const
++  {
++    return HasOpacityInternal(aDisp, 1.0f);
++  }
+   /**
+    * Returns true if the frame is translucent for display purposes.
+    */
+@@ -1190,6 +1195,13 @@
+     // creating a stacking context only.
+     return HasOpacityInternal(0.99f);
+   }
++  bool HasVisualOpacity(const nsStyleDisplay* aDisp) const
++  {
++    // Treat an opacity value of 0.99 and above as opaque.  This is an
++    // optimization aimed at Web content which use opacity:0.99 as a hint for
++    // creating a stacking context only.
++    return HasOpacityInternal(aDisp, 0.99f);
++  }
+ 
+    /**
+    * Return true if this frame might be using a transform getter.
+@@ -1214,6 +1226,7 @@
+    * or svg effects.
+    */
+   bool Preserves3DChildren() const;
++  bool Preserves3DChildren(const nsStyleDisplay* aDisp) const;
+ 
+   /**
+    * Returns whether this frame has a parent that Preserves3DChildren() and has
+@@ -1221,6 +1234,8 @@
+    * transform.
+    */
+   bool Preserves3D() const;
++  bool Preserves3D(const nsIFrame* aParent,
++                   const nsStyleDisplay* aParentDisp) const;
+ 
+   bool HasPerspective() const;
+ 
+@@ -3155,6 +3170,7 @@
+   static nsIFrame* MergeSort(nsIFrame *aSource);
+ 
+   bool HasOpacityInternal(float aThreshold) const;
++  bool HasOpacityInternal(const nsStyleDisplay* aDisp, float aThreshold) const;
+ 
+ #ifdef DEBUG_FRAME_DUMP
+ public:
+diff -r a2ffa9047bf4 -r 67316c163750 layout/generic/nsLineBox.h
+--- a/layout/generic/nsLineBox.h	Thu Feb 19 19:54:14 2015 -0500
++++ b/layout/generic/nsLineBox.h	Wed Feb 25 01:57:00 2015 +0800
+@@ -741,6 +741,11 @@
+       return rv;
+     }
+ 
++    pointer peekNext()
++    {
++      return static_cast<pointer>(mCurrent->_mNext);
++    }
++
+     iterator_self_type& operator--()
+     {
+       mCurrent = mCurrent->_mPrev;
+diff -r a2ffa9047bf4 -r 67316c163750 layout/style/nsCSSRuleProcessor.cpp
+--- a/layout/style/nsCSSRuleProcessor.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/layout/style/nsCSSRuleProcessor.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -9,6 +9,10 @@
+  * matching and cascading
+  */
+ 
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++#include <xmmintrin.h>
++#endif
++
+ #define PL_ARENA_CONST_ALIGN_MASK 7
+ // We want page-sized arenas so there's no fragmentation involved.
+ // Including plarena.h must come first to avoid it being included by some
+@@ -1882,6 +1886,9 @@
+   // test for pseudo class match
+   for (nsPseudoClassList* pseudoClass = aSelector->mPseudoClassList;
+        pseudoClass; pseudoClass = pseudoClass->mNext) {
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++    _mm_prefetch((char *)pseudoClass->mNext, _MM_HINT_NTA);
++#endif
+     EventStates statesToCheck = sPseudoClassStates[pseudoClass->mType];
+     if (statesToCheck.IsEmpty()) {
+       // keep the cases here in the same order as the list in
+@@ -2713,6 +2720,12 @@
+         selector = selector->mNext;
+       }
+ 
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++      if (iter + 1 != end) {
++        _mm_prefetch((char *)(iter + 1)->mSelector, _MM_HINT_NTA);
++      }
++#endif
++
+       nsRestyleHint possibleChange = RestyleHintForOp(selector->mOperator);
+       SelectorMatchesFlags selectorFlags = SelectorMatchesFlags::UNKNOWN;
+ 
+diff -r a2ffa9047bf4 -r 67316c163750 layout/style/nsStyleContext.h
+--- a/layout/style/nsStyleContext.h	Thu Feb 19 19:54:14 2015 -0500
++++ b/layout/style/nsStyleContext.h	Wed Feb 25 01:57:00 2015 +0800
+@@ -8,6 +8,10 @@
+ #ifndef _nsStyleContext_h_
+ #define _nsStyleContext_h_
+ 
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++#include <xmmintrin.h>
++#endif
++
+ #include "mozilla/RestyleLogging.h"
+ #include "nsRuleNode.h"
+ #include "nsCSSPseudoElements.h"
+@@ -394,6 +398,12 @@
+    */
+   void ClearCachedInheritedStyleDataOnDescendants(uint32_t aStructs);
+ 
++  void PrefetchCachedResetData() {
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++    _mm_prefetch((char *)mCachedResetData, _MM_HINT_NTA);
++#endif
++  }
++
+ #ifdef DEBUG
+   void List(FILE* out, int32_t aIndent, bool aListDescendants = true);
+   static void AssertStyleStructMaxDifferenceValid();
+@@ -469,6 +479,8 @@
+ 
+   nsStyleContext* mParent; // STRONG
+ 
++  nsResetStyleData*       mCachedResetData; // Cached reset style data.
++
+   // Children are kept in two circularly-linked lists.  The list anchor
+   // is not part of the list (null for empty), and we point to the first
+   // child.
+@@ -506,7 +518,6 @@
+   // Since style contexts typically have some inherited data but only sometimes
+   // have reset data, we always allocate the mCachedInheritedData, but only
+   // sometimes allocate the mCachedResetData.
+-  nsResetStyleData*       mCachedResetData; // Cached reset style data.
+   nsInheritedStyleData    mCachedInheritedData; // Cached inherited style data
+   uint64_t                mBits; // Which structs are inherited from the
+                                  // parent context or owned by mRuleNode.
+diff -r a2ffa9047bf4 -r 67316c163750 layout/style/nsStyleStruct.cpp
+--- a/layout/style/nsStyleStruct.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/layout/style/nsStyleStruct.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -2268,9 +2268,9 @@
+ 
+ bool nsStyleBackground::IsTransparent() const
+ {
+-  return BottomLayer().mImage.IsEmpty() &&
+-         mImageCount == 1 &&
+-         NS_GET_A(mBackgroundColor) == 0;
++  return mImageCount == 1 &&
++         NS_GET_A(mBackgroundColor) == 0 &&
++         BottomLayer().mImage.IsEmpty();
+ }
+ 
+ void
+diff -r a2ffa9047bf4 -r 67316c163750 layout/style/nsStyleStruct.h
+--- a/layout/style/nsStyleStruct.h	Thu Feb 19 19:54:14 2015 -0500
++++ b/layout/style/nsStyleStruct.h	Wed Feb 25 01:57:00 2015 +0800
+@@ -533,9 +533,12 @@
+            mOriginCount,
+            mRepeatCount,
+            mPositionCount,
+-           mImageCount,
+            mSizeCount,
+-           mBlendModeCount;
++           mBlendModeCount,
++           mImageCount;
++
++  nscolor mBackgroundColor;       // [reset]
++
+   // Layers are stored in an array, matching the top-to-bottom order in
+   // which they are specified in CSS.  The number of layers to be used
+   // should come from the background-image property.  We create
+@@ -557,8 +560,6 @@
+     NS_ASSERTION((count_) > 0 && (count_) <= (start_) + 1, "Invalid layer range!"); \
+     for (uint32_t var_ = (start_) + 1; var_-- != (uint32_t)((start_) + 1 - (count_)); )
+ 
+-  nscolor mBackgroundColor;       // [reset]
+-
+   // True if this background is completely transparent.
+   bool IsTransparent() const;
+ 
+diff -r a2ffa9047bf4 -r 67316c163750 layout/xul/nsBoxFrame.cpp
+--- a/layout/xul/nsBoxFrame.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/layout/xul/nsBoxFrame.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -31,6 +31,10 @@
+ // any number of syblings around the box. Basically any children in the reflow chain must have their caches cleared
+ // so when asked for there current size they can relayout themselves. 
+ 
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++#include <xmmintrin.h>
++#endif
++
+ #include "nsBoxFrame.h"
+ 
+ #include "gfxUtils.h"
+@@ -1309,6 +1313,10 @@
+                              const nsRect&           aDirtyRect,
+                              const nsDisplayListSet& aLists)
+ {
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++  _mm_prefetch((char *)StyleVisibility(), _MM_HINT_NTA);
++#endif
++
+   bool forceLayer = false;
+   uint32_t flags = 0;
+   mozilla::layers::FrameMetrics::ViewID scrollTargetId =
+@@ -1340,6 +1348,10 @@
+   nsDisplayListCollection tempLists;
+   const nsDisplayListSet& destination = forceLayer ? tempLists : aLists;
+ 
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++  _mm_prefetch((char *)mFrames.FirstChild(), _MM_HINT_NTA);
++#endif
++
+   DisplayBorderBackgroundOutline(aBuilder, destination);
+ 
+ #ifdef DEBUG_LAYOUT
+@@ -1387,6 +1399,9 @@
+   nsDisplayListSet set(aLists, aLists.BlockBorderBackgrounds());
+   // The children should be in the right order
+   while (kid) {
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++    _mm_prefetch((char *)kid->GetNextSibling(), _MM_HINT_T0);
++#endif
+     BuildDisplayListForChild(aBuilder, kid, aDirtyRect, set);
+     kid = kid->GetNextSibling();
+   }
+diff -r a2ffa9047bf4 -r 67316c163750 media/libvpx/moz.build
+--- a/media/libvpx/moz.build	Thu Feb 19 19:54:14 2015 -0500
++++ b/media/libvpx/moz.build	Wed Feb 25 01:57:00 2015 +0800
+@@ -33,6 +33,7 @@
+     if CONFIG['_MSC_VER']:
+         for s in offset_sources:
+             SOURCES[s].no_pgo = True
++            SOURCES[s].flags += ['-GL-']
+ 
+ if CONFIG['VPX_X86_ASM']:
+     SOURCES += files['X86_ASM']
+diff -r a2ffa9047bf4 -r 67316c163750 memory/mozjemalloc/jemalloc.c
+--- a/memory/mozjemalloc/jemalloc.c	Thu Feb 19 19:54:14 2015 -0500
++++ b/memory/mozjemalloc/jemalloc.c	Wed Feb 25 01:57:00 2015 +0800
+@@ -100,6 +100,10 @@
+  *******************************************************************************
+  */
+ 
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++#include <xmmintrin.h>
++#endif
++
+ #ifdef MOZ_MEMORY_ANDROID
+ #define NO_TLS
+ #define _pthread_self() pthread_self()
+@@ -224,6 +228,9 @@
+ #include <io.h>
+ #include <windows.h>
+ #include <intrin.h>
++#if defined _M_IX86 || defined _M_AMD64
++#include <smmintrin.h>
++#endif
+ 
+ #pragma warning( disable: 4267 4996 4146 )
+ 
+@@ -240,6 +247,15 @@
+ static unsigned long tlsIndex = 0xffffffff;
+ #endif 
+ 
++static BOOL sse4_1_supported = FALSE;
++typedef struct
++{
++  int EAX;
++  int EBX;
++  int ECX;
++  int EDX;
++} CPU_INFO;
++
+ #define	__thread
+ #define	_pthread_self() __threadid()
+ 
+@@ -4202,6 +4218,10 @@
+ 	}
+ 	RELEASE_ASSERT(size == bin->reg_size);
+ 
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++	_mm_prefetch((char *)bin, _MM_HINT_NTA);
++#endif
++
+ #ifdef MALLOC_BALANCE
+ 	arena_lock_balance(arena);
+ #else
+@@ -4217,6 +4237,11 @@
+ 		return (NULL);
+ 	}
+ 
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++	_mm_prefetch((char *)ret, _MM_HINT_NTA);
++	_mm_prefetch((char *)ret + 64, _MM_HINT_NTA);
++#endif
++
+ #ifdef MALLOC_STATS
+ 	bin->stats.nrequests++;
+ 	arena->stats.nmalloc_small++;
+@@ -4254,6 +4279,10 @@
+ 		malloc_spin_unlock(&arena->lock);
+ 		return (NULL);
+ 	}
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++	_mm_prefetch((char *)ret, _MM_HINT_NTA);
++	_mm_prefetch((char *)ret + 64, _MM_HINT_NTA);
++#endif
+ #ifdef MALLOC_STATS
+ 	arena->stats.nmalloc_large++;
+ 	arena->stats.allocated_large += size;
+@@ -4714,6 +4743,10 @@
+ 	mapelm = &chunk->map[pageind];
+ 	RELEASE_ASSERT((mapelm->bits & CHUNK_MAP_ALLOCATED) != 0);
+ 	if ((mapelm->bits & CHUNK_MAP_LARGE) == 0) {
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++		arena_run_t *run = (arena_run_t *)(mapelm->bits & ~pagesize_mask);
++		_mm_prefetch((char *)run, _MM_HINT_NTA);
++#endif
+ 		/* Small allocation. */
+ 		malloc_spin_lock(&arena->lock);
+ 		arena_dalloc_small(arena, chunk, ptr, mapelm);
+@@ -5566,6 +5599,20 @@
+ #ifdef MOZ_MEMORY_WINDOWS
+ 	/* get a thread local storage index */
+ 	tlsIndex = TlsAlloc();
++
++	{
++		CPU_INFO CPUInfo;
++
++		__cpuid((int*)&CPUInfo, 0);
++		if (CPUInfo.EAX >= 1)
++		{
++			__cpuid((int*)&CPUInfo, 1);
++			if (CPUInfo.ECX & (1 << 19))
++			{
++				sse4_1_supported = TRUE;
++			}
++		}
++	}
+ #endif
+ 
+ 	/* Get page size and number of CPUs */
+@@ -7184,3 +7231,40 @@
+   return TRUE;
+ }
+ #endif
++
++#ifdef MOZ_MEMORY_WINDOWS
++#include <math.h>
++
++double __cdecl floor_tt(double x)
++{
++#if defined _M_IX86 || defined _M_AMD64
++  if (sse4_1_supported)
++  {
++    __m128d xd = _mm_load_sd(&x);
++    double d;
++
++    xd = _mm_floor_sd(xd, xd);
++    _mm_store_sd(&d, xd);
++    return d;
++  }
++#endif
++  return floor(x);
++}
++
++double __cdecl ceil_tt(double x)
++{
++#if defined _M_IX86 || defined _M_AMD64
++  if (sse4_1_supported)
++  {
++    __m128d xd = _mm_load_sd(&x);
++    double d;
++
++    xd = _mm_ceil_sd(xd, xd);
++    _mm_store_sd(&d, xd);
++    return d;
++  }
++#endif
++  return ceil(x);
++}
++
++#endif
+diff -r a2ffa9047bf4 -r 67316c163750 mfbt/Attributes.h
+--- a/mfbt/Attributes.h	Thu Feb 19 19:54:14 2015 -0500
++++ b/mfbt/Attributes.h	Wed Feb 25 01:57:00 2015 +0800
+@@ -11,6 +11,12 @@
+ 
+ #include "mozilla/Compiler.h"
+ 
++#if defined(WIN32) || defined(__SYMBIAN32__)
++#  define TT_RESTRICTED_PTR     __restrict
++#else
++#  define TT_RESTRICTED_PTR     __restrict__
++#endif
++
+ /*
+  * MOZ_ALWAYS_INLINE is a macro which expands to tell the compiler that the
+  * method decorated with it must be inlined, even if the compiler thinks
+diff -r a2ffa9047bf4 -r 67316c163750 mfbt/Vector.h
+--- a/mfbt/Vector.h	Thu Feb 19 19:54:14 2015 -0500
++++ b/mfbt/Vector.h	Wed Feb 25 01:57:00 2015 +0800
+@@ -21,6 +21,7 @@
+ #include "mozilla/ReentrancyGuard.h"
+ #include "mozilla/TemplateLib.h"
+ #include "mozilla/TypeTraits.h"
++#include "mozilla/PodOperations.h"
+ 
+ #include <new> // for placement new
+ 
+@@ -185,6 +186,13 @@
+     }
+   }
+ 
++  static inline void copyConstruct(wchar_t* aDst,
++                                   const wchar_t* aSrcStart, const wchar_t* aSrcEnd)
++  {
++    MOZ_ASSERT(aSrcStart <= aSrcEnd);
++    mozilla::PodCopy(aDst, aSrcStart, aSrcEnd - aSrcStart);
++  }
++
+   template<typename U>
+   static inline void moveConstruct(T* aDst,
+                                    const U* aSrcStart, const U* aSrcEnd)
+diff -r a2ffa9047bf4 -r 67316c163750 mozglue/build/moz.build
+--- a/mozglue/build/moz.build	Thu Feb 19 19:54:14 2015 -0500
++++ b/mozglue/build/moz.build	Wed Feb 25 01:57:00 2015 +0800
+@@ -85,3 +85,18 @@
+ DEFINES['IMPL_MFBT'] = True
+ 
+ LDFLAGS += CONFIG['MOZ_GLUE_WRAP_LDFLAGS']
++
++EXPORTS.mozilla += [
++    'parallel_invoke.h',
++]
++
++SOURCES += [
++    'parallel_invoke.cpp',
++]
++
++if CONFIG['_MSC_VER']:
++    if '-DTT_MEMUTIL' in CONFIG['MOZ_OPTIMIZE_FLAGS']:
++        SOURCES['parallel_invoke.cpp'].flags += [
++            '-GL-',
++            '-openmp',
++        ]
+diff -r a2ffa9047bf4 -r 67316c163750 mozglue/build/mozglue.def.in
+--- a/mozglue/build/mozglue.def.in	Thu Feb 19 19:54:14 2015 -0500
++++ b/mozglue/build/mozglue.def.in	Wed Feb 25 01:57:00 2015 +0800
+@@ -33,4 +33,6 @@
+   jemalloc_free_dirty_pages
+   ; A hack to work around the CRT (see giant comment in Makefile.in)
+   frex=dumb_free_thunk
++  floor=floor_tt
++  ceil=ceil_tt
+ #endif
+diff -r a2ffa9047bf4 -r 67316c163750 mozglue/build/parallel_invoke.cpp
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/mozglue/build/parallel_invoke.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -0,0 +1,44 @@
++#ifdef _OPENMP
++#include <omp.h>
++#endif
++
++#include "parallel_invoke.h"
++
++void parallel_invoke(PARALLEL_INVOKE_FUNC *functions,
++                     int count,
++                     void *param,
++                     int num_threads)
++{
++#ifdef _OPENMP
++
++  if (num_threads == PARALLEL_INVOKE_MAX_THREADS)
++    num_threads = omp_get_max_threads();
++
++  if (num_threads <= 0)
++    num_threads = 1;
++
++  if (num_threads == 1 || count <= 1) {
++    for (int i = 0; i < count; i++) {
++      functions[i](param);
++    }
++  } else {
++#pragma omp parallel num_threads(num_threads)
++    {
++#pragma omp master
++      functions[0](param);
++
++#pragma omp for schedule(dynamic)
++      for (int i = 1; i < count; i++) {
++        functions[i](param);
++      }
++    }
++  }
++
++#else  // _OPENMP
++
++  for (int i = 0; i < count; i++) {
++    functions[i](param);
++  }
++
++#endif // _OPENMP
++}
+diff -r a2ffa9047bf4 -r 67316c163750 mozglue/build/parallel_invoke.h
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/mozglue/build/parallel_invoke.h	Wed Feb 25 01:57:00 2015 +0800
+@@ -0,0 +1,18 @@
++#ifndef parallel_invoke_h_
++#define parallel_invoke_h_
++
++#include "mozilla/Types.h"
++
++MOZ_BEGIN_EXTERN_C
++
++#define PARALLEL_INVOKE_MAX_THREADS (-1)
++typedef void (*PARALLEL_INVOKE_FUNC)(void *param);
++
++MFBT_API void parallel_invoke(PARALLEL_INVOKE_FUNC *functions,
++                              int count,
++                              void *param = nullptr,
++                              int num_threads = PARALLEL_INVOKE_MAX_THREADS);
++
++MOZ_END_EXTERN_C
++
++#endif /* !defined(parallel_invoke_h_) */
+diff -r a2ffa9047bf4 -r 67316c163750 netwerk/protocol/http/nsHttpConnectionMgr.cpp
+--- a/netwerk/protocol/http/nsHttpConnectionMgr.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/netwerk/protocol/http/nsHttpConnectionMgr.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -3,6 +3,10 @@
+  * License, v. 2.0. If a copy of the MPL was not distributed with this
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++#include <xmmintrin.h>
++#endif
++
+ // HttpLog.h should generally be included first
+ #include "HttpLog.h"
+ 
+@@ -1163,6 +1167,11 @@
+     // Keep iterating afterwards only until a transaction fails to dispatch.
+     // if considerAll == true then try and dispatch all items.
+     for (uint32_t i = 0; i < ent->mPendingQ.Length(); ) {
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++        if (i + 1 < ent->mPendingQ.Length()) {
++          _mm_prefetch((char *)ent->mPendingQ[i + 1]->LoadGroupConnectionInfo(), _MM_HINT_NTA);
++        }
++#endif
+         trans = ent->mPendingQ[i];
+ 
+         // When this transaction has already established a half-open
+diff -r a2ffa9047bf4 -r 67316c163750 nsprpub/configure
+--- a/nsprpub/configure	Thu Feb 19 19:54:14 2015 -0500
++++ b/nsprpub/configure	Wed Feb 25 01:57:00 2015 +0800
+@@ -7287,9 +7287,6 @@
+ 	else
+ 	    $as_echo "#define _X86_ 1" >>confdefs.h
+ 
+-            if test -z "$GNU_CC" -a "$MSC_VER" -ge "1700"; then
+-                                                CFLAGS="$CFLAGS -arch:IA32"
+-            fi
+ 	fi
+         ;;
+     x86_64)
+diff -r a2ffa9047bf4 -r 67316c163750 nsprpub/configure.in
+--- a/nsprpub/configure.in	Thu Feb 19 19:54:14 2015 -0500
++++ b/nsprpub/configure.in	Wed Feb 25 01:57:00 2015 +0800
+@@ -1989,9 +1989,13 @@
+         _DEBUG_FLAGS=-Zi
+         _OPTIMIZE_FLAGS=-O2
+ 
+-        PROFILE_GEN_CFLAGS="-GL"
++        PROFILE_GEN_CFLAGS="-GL -DMSVC_PGO_ENABLED"
+         PROFILE_GEN_LDFLAGS="-LTCG:PGINSTRUMENT"
+-        PROFILE_USE_CFLAGS="-GL -wd4624 -wd4952"
++        if test $_CC_MAJOR_VERSION -ge 18; then
++            dnl Run PGO profiling in safe mode
++            PROFILE_GEN_LDFLAGS="$PROFILE_GEN_LDFLAGS -PogoSafeMode"
++        fi
++        PROFILE_USE_CFLAGS="-GL -wd4624 -wd4952 -DMSVC_PGO_ENABLED"
+         PROFILE_USE_LDFLAGS="-LTCG:PGUPDATE"
+ 
+         if test "$MSC_VER" -ge "1800"; then
+@@ -2095,11 +2099,6 @@
+ 	    AC_DEFINE(_AMD64_)
+ 	else		
+ 	    AC_DEFINE(_X86_)
+-            if test -z "$GNU_CC" -a "$MSC_VER" -ge "1700"; then
+-                dnl Visual C++ 2012 defaults to -arch:SSE2. Use -arch:IA32
+-                dnl to avoid requiring SSE2.
+-                CFLAGS="$CFLAGS -arch:IA32"
+-            fi
+ 	fi
+         ;;
+     x86_64)
+diff -r a2ffa9047bf4 -r 67316c163750 security/nss/coreconf/WIN32.mk
+--- a/security/nss/coreconf/WIN32.mk	Thu Feb 19 19:54:14 2015 -0500
++++ b/security/nss/coreconf/WIN32.mk	Wed Feb 25 01:57:00 2015 +0800
+@@ -216,11 +216,8 @@
+ 	endif
+ else
+ 	DEFINES += -D_X86_
+-	# VS2012 defaults to -arch:SSE2. Use -arch:IA32 to avoid requiring
+-	# SSE2.
+ 	# Use subsystem 5.01 to allow running on Windows XP.
+ 	ifeq ($(_MSC_VER_GE_11),1)
+-		OS_CFLAGS += -arch:IA32
+ 		LDFLAGS += -SUBSYSTEM:CONSOLE,5.01
+ 	endif
+ endif
+diff -r a2ffa9047bf4 -r 67316c163750 security/nss/lib/freebl/Makefile
+--- a/security/nss/lib/freebl/Makefile	Thu Feb 19 19:54:14 2015 -0500
++++ b/security/nss/lib/freebl/Makefile	Wed Feb 25 01:57:00 2015 +0800
+@@ -129,11 +129,10 @@
+     DEFINES += -DMP_NO_MP_WORD -DMP_USE_UINT_DIGIT
+ else
+ # MSVC
+-    MPI_SRCS += mpi_x86_asm.c
+     DEFINES += -DMP_ASSEMBLY_MULTIPLY -DMP_ASSEMBLY_SQUARE 
+     DEFINES += -DMP_ASSEMBLY_DIV_2DX1D -DMP_USE_UINT_DIGIT -DMP_NO_MP_WORD
+     ifdef BUILD_OPT
+-	OPTIMIZER += -Ox  # maximum optimization for freebl
++	OPTIMIZER += -O2  # maximum optimization for freebl
+     endif
+     # The Intel AES assembly code requires Visual C++ 2010.
+     # if $(_MSC_VER) >= 1600 (Visual C++ 2010)
+diff -r a2ffa9047bf4 -r 67316c163750 security/nss/lib/freebl/manifest.mn
+--- a/security/nss/lib/freebl/manifest.mn	Thu Feb 19 19:54:14 2015 -0500
++++ b/security/nss/lib/freebl/manifest.mn	Wed Feb 25 01:57:00 2015 +0800
+@@ -65,7 +65,11 @@
+ 	$(NULL)
+ 
+ MPI_HDRS = mpi-config.h mpi.h mpi-priv.h mplogic.h mpprime.h logtab.h mp_gf2m.h
++ifdef USE_64
+ MPI_SRCS = mpprime.c mpmontg.c mplogic.c mpi.c mp_gf2m.c
++else
++MPI_SRCS = mpprime.c mpmontg.c mplogic.c mpi.c mp_gf2m.c mpi_x86_asm.c
++endif
+ 
+ 
+ ECL_HDRS = ecl-exp.h ecl.h ec2.h ecp.h ecl-priv.h
+diff -r a2ffa9047bf4 -r 67316c163750 toolkit/modules/debug.js
+--- a/toolkit/modules/debug.js	Thu Feb 19 19:54:14 2015 -0500
++++ b/toolkit/modules/debug.js	Wed Feb 25 01:57:00 2015 +0800
+@@ -42,7 +42,7 @@
+       case "nightly":
+       case "aurora":
+       case "beta":
+-      case "default":
++      // case "default":
+         releaseBuild = false;
+     }
+   } catch(ex) {}
+diff -r a2ffa9047bf4 -r 67316c163750 toolkit/xre/nsWindowsWMain.cpp
+--- a/toolkit/xre/nsWindowsWMain.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/toolkit/xre/nsWindowsWMain.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -10,6 +10,15 @@
+ #error This file only makes sense on Windows.
+ #endif
+ 
++// Force link tmemutil.dll
++#if defined(TT_MEMUTIL)
++#if defined(_M_IX86)
++#pragma comment(linker, "/include:_GetCpuFeature_tt")
++#elif defined(_M_AMD64)
++#pragma comment(linker, "/include:GetCpuFeature_tt")
++#endif
++#endif /* TT_MEMUTIL */
++
+ #include "nsUTF8Utils.h"
+ 
+ #ifndef XRE_DONT_PROTECT_DLL_LOAD
+diff -r a2ffa9047bf4 -r 67316c163750 widget/windows/WinUtils.cpp
+--- a/widget/windows/WinUtils.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/widget/windows/WinUtils.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -748,16 +748,26 @@
+   return topWnd;
+ }
+ 
++class CAtom_NSWindowPropName {
++public:
++  CAtom_NSWindowPropName() {
++    wchar_t sPropName[40] = L"";
++    _snwprintf(sPropName, 39, L"MozillansIWidgetPtr%p",
++               ::GetCurrentProcessId());
++    sPropName[39] = '\0';
++    atom = ::GlobalAddAtomW(sPropName);
++  }
++  ~CAtom_NSWindowPropName() {
++    ::GlobalDeleteAtom(atom);
++  }
++  ATOM atom;
++};
++
+ static const wchar_t*
+ GetNSWindowPropName()
+ {
+-  static wchar_t sPropName[40] = L"";
+-  if (!*sPropName) {
+-    _snwprintf(sPropName, 39, L"MozillansIWidgetPtr%p",
+-               ::GetCurrentProcessId());
+-    sPropName[39] = '\0';
+-  }
+-  return sPropName;
++  static CAtom_NSWindowPropName gaNswpn;
++  return (const wchar_t*)(UINT_PTR)gaNswpn.atom;
+ }
+ 
+ /* static */
+diff -r a2ffa9047bf4 -r 67316c163750 widget/windows/nsWindow.cpp
+--- a/widget/windows/nsWindow.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/widget/windows/nsWindow.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -2072,7 +2072,18 @@
+ // Internally track the caption status via a window property. Required
+ // due to our internal handling of WM_NCACTIVATE when custom client
+ // margins are set.
+-static const wchar_t kManageWindowInfoProperty[] = L"ManageWindowInfoProperty";
++class CAtom_ManageWindowInfoProperty {
++public:
++  CAtom_ManageWindowInfoProperty() {
++    atom = ::GlobalAddAtomW(L"ManageWindowInfoProperty");
++  }
++  ~CAtom_ManageWindowInfoProperty() {
++    ::GlobalDeleteAtom(atom);
++  }
++  ATOM atom;
++};
++static CAtom_ManageWindowInfoProperty gaMwip;
++#define kManageWindowInfoProperty ((LPCWSTR)(UINT_PTR)gaMwip.atom)
+ typedef BOOL (WINAPI *GetWindowInfoPtr)(HWND hwnd, PWINDOWINFO pwi);
+ static GetWindowInfoPtr sGetWindowInfoPtrStub = nullptr;
+ 
+diff -r a2ffa9047bf4 -r 67316c163750 xpcom/base/nsCycleCollector.cpp
+--- a/xpcom/base/nsCycleCollector.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/xpcom/base/nsCycleCollector.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -143,6 +143,10 @@
+ // objects alive during the unlinking.
+ //
+ 
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++#include <xmmintrin.h>
++#endif
++
+ #if !defined(__MINGW32__)
+ #ifdef WIN32
+ #include <crtdbg.h>
+@@ -1000,6 +1004,12 @@
+       for (nsPurpleBufferEntry* e = mEntries; e != eEnd; ++e) {
+         MOZ_ASSERT(e->mObject, "There should be no null mObject when we iterate over the purple buffer");
+         if (!(uintptr_t(e->mObject) & uintptr_t(1)) && e->mObject) {
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++          nsPurpleBufferEntry* ePref = e + 8;
++          if (ePref < eEnd) {
++            _mm_prefetch((char *)ePref->mRefCnt, _MM_HINT_NTA);
++          }
++#endif
+           aVisitor.Visit(aBuffer, e);
+         }
+       }
+diff -r a2ffa9047bf4 -r 67316c163750 xpcom/glue/nsDeque.cpp
+--- a/xpcom/glue/nsDeque.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/xpcom/glue/nsDeque.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -135,7 +135,22 @@
+ nsDeque::Empty()
+ {
+   if (mSize && mData) {
++#ifdef TT_MEMUTIL
++    static const uint32_t dwNonTemporalDataSizeMin = GetNonTemporalDataSizeMin_tt();
++    const uint32_t dwDataSize = mCapacity * sizeof(mData);
++
++    if (dwDataSize < dwNonTemporalDataSizeMin ||
++        NON_TEMPORAL_STORES_NOT_SUPPORTED == dwNonTemporalDataSizeMin)
++    {
++        memset(mData, 0, mCapacity * sizeof(mData));
++    }
++    else
++    {
++        memset_nontemporal_tt(mData, 0, mCapacity * sizeof(mData));
++    }
++#else
+     memset(mData, 0, mCapacity * sizeof(mData));
++#endif
+   }
+   mSize = 0;
+   mOrigin = 0;
+diff -r a2ffa9047bf4 -r 67316c163750 xpcom/glue/pldhash.cpp
+--- a/xpcom/glue/pldhash.cpp	Thu Feb 19 19:54:14 2015 -0500
++++ b/xpcom/glue/pldhash.cpp	Wed Feb 25 01:57:00 2015 +0800
+@@ -7,6 +7,13 @@
+ /*
+  * Double hashing implementation.
+  */
++#if _MSC_VER >= 1400
++#include <intrin.h>
++#endif
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++#include <xmmintrin.h>
++#endif
++
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -119,7 +126,15 @@
+ PLDHashTable::MoveEntryStub(const PLDHashEntryHdr* aFrom,
+                             PLDHashEntryHdr* aTo)
+ {
++#if _MSC_VER >= 1400
++  if ((mEntrySize & 3) == 0) {
++    __movsd((unsigned long*)aTo, (unsigned long*)aFrom, mEntrySize >> 2);
++  } else {
++    memcpy(aTo, aFrom, mEntrySize);
++  }
++#else
+   memcpy(aTo, aFrom, mEntrySize);
++#endif
+ }
+ 
+ void
+@@ -133,7 +148,15 @@
+ MOZ_ALWAYS_INLINE void
+ PLDHashTable::ClearEntryStub(PLDHashEntryHdr* aEntry)
+ {
++#if _MSC_VER >= 1400
++  if ((mEntrySize & 3) == 0) {
++    __stosd((unsigned long*)aEntry, 0, mEntrySize >> 2);
++  } else {
++    memset(aEntry, 0, mEntrySize);
++  }
++#else
+   memset(aEntry, 0, mEntrySize);
++#endif
+ }
+ 
+ void
+@@ -521,7 +544,26 @@
+   mGeneration++;
+ 
+   /* Assign the new entry store to table. */
++#ifdef TT_MEMUTIL
++  {
++    static bool initialized = false;
++    static uint32_t dwNonTemporalDataSizeMin = NON_TEMPORAL_STORES_NOT_SUPPORTED;
++
++    if (!initialized) {
++      dwNonTemporalDataSizeMin = GetNonTemporalDataSizeMin_tt();
++      initialized = true;
++    }
++
++    if (nbytes < dwNonTemporalDataSizeMin ||
++        NON_TEMPORAL_STORES_NOT_SUPPORTED == dwNonTemporalDataSizeMin) {
++      memset(newEntryStore, 0, nbytes);
++    } else {
++      memset_nontemporal_tt(newEntryStore, 0, nbytes);
++    }
++  }
++#else
+   memset(newEntryStore, 0, nbytes);
++#endif
+   char* oldEntryStore;
+   char* oldEntryAddr;
+   oldEntryAddr = oldEntryStore = mEntryStore;
+@@ -720,6 +762,9 @@
+   for (uint32_t e = 0; e < capacity; ++e) {
+     PLDHashEntryHdr* entry = (PLDHashEntryHdr*)entryAddr;
+     if (ENTRY_IS_LIVE(entry)) {
++#if (_M_IX86_FP >= 1) || defined(__SSE__) || defined(_M_AMD64) || defined(__amd64__)
++      _mm_prefetch((char *)(entryAddr + mEntrySize), _MM_HINT_NTA);
++#endif
+       PLDHashOperator op = aEtor(this, entry, i++, aArg);
+       if (op & PL_DHASH_REMOVE) {
+         METER(mStats.mRemoveEnums++);
+diff -r a2ffa9047bf4 -r 67316c163750 xpcom/string/nsCharTraits.h
+--- a/xpcom/string/nsCharTraits.h	Thu Feb 19 19:54:14 2015 -0500
++++ b/xpcom/string/nsCharTraits.h	Wed Feb 25 01:57:00 2015 +0800
+@@ -153,6 +153,10 @@
+   static char_type*
+   copy(char_type* aStr1, const char_type* aStr2, size_t aN)
+   {
++    if (1 == aN) {
++      *aStr1 = *aStr2;
++      return aStr1;
++    }
+     return static_cast<char_type*>(memcpy(aStr1, aStr2,
+                                           aN * sizeof(char_type)));
+   }

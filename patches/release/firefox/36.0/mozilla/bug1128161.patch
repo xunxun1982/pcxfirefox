@@ -1,0 +1,26 @@
+# HG changeset patch
+# User Chris Double <chris.double@double.co.nz>
+# Date 1422915617 -46800
+#      Tue Feb 03 11:20:17 2015 +1300
+# Node ID 7dabddb95bea70b139495efb12f98e574754a66c
+# Parent  7d4016a05dd32bf2d726975ba9175bb13fc9ea97
+Bug 1128161 - Fix build error when logging is disabled - r=ajones
+
+diff -r 7d4016a05dd3 -r 7dabddb95bea dom/media/mediasource/MediaSourceUtils.cpp
+--- a/dom/media/mediasource/MediaSourceUtils.cpp	Wed Feb 04 12:27:54 2015 +0800
++++ b/dom/media/mediasource/MediaSourceUtils.cpp	Tue Feb 03 11:20:17 2015 +1300
+@@ -11,7 +11,6 @@
+ 
+ namespace mozilla {
+ 
+-#if defined(PR_LOGGING)
+ nsCString
+ DumpTimeRanges(dom::TimeRanges* aRanges)
+ {
+@@ -31,6 +30,5 @@
+ 
+   return dump;
+ }
+-#endif
+ 
+ } // namespace mozilla

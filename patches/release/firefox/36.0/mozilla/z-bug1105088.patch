@@ -1,0 +1,23 @@
+# HG changeset patch
+# User Nicolas Silva <nsilva@mozilla.com>
+# Date 1419330457 -3600
+#      Tue Dec 23 11:27:37 2014 +0100
+# Node ID 65623905dced7be87d69ab8d8f7abf72ff6450c1
+# Parent  cbf03e15c98f8f9c04e688403d1721a719125cbb
+Bug 1105088 - Disable D3D9 on Vista or later Windows versions. r=jrmuizel
+
+diff -r cbf03e15c98f -r 65623905dced widget/windows/nsWindow.cpp
+--- a/widget/windows/nsWindow.cpp	Thu Feb 19 01:57:49 2015 +0800
++++ b/widget/windows/nsWindow.cpp	Tue Dec 23 11:27:37 2014 +0100
+@@ -6781,7 +6781,10 @@
+     if (!prefs.mPreferD3D9) {
+       aHints.AppendElement(LayersBackend::LAYERS_D3D11);
+     }
+-    aHints.AppendElement(LayersBackend::LAYERS_D3D9);
++    if (prefs.mPreferD3D9 || !mozilla::IsVistaOrLater()) {
++      // We don't want D3D9 except on Windows XP
++      aHints.AppendElement(LayersBackend::LAYERS_D3D9);
++    }
+   }
+   aHints.AppendElement(LayersBackend::LAYERS_BASIC);
+ }

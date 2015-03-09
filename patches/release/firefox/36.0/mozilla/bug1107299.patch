@@ -1,0 +1,59 @@
+# HG changeset patch
+# User Bas Schouten <bschouten@mozilla.com>
+# Date 1417824138 0
+#      Sat Dec 06 00:02:18 2014 +0000
+# Node ID 630ca7526749e23b5adc863677d6b257162b6913
+# Parent  33b02a0e4ab179566e09f8daada303db7542726a
+Bug 1107299: Only block shared surface usage when that is broken. r=jrmuizel
+
+Currently when the usage of surface sharing is broken on certain drivers, be block D3D11 entirely and fall back to Basic composition. There's no real benefit in this case from disabling D3D11 entirely, and we might as well just use it with software composition like we do when we don't have Direct2D, and in addition to that disable texture sharing for webGL, falling back to slow WebGL which again is no worse than the situation when using Basic or D3D9 composition.
+
+diff -r 33b02a0e4ab1 -r 630ca7526749 gfx/layers/client/ClientCanvasLayer.cpp
+--- a/gfx/layers/client/ClientCanvasLayer.cpp	Mon Dec 01 15:18:40 2014 -0500
++++ b/gfx/layers/client/ClientCanvasLayer.cpp	Sat Dec 06 00:02:18 2014 +0000
+@@ -21,6 +21,7 @@
+ 
+ #ifdef XP_WIN
+ #include "SharedSurfaceANGLE.h"         // for SurfaceFactory_ANGLEShareHandle
++#include "gfxWindowsPlatform.h"
+ #endif
+ 
+ #ifdef MOZ_WIDGET_GONK
+@@ -110,7 +111,7 @@
+       case mozilla::layers::LayersBackend::LAYERS_D3D10:
+       case mozilla::layers::LayersBackend::LAYERS_D3D11: {
+ #ifdef XP_WIN
+-        if (mGLContext->IsANGLE()) {
++        if (mGLContext->IsANGLE() && DoesD3D11DeviceWork(gfxWindowsPlatform::GetPlatform()->GetD3D11Device())) {
+           factory = SurfaceFactory_ANGLEShareHandle::Create(mGLContext, caps);
+         }
+ #endif
+diff -r 33b02a0e4ab1 -r 630ca7526749 widget/windows/nsWindow.cpp
+--- a/widget/windows/nsWindow.cpp	Mon Dec 01 15:18:40 2014 -0500
++++ b/widget/windows/nsWindow.cpp	Sat Dec 06 00:02:18 2014 +0000
+@@ -6777,20 +6777,11 @@
+     }
+ 
+     ID3D11Device* device = gfxWindowsPlatform::GetPlatform()->GetD3D11Device();
+-    if (device &&
+-        device->GetFeatureLevel() >= D3D_FEATURE_LEVEL_10_0 &&
+-        !DoesD3D11DeviceWork(device)) {
+-      // bug 1083071 - bad things - fall back to basic layers
+-      // This should not happen aside from driver bugs, and in particular
+-      // should not happen on our test machines, so let's NS_ERROR to ensure
+-      // that we would catch it as a test failure.
+-      NS_ERROR("Can't use Direct3D 11 because of a driver bug");
+-    } else {
+-      if (!prefs.mPreferD3D9) {
+-        aHints.AppendElement(LayersBackend::LAYERS_D3D11);
+-      }
+-      aHints.AppendElement(LayersBackend::LAYERS_D3D9);
+-    }
++
++    if (!prefs.mPreferD3D9) {
++      aHints.AppendElement(LayersBackend::LAYERS_D3D11);
++    }
++    aHints.AppendElement(LayersBackend::LAYERS_D3D9);
+   }
+   aHints.AppendElement(LayersBackend::LAYERS_BASIC);
+ }

@@ -1,0 +1,74 @@
+# HG changeset patch
+# User Jan de Mooij <jdemooij@mozilla.com>
+# Date 1417224332 28800
+#      Fri Nov 28 17:25:32 2014 -0800
+# Node ID d94cede073853eaebe32c7980e79d5907f7aeaa6
+# Parent  7dabddb95bea70b139495efb12f98e574754a66c
+Bug 1104199 - Don't require LUnbox operand to be in a register on x64. r=sunfish
+
+diff -r 7dabddb95bea -r d94cede07385 js/src/jit/x64/CodeGenerator-x64.cpp
+--- a/js/src/jit/x64/CodeGenerator-x64.cpp	Tue Feb 03 11:20:17 2015 +1300
++++ b/js/src/jit/x64/CodeGenerator-x64.cpp	Fri Nov 28 17:25:32 2014 -0800
+@@ -87,11 +87,10 @@
+ bool
+ CodeGeneratorX64::visitUnbox(LUnbox *unbox)
+ {
+-    const ValueOperand value = ToValue(unbox, LUnbox::Input);
+-    const LDefinition *result = unbox->output();
+     MUnbox *mir = unbox->mir();
+ 
+     if (mir->fallible()) {
++        const ValueOperand value = ToValue(unbox, LUnbox::Input);
+         Assembler::Condition cond;
+         switch (mir->type()) {
+           case MIRType_Int32:
+@@ -116,21 +115,23 @@
+             return false;
+     }
+ 
++    Operand input = ToOperand(unbox->getOperand(LUnbox::Input));
++    Register result = ToRegister(unbox->output());
+     switch (mir->type()) {
+       case MIRType_Int32:
+-        masm.unboxInt32(value, ToRegister(result));
++        masm.unboxInt32(input, result);
+         break;
+       case MIRType_Boolean:
+-        masm.unboxBoolean(value, ToRegister(result));
++        masm.unboxBoolean(input, result);
+         break;
+       case MIRType_Object:
+-        masm.unboxObject(value, ToRegister(result));
++        masm.unboxObject(input, result);
+         break;
+       case MIRType_String:
+-        masm.unboxString(value, ToRegister(result));
++        masm.unboxString(input, result);
+         break;
+       case MIRType_Symbol:
+-        masm.unboxSymbol(value, ToRegister(result));
++        masm.unboxSymbol(input, result);
+         break;
+       default:
+         MOZ_CRASH("Given MIRType cannot be unboxed.");
+diff -r 7dabddb95bea -r d94cede07385 js/src/jit/x64/Lowering-x64.cpp
+--- a/js/src/jit/x64/Lowering-x64.cpp	Tue Feb 03 11:20:17 2015 +1300
++++ b/js/src/jit/x64/Lowering-x64.cpp	Fri Nov 28 17:25:32 2014 -0800
+@@ -84,10 +84,15 @@
+     MOZ_ASSERT(box->type() == MIRType_Value);
+ 
+     LUnboxBase *lir;
+-    if (IsFloatingPointType(unbox->type()))
++    if (IsFloatingPointType(unbox->type())) {
+         lir = new(alloc()) LUnboxFloatingPoint(useRegisterAtStart(box), unbox->type());
+-    else
++    } else if (unbox->fallible()) {
++        // If the unbox is fallible, load the Value in a register first to
++        // avoid multiple loads.
+         lir = new(alloc()) LUnbox(useRegisterAtStart(box));
++    } else {
++        lir = new(alloc()) LUnbox(useAtStart(box));
++    }
+ 
+     if (unbox->fallible() && !assignSnapshot(lir, unbox->bailoutKind()))
+         return false;

@@ -1,0 +1,34 @@
+# HG changeset patch
+# User L. David Baron <dbaron@dbaron.org>
+# Date 1421211791 28800
+#      Tue Jan 13 21:03:11 2015 -0800
+# Node ID e5c8fd6fda38c15d53c067d01105856707ca1555
+# Parent  f9fd56eb87c96a7b527936da9cb885301d5eae20
+Bug 908987 - Honor mIsActive more aggressively to avoid calling IsVisibleConsideringAncestors.  r=roc
+
+This means that we avoid an O(N^2) calling pattern of IsVisible when we
+call IsVisible for all tabs of a tabbrowser, since in a tabbrowser
+(which uses an nsDeckFrame), IsVisibleConsideringAncestors is O(N) in
+number of earlier tabs.
+
+diff -r f9fd56eb87c9 -r e5c8fd6fda38 layout/base/nsPresShell.cpp
+--- a/layout/base/nsPresShell.cpp	Sun Feb 22 16:09:50 2015 +0800
++++ b/layout/base/nsPresShell.cpp	Tue Jan 13 21:03:11 2015 -0800
+@@ -8870,7 +8870,7 @@
+ bool
+ PresShell::IsVisible()
+ {
+-  if (!mViewManager)
++  if (!mIsActive || !mViewManager)
+     return false;
+ 
+   nsView* view = mViewManager->GetRootView();
+@@ -8880,7 +8880,7 @@
+   // inner view of subdoc frame
+   view = view->GetParent();
+   if (!view)
+-    return mIsActive;
++    return true;
+ 
+   // subdoc view
+   view = view->GetParent();

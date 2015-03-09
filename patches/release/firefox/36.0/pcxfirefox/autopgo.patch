@@ -1,0 +1,33 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1419519199 -28800
+#      Thu Dec 25 22:53:19 2014 +0800
+# Node ID 7627bd82c025dc59bdfb2289dbd1b74e026b1819
+# Parent  f86ea44c33117e64cd45fab0a1694c840979e08f
+autopgo
+
+diff -r f86ea44c3311 -r 7627bd82c025 Makefile.in
+--- a/Makefile.in	Wed Feb 25 15:19:38 2015 +0800
++++ b/Makefile.in	Thu Dec 25 22:53:19 2014 +0800
+@@ -298,6 +298,9 @@
+ 	find $(DIST)/$(MOZ_APP_NAME) -name '*.pgc' -exec mv {} $(DIST)/bin \;
+ endif
+ 
++pgo-profile-run:
++	$(PYTHON) $(topsrcdir)/build/pgo/profileserver.py $(EXTRA_TEST_ARGS)
++
+ .PHONY: maybe_clobber_profiledbuild
+ 
+ # Look for R_386_PC32 relocations in shared libs, these
+diff -r f86ea44c3311 -r 7627bd82c025 build/pgo/profileserver.py
+--- a/build/pgo/profileserver.py	Wed Feb 25 15:19:38 2015 +0800
++++ b/build/pgo/profileserver.py	Thu Dec 25 22:53:19 2014 +0800
+@@ -68,7 +68,7 @@
+       env["MOZ_JAR_LOG_FILE"] = os.path.abspath(jarlog)
+       print "jarlog: %s" % env["MOZ_JAR_LOG_FILE"]
+ 
+-    cmdargs = ["http://localhost:%d/index.html" % PORT]
++    cmdargs = ["http://127.0.0.1:%d/index.html" % PORT]
+     runner = FirefoxRunner(profile=profile,
+                            binary=build.get_binary_path(where="staged-package"),
+                            cmdargs=cmdargs,
