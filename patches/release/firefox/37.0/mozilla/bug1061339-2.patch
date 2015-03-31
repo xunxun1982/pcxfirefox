@@ -1,0 +1,23 @@
+# HG changeset patch
+# User Makoto Kato <m_kato@ga2.so-net.ne.jp>
+# Date 1424146200 18000
+#      Mon Feb 16 23:10:00 2015 -0500
+# Branch MOBILE370b8_2015032422_RELBRANCH
+# Node ID af1893a016b6e28a17ff0118de8fba4e257ddd93
+# Parent  b9eeec80f62e7039e8cd19301ee9b8259c7cb587
+Bug 1061339 - Part 2: Build AVX code on all Windows build. r=rillian, r=ted
+
+diff -r b9eeec80f62e -r af1893a016b6 media/libvpx/moz.build
+--- a/media/libvpx/moz.build	Mon Feb 16 21:15:00 2015 -0500
++++ b/media/libvpx/moz.build	Mon Feb 16 23:10:00 2015 -0500
+@@ -42,8 +42,8 @@
+         SOURCES += files['X86-64_ASM']
+ 
+     # AVX2 only supported on
+-    # Darwin and mingw toolchains right now
+-    if CONFIG['OS_TARGET'] == 'Darwin' or (CONFIG['OS_TARGET'] == 'WINNT' and CONFIG['GNU_CC']):
++    # Darwin and Windows toolchains right now
++    if CONFIG['OS_TARGET'] in ('Darwin', 'WINNT'):
+         SOURCES += files['AVX2']
+ 
+     #postproc is only enabled on x86 with asm

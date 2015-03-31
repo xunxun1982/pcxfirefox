@@ -1,0 +1,71 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1427328523 -28800
+#      Thu Mar 26 08:08:43 2015 +0800
+# Branch MOBILE370b8_2015032422_RELBRANCH
+# Node ID d8ba0dd7c369219537a6afeead6612760d563846
+# Parent  f402a3f6c9a249fe20f7a3a16f5531cd81341ca4
+Bug 1098415 - Skip DNS prefetch for local resources.
+
+diff -r f402a3f6c9a2 -r d8ba0dd7c369 dom/base/nsContentSink.cpp
+--- a/dom/base/nsContentSink.cpp	Wed Mar 25 16:35:46 2015 +0800
++++ b/dom/base/nsContentSink.cpp	Thu Mar 26 08:08:43 2015 +0800
+@@ -847,9 +847,15 @@
+     if (!uri) {
+       return;
+     }
+-    nsAutoCString host;
+-    uri->GetHost(host);
+-    CopyUTF8toUTF16(host, hostname);
++    nsresult rv;
++    bool isLocalResource = false;
++    rv = NS_URIChainHasFlags(uri, nsIProtocolHandler::URI_IS_LOCAL_RESOURCE,
++                             &isLocalResource);
++    if (NS_SUCCEEDED(rv) && !isLocalResource) {
++      nsAutoCString host;
++      uri->GetHost(host);
++      CopyUTF8toUTF16(host, hostname);
++    }
+   }
+ 
+   if (!hostname.IsEmpty() && nsHTMLDNSPrefetch::IsAllowed(mDocument)) {
+diff -r f402a3f6c9a2 -r d8ba0dd7c369 dom/html/nsHTMLDNSPrefetch.cpp
+--- a/dom/html/nsHTMLDNSPrefetch.cpp	Wed Mar 25 16:35:46 2015 +0800
++++ b/dom/html/nsHTMLDNSPrefetch.cpp	Thu Mar 26 08:08:43 2015 +0800
+@@ -311,21 +311,29 @@
+       // Only prefetch here if request was deferred and deferral not cancelled
+       if (link && link->HasDeferredDNSPrefetchRequest()) {
+         nsCOMPtr<nsIURI> hrefURI(link ? link->GetURI() : nullptr);
+-        if (hrefURI)
++        bool isLocalResource = false;
++        nsresult rv;
++
++        hostName.Truncate();
++        if (hrefURI) {
+           hrefURI->GetAsciiHost(hostName);
++          rv = NS_URIChainHasFlags(hrefURI,
++                                   nsIProtocolHandler::URI_IS_LOCAL_RESOURCE,
++                                   &isLocalResource);
++        }
+ 
+-        if (!hostName.IsEmpty()) {
++        if (!hostName.IsEmpty() && NS_SUCCEEDED(rv) && !isLocalResource) {
+           if (IsNeckoChild()) {
+             gNeckoChild->SendHTMLDNSPrefetch(NS_ConvertUTF8toUTF16(hostName),
+                                            mEntries[mTail].mFlags);
+           } else {
+             nsCOMPtr<nsICancelable> tmpOutstanding;
+ 
+-            nsresult rv = sDNSService->AsyncResolve(hostName, 
+-                                    mEntries[mTail].mFlags
+-                                    | nsIDNSService::RESOLVE_SPECULATE,
+-                                    sDNSListener, nullptr,
+-                                    getter_AddRefs(tmpOutstanding));
++            rv = sDNSService->AsyncResolve(hostName,
++                                           mEntries[mTail].mFlags
++                                           | nsIDNSService::RESOLVE_SPECULATE,
++                                           sDNSListener, nullptr,
++                                           getter_AddRefs(tmpOutstanding));
+             // Tell link that deferred prefetch was requested
+             if (NS_SUCCEEDED(rv))
+               link->OnDNSPrefetchRequested();

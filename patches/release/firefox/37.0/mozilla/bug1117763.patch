@@ -1,0 +1,66 @@
+# HG changeset patch
+# User Honza Bambas <honzab.moz@firemni.cz>
+# Date 1423832040 18000
+#      Fri Feb 13 07:54:00 2015 -0500
+# Branch MOBILE370b8_2015032422_RELBRANCH
+# Node ID 67ed774b6a58fb706a890ef162137a86664d8fce
+# Parent  d8ba0dd7c369219537a6afeead6612760d563846
+Bug 1117763 - Remove range request headers on cache entry open failure. r=michal
+
+diff -r d8ba0dd7c369 -r 67ed774b6a58 netwerk/protocol/http/nsHttpChannel.cpp
+--- a/netwerk/protocol/http/nsHttpChannel.cpp	Thu Mar 26 08:08:43 2015 +0800
++++ b/netwerk/protocol/http/nsHttpChannel.cpp	Fri Feb 13 07:54:00 2015 -0500
+@@ -2260,8 +2260,7 @@
+     nsresult rv = SetupByteRangeRequest(partialLen);
+     if (NS_FAILED(rv)) {
+         // Make the request unconditional again.
+-        mRequestHead.ClearHeader(nsHttp::Range);
+-        mRequestHead.ClearHeader(nsHttp::If_Range);
++        UntieByteRangeRequest();
+     }
+ 
+     return rv;
+@@ -2295,6 +2294,13 @@
+     return NS_OK;
+ }
+ 
++void
++nsHttpChannel::UntieByteRangeRequest()
++{
++    mRequestHead.ClearHeader(nsHttp::Range);
++    mRequestHead.ClearHeader(nsHttp::If_Range);
++}
++
+ nsresult
+ nsHttpChannel::ProcessPartialContent()
+ {
+@@ -3009,9 +3015,16 @@
+             mCachedContentIsPartial = NS_SUCCEEDED(rv) && mIsPartialRequest;
+             if (mCachedContentIsPartial) {
+                 rv = OpenCacheInputStream(entry, false, !!appCache);
++                if (NS_FAILED(rv)) {
++                    UntieByteRangeRequest();
++                    return rv;
++                }
++
+                 *aResult = ENTRY_NEEDS_REVALIDATION;
+-                return rv;
+-            } else if (size == 0 && mCacheOnlyMetadata) {
++                return NS_OK;
++            }
++
++            if (size == 0 && mCacheOnlyMetadata) {
+                 // Don't break cache entry load when the entry's data size
+                 // is 0 and mCacheOnlyMetadata flag is set. In that case we
+                 // want to proceed since the LOAD_ONLY_IF_MODIFIED flag is
+diff -r d8ba0dd7c369 -r 67ed774b6a58 netwerk/protocol/http/nsHttpChannel.h
+--- a/netwerk/protocol/http/nsHttpChannel.h	Thu Mar 26 08:08:43 2015 +0800
++++ b/netwerk/protocol/http/nsHttpChannel.h	Fri Feb 13 07:54:00 2015 -0500
+@@ -366,6 +366,7 @@
+     nsresult MaybeSetupByteRangeRequest(int64_t partialLen, int64_t contentLength,
+                                         bool ignoreMissingPartialLen = false);
+     nsresult SetupByteRangeRequest(int64_t partialLen);
++    void UntieByteRangeRequest();
+     nsresult OpenCacheInputStream(nsICacheEntry* cacheEntry, bool startBuffering,
+                                   bool checkingAppCacheEntry);
+ 

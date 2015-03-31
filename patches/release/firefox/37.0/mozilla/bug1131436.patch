@@ -1,0 +1,25 @@
+# HG changeset patch
+# User Makoto Kato <m_kato@ga2.so-net.ne.jp>
+# Date 1423721277 -32400
+#      Thu Feb 12 15:07:57 2015 +0900
+# Branch MOBILE370b8_2015032422_RELBRANCH
+# Node ID ebda2a2307cd298d56f4b9f6edac5be19f7b1a63
+# Parent  673ff42c76f95d858178715db56945f1a1e836dc
+Bug 1131436 - WindowsDllInterceptor is always failure with --disable-optimize and --enable-debug. r=dmajor
+
+diff -r 673ff42c76f9 -r ebda2a2307cd xpcom/build/nsWindowsDllInterceptor.h
+--- a/xpcom/build/nsWindowsDllInterceptor.h	Fri Feb 13 07:58:00 2015 -0500
++++ b/xpcom/build/nsWindowsDllInterceptor.h	Thu Feb 12 15:07:57 2015 +0900
+@@ -678,6 +678,12 @@
+     if (aOriginalFunction[0] == 0xff && aOriginalFunction[1] == 0x25) {
+       return (void*)(**((uint32_t**) (aOriginalFunction + 2)));
+     }
++#elif defined(_M_X64)
++    if (aOriginalFunction[0] == 0xe9) {
++      // require for TestDllInterceptor with --disable-optimize
++      int32_t offset = *((int32_t*)(aOriginalFunction + 1));
++      return aOriginalFunction + 5 + offset;
++    }
+ #endif
+ 
+     return aOriginalFunction;

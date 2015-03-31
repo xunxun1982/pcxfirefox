@@ -1,0 +1,21 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1411491382 -28800
+#      Wed Sep 24 00:56:22 2014 +0800
+# Branch MOBILE370b8_2015032422_RELBRANCH
+# Node ID f8db9c5b8af0ccce686f1a6d77d61ce1c9f81b4c
+# Parent  008d9f7ea6a3759c5033bfe065ac33470e5a29e1
+Bug 1007050 - backout bug 888159 since VS2013RTM supports std::isinf etc
+
+diff -r 008d9f7ea6a3 -r f8db9c5b8af0 mfbt/decimal/moz-decimal-utils.h
+--- a/mfbt/decimal/moz-decimal-utils.h	Tue Jan 13 21:03:11 2015 -0800
++++ b/mfbt/decimal/moz-decimal-utils.h	Wed Sep 24 00:56:22 2014 +0800
+@@ -38,7 +38,7 @@
+     ClassName(const ClassName&) = delete; \
+     void operator=(const ClassName&) = delete;
+ 
+-#if defined(_MSC_VER)
++#if defined(_MSC_VER) && (_MSC_VER <= 1700)
+ namespace std {
+   inline bool isinf(double num) { return mozilla::IsInfinite(num); }
+   inline bool isnan(double num) { return mozilla::IsNaN(num); }

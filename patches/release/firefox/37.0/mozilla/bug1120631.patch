@@ -1,0 +1,25 @@
+# HG changeset patch
+# User Honza Bambas <honzab.moz@firemni.cz>
+# Date 1423832100 18000
+#      Fri Feb 13 07:55:00 2015 -0500
+# Branch MOBILE370b8_2015032422_RELBRANCH
+# Node ID a77e3d937dec1ab2c4010d9305848cf827acd01c
+# Parent  115c4a9e8cbf4a1f4b7d9d9ae0a0f72dfebd2772
+Bug 1120631 - CacheEntry::mFileStatus made atomic/rel_acq. r=nfroyd, r=michal
+
+diff -r 115c4a9e8cbf -r a77e3d937dec netwerk/cache2/CacheEntry.h
+--- a/netwerk/cache2/CacheEntry.h	Tue Jan 27 15:50:18 2015 +0100
++++ b/netwerk/cache2/CacheEntry.h	Fri Feb 13 07:55:00 2015 -0500
+@@ -265,7 +265,11 @@
+   nsCOMPtr<nsICacheEntryDoomCallback> mDoomCallback;
+ 
+   nsRefPtr<CacheFile> mFile;
+-  nsresult mFileStatus;
++
++  // Using ReleaseAcquire since we only control access to mFile with this.
++  // When mFileStatus is read and found success it is ensured there is mFile and
++  // that it is after a successful call to Init().
++  ::mozilla::Atomic<nsresult, ::mozilla::ReleaseAcquire> mFileStatus;
+   nsCOMPtr<nsIURI> mURI;
+   nsCString mEnhanceID;
+   nsCString mStorageID;

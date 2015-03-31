@@ -1,0 +1,598 @@
+# HG changeset patch
+# User Ben Turner <bent.mozilla@gmail.com>
+# Date 1426713659 25200
+#      Wed Mar 18 14:20:59 2015 -0700
+# Branch MOBILE370b8_2015032422_RELBRANCH
+# Node ID e1a36d248eb8e7259e5ba91c285d61461052dcd6
+# Parent  04af83ef70607ffc9ec05d4e930911f7bd588a2d
+Bug 1143885 - Fix transaction handling when requests are killed prematurely. r=khuey, a=sledru
+
+diff -r 04af83ef7060 -r e1a36d248eb8 dom/indexedDB/ActorsChild.cpp
+--- a/dom/indexedDB/ActorsChild.cpp	Thu Mar 26 12:00:55 2015 +0800
++++ b/dom/indexedDB/ActorsChild.cpp	Wed Mar 18 14:20:59 2015 -0700
+@@ -1826,18 +1826,14 @@
+   mTransaction->AssertIsOnOwningThread();
+ 
+   MOZ_COUNT_CTOR(indexedDB::BackgroundRequestChild);
+-
+-  mTransaction->OnNewRequest();
+ }
+ 
+ BackgroundRequestChild::~BackgroundRequestChild()
+ {
+   AssertIsOnOwningThread();
+-  MOZ_ASSERT_IF(!IsActorDestroyed(), mTransaction);
++  MOZ_ASSERT(!mTransaction);
+ 
+   MOZ_COUNT_DTOR(indexedDB::BackgroundRequestChild);
+-
+-  MaybeFinishTransactionEarly();
+ }
+ 
+ void
+@@ -1851,19 +1847,6 @@
+ }
+ 
+ void
+-BackgroundRequestChild::MaybeFinishTransactionEarly()
+-{
+-  AssertIsOnOwningThread();
+-
+-  if (mTransaction) {
+-    mTransaction->AssertIsOnOwningThread();
+-
+-    mTransaction->OnRequestFinished();
+-    mTransaction = nullptr;
+-  }
+-}
+-
+-bool
+ BackgroundRequestChild::HandleResponse(nsresult aResponse)
+ {
+   AssertIsOnOwningThread();
+@@ -1872,10 +1855,9 @@
+   MOZ_ASSERT(mTransaction);
+ 
+   DispatchErrorEvent(mRequest, aResponse, mTransaction);
+-  return true;
+ }
+ 
+-bool
++void
+ BackgroundRequestChild::HandleResponse(const Key& aResponse)
+ {
+   AssertIsOnOwningThread();
+@@ -1883,10 +1865,9 @@
+   ResultHelper helper(mRequest, mTransaction, &aResponse);
+ 
+   DispatchSuccessEvent(&helper);
+-  return true;
+ }
+ 
+-bool
++void
+ BackgroundRequestChild::HandleResponse(const nsTArray<Key>& aResponse)
+ {
+   AssertIsOnOwningThread();
+@@ -1894,10 +1875,9 @@
+   ResultHelper helper(mRequest, mTransaction, &aResponse);
+ 
+   DispatchSuccessEvent(&helper);
+-  return true;
+ }
+ 
+-bool
++void
+ BackgroundRequestChild::HandleResponse(
+                              const SerializedStructuredCloneReadInfo& aResponse)
+ {
+@@ -1917,10 +1897,9 @@
+   ResultHelper helper(mRequest, mTransaction, &cloneReadInfo);
+ 
+   DispatchSuccessEvent(&helper);
+-  return true;
+ }
+ 
+-bool
++void
+ BackgroundRequestChild::HandleResponse(
+                    const nsTArray<SerializedStructuredCloneReadInfo>& aResponse)
+ {
+@@ -1955,10 +1934,9 @@
+   ResultHelper helper(mRequest, mTransaction, &cloneReadInfos);
+ 
+   DispatchSuccessEvent(&helper);
+-  return true;
+ }
+ 
+-bool
++void
+ BackgroundRequestChild::HandleResponse(JS::Handle<JS::Value> aResponse)
+ {
+   AssertIsOnOwningThread();
+@@ -1966,10 +1944,9 @@
+   ResultHelper helper(mRequest, mTransaction, &aResponse);
+ 
+   DispatchSuccessEvent(&helper);
+-  return true;
+ }
+ 
+-bool
++void
+ BackgroundRequestChild::HandleResponse(uint64_t aResponse)
+ {
+   AssertIsOnOwningThread();
+@@ -1979,7 +1956,6 @@
+   ResultHelper helper(mRequest, mTransaction, &response);
+ 
+   DispatchSuccessEvent(&helper);
+-  return true;
+ }
+ 
+ void
+@@ -1989,9 +1965,17 @@
+ 
+   MaybeCollectGarbageOnIPCMessage();
+ 
+-  MaybeFinishTransactionEarly();
+-
+   NoteActorDestroyed();
++
++  if (mTransaction) {
++    mTransaction->AssertIsOnOwningThread();
++
++    mTransaction->OnRequestFinished(/* aActorDestroyedNormally */
++                                    aWhy == Deletion);
++#ifdef DEBUG
++    mTransaction = nullptr;
++#endif
++  }
+ }
+ 
+ bool
+@@ -2003,62 +1987,80 @@
+ 
+   MaybeCollectGarbageOnIPCMessage();
+ 
+-  // Always fire an "error" event with ABORT_ERR if the transaction was aborted,
+-  // even if the request succeeded or failed with another error.
+   if (mTransaction->IsAborted()) {
+-    return HandleResponse(NS_ERROR_DOM_INDEXEDDB_ABORT_ERR);
++    // Always fire an "error" event with ABORT_ERR if the transaction was
++    // aborted, even if the request succeeded or failed with another error.
++    HandleResponse(NS_ERROR_DOM_INDEXEDDB_ABORT_ERR);
++  } else {
++    switch (aResponse.type()) {
++      case RequestResponse::Tnsresult:
++        HandleResponse(aResponse.get_nsresult());
++        break;
++
++      case RequestResponse::TObjectStoreAddResponse:
++        HandleResponse(aResponse.get_ObjectStoreAddResponse().key());
++        break;
++
++      case RequestResponse::TObjectStorePutResponse:
++        HandleResponse(aResponse.get_ObjectStorePutResponse().key());
++        break;
++
++      case RequestResponse::TObjectStoreGetResponse:
++        HandleResponse(aResponse.get_ObjectStoreGetResponse().cloneInfo());
++        break;
++
++      case RequestResponse::TObjectStoreGetAllResponse:
++        HandleResponse(aResponse.get_ObjectStoreGetAllResponse().cloneInfos());
++        break;
++
++      case RequestResponse::TObjectStoreGetAllKeysResponse:
++        HandleResponse(aResponse.get_ObjectStoreGetAllKeysResponse().keys());
++        break;
++
++      case RequestResponse::TObjectStoreDeleteResponse:
++        HandleResponse(JS::UndefinedHandleValue);
++        break;
++
++      case RequestResponse::TObjectStoreClearResponse:
++        HandleResponse(JS::UndefinedHandleValue);
++        break;
++
++      case RequestResponse::TObjectStoreCountResponse:
++        HandleResponse(aResponse.get_ObjectStoreCountResponse().count());
++        break;
++
++      case RequestResponse::TIndexGetResponse:
++        HandleResponse(aResponse.get_IndexGetResponse().cloneInfo());
++        break;
++
++      case RequestResponse::TIndexGetKeyResponse:
++        HandleResponse(aResponse.get_IndexGetKeyResponse().key());
++        break;
++
++      case RequestResponse::TIndexGetAllResponse:
++        HandleResponse(aResponse.get_IndexGetAllResponse().cloneInfos());
++        break;
++
++      case RequestResponse::TIndexGetAllKeysResponse:
++        HandleResponse(aResponse.get_IndexGetAllKeysResponse().keys());
++        break;
++
++      case RequestResponse::TIndexCountResponse:
++        HandleResponse(aResponse.get_IndexCountResponse().count());
++        break;
++
++      default:
++        MOZ_CRASH("Unknown response type!");
++    }
+   }
+ 
+-  switch (aResponse.type()) {
+-    case RequestResponse::Tnsresult:
+-      return HandleResponse(aResponse.get_nsresult());
+-
+-    case RequestResponse::TObjectStoreAddResponse:
+-      return HandleResponse(aResponse.get_ObjectStoreAddResponse().key());
+-
+-    case RequestResponse::TObjectStorePutResponse:
+-      return HandleResponse(aResponse.get_ObjectStorePutResponse().key());
+-
+-    case RequestResponse::TObjectStoreGetResponse:
+-      return HandleResponse(aResponse.get_ObjectStoreGetResponse().cloneInfo());
+-
+-    case RequestResponse::TObjectStoreGetAllResponse:
+-      return HandleResponse(aResponse.get_ObjectStoreGetAllResponse()
+-                                     .cloneInfos());
+-
+-    case RequestResponse::TObjectStoreGetAllKeysResponse:
+-      return HandleResponse(aResponse.get_ObjectStoreGetAllKeysResponse()
+-                                     .keys());
+-
+-    case RequestResponse::TObjectStoreDeleteResponse:
+-      return HandleResponse(JS::UndefinedHandleValue);
+-
+-    case RequestResponse::TObjectStoreClearResponse:
+-      return HandleResponse(JS::UndefinedHandleValue);
+-
+-    case RequestResponse::TObjectStoreCountResponse:
+-      return HandleResponse(aResponse.get_ObjectStoreCountResponse().count());
+-
+-    case RequestResponse::TIndexGetResponse:
+-      return HandleResponse(aResponse.get_IndexGetResponse().cloneInfo());
+-
+-    case RequestResponse::TIndexGetKeyResponse:
+-      return HandleResponse(aResponse.get_IndexGetKeyResponse().key());
+-
+-    case RequestResponse::TIndexGetAllResponse:
+-      return HandleResponse(aResponse.get_IndexGetAllResponse().cloneInfos());
+-
+-    case RequestResponse::TIndexGetAllKeysResponse:
+-      return HandleResponse(aResponse.get_IndexGetAllKeysResponse().keys());
+-
+-    case RequestResponse::TIndexCountResponse:
+-      return HandleResponse(aResponse.get_IndexCountResponse().count());
+-
+-    default:
+-      MOZ_CRASH("Unknown response type!");
+-  }
+-
+-  MOZ_CRASH("Should never get here!");
++  mTransaction->OnRequestFinished(/* aActorDestroyedNormally */ true);
++
++  // Null this out so that we don't try to call OnRequestFinished() again in
++  // ActorDestroy.
++  mTransaction = nullptr;
++
++  return true;
+ }
+ 
+ /*******************************************************************************
+@@ -2368,7 +2370,8 @@
+   MaybeCollectGarbageOnIPCMessage();
+ 
+   if (mStrongRequest && !mStrongCursor && mTransaction) {
+-    mTransaction->OnRequestFinished();
++    mTransaction->OnRequestFinished(/* aActorDestroyedNormally */
++                                    aWhy == Deletion);
+   }
+ 
+   if (mCursor) {
+@@ -2433,7 +2436,7 @@
+       MOZ_CRASH("Should never get here!");
+   }
+ 
+-  mTransaction->OnRequestFinished();
++  mTransaction->OnRequestFinished(/* aActorDestroyedNormally */ true);
+ 
+   return true;
+ }
+diff -r 04af83ef7060 -r e1a36d248eb8 dom/indexedDB/ActorsChild.h
+--- a/dom/indexedDB/ActorsChild.h	Thu Mar 26 12:00:55 2015 +0800
++++ b/dom/indexedDB/ActorsChild.h	Wed Mar 18 14:20:59 2015 -0700
+@@ -561,43 +561,43 @@
+ {
+   friend class BackgroundTransactionChild;
+   friend class BackgroundVersionChangeTransactionChild;
++  friend class IDBTransaction;
+ 
+   nsRefPtr<IDBTransaction> mTransaction;
+   nsTArray<nsRefPtr<FileInfo>> mFileInfos;
+ 
+ public:
+-  explicit BackgroundRequestChild(IDBRequest* aRequest);
+-
+   void
+   HoldFileInfosUntilComplete(nsTArray<nsRefPtr<FileInfo>>& aFileInfos);
+ 
+ private:
++  // Only created by IDBTransaction.
++  explicit
++  BackgroundRequestChild(IDBRequest* aRequest);
++
+   // Only destroyed by BackgroundTransactionChild or
+   // BackgroundVersionChangeTransactionChild.
+   ~BackgroundRequestChild();
+ 
+   void
+-  MaybeFinishTransactionEarly();
+-
+-  bool
+   HandleResponse(nsresult aResponse);
+ 
+-  bool
++  void
+   HandleResponse(const Key& aResponse);
+ 
+-  bool
++  void
+   HandleResponse(const nsTArray<Key>& aResponse);
+ 
+-  bool
++  void
+   HandleResponse(const SerializedStructuredCloneReadInfo& aResponse);
+ 
+-  bool
++  void
+   HandleResponse(const nsTArray<SerializedStructuredCloneReadInfo>& aResponse);
+ 
+-  bool
++  void
+   HandleResponse(JS::Handle<JS::Value> aResponse);
+ 
+-  bool
++  void
+   HandleResponse(uint64_t aResponse);
+ 
+   // IPDL methods are only called by IPDL.
+diff -r 04af83ef7060 -r e1a36d248eb8 dom/indexedDB/IDBIndex.cpp
+--- a/dom/indexedDB/IDBIndex.cpp	Thu Mar 26 12:00:55 2015 +0800
++++ b/dom/indexedDB/IDBIndex.cpp	Wed Mar 18 14:20:59 2015 -0700
+@@ -292,9 +292,7 @@
+                  IDB_LOG_STRINGIFY(keyRange));
+   }
+ 
+-  BackgroundRequestChild* actor = new BackgroundRequestChild(request);
+-
+-  transaction->StartRequest(actor, params);
++  transaction->StartRequest(request, params);
+ 
+   return request.forget();
+ }
+@@ -375,9 +373,7 @@
+                  IDB_LOG_STRINGIFY(aLimit));
+   }
+ 
+-  BackgroundRequestChild* actor = new BackgroundRequestChild(request);
+-
+-  transaction->StartRequest(actor, params);
++  transaction->StartRequest(request, params);
+ 
+   return request.forget();
+ }
+@@ -527,9 +523,7 @@
+                IDB_LOG_STRINGIFY(this),
+                IDB_LOG_STRINGIFY(keyRange));
+ 
+-  BackgroundRequestChild* actor = new BackgroundRequestChild(request);
+-
+-  transaction->StartRequest(actor, params);
++  transaction->StartRequest(request, params);
+ 
+   return request.forget();
+ }
+diff -r 04af83ef7060 -r e1a36d248eb8 dom/indexedDB/IDBObjectStore.cpp
+--- a/dom/indexedDB/IDBObjectStore.cpp	Thu Mar 26 12:00:55 2015 +0800
++++ b/dom/indexedDB/IDBObjectStore.cpp	Wed Mar 18 14:20:59 2015 -0700
+@@ -1282,9 +1282,8 @@
+     }
+   }
+ 
+-  BackgroundRequestChild* actor = new BackgroundRequestChild(request);
+-
+-  mTransaction->StartRequest(actor, params);
++  BackgroundRequestChild* actor = mTransaction->StartRequest(request, params);
++  MOZ_ASSERT(actor);
+ 
+   if (!fileInfosToKeepAlive.IsEmpty()) {
+     nsTArray<nsRefPtr<FileInfo>> fileInfos;
+@@ -1368,9 +1367,7 @@
+                  IDB_LOG_STRINGIFY(aLimit));
+   }
+ 
+-  BackgroundRequestChild* actor = new BackgroundRequestChild(request);
+-
+-  mTransaction->StartRequest(actor, params);
++  mTransaction->StartRequest(request, params);
+ 
+   return request.forget();
+ }
+@@ -1406,9 +1403,7 @@
+                IDB_LOG_STRINGIFY(mTransaction),
+                IDB_LOG_STRINGIFY(this));
+ 
+-  BackgroundRequestChild* actor = new BackgroundRequestChild(request);
+-
+-  mTransaction->StartRequest(actor, params);
++  mTransaction->StartRequest(request, params);
+ 
+   return request.forget();
+ }
+@@ -1603,9 +1598,7 @@
+                IDB_LOG_STRINGIFY(this),
+                IDB_LOG_STRINGIFY(keyRange));
+ 
+-  BackgroundRequestChild* actor = new BackgroundRequestChild(request);
+-
+-  mTransaction->StartRequest(actor, params);
++  mTransaction->StartRequest(request, params);
+ 
+   return request.forget();
+ }
+@@ -1660,9 +1653,7 @@
+                  IDB_LOG_STRINGIFY(keyRange));
+   }
+ 
+-  BackgroundRequestChild* actor = new BackgroundRequestChild(request);
+-
+-  mTransaction->StartRequest(actor, params);
++  mTransaction->StartRequest(request, params);
+ 
+   return request.forget();
+ }
+@@ -1902,9 +1893,7 @@
+                IDB_LOG_STRINGIFY(this),
+                IDB_LOG_STRINGIFY(keyRange));
+ 
+-  BackgroundRequestChild* actor = new BackgroundRequestChild(request);
+-
+-  mTransaction->StartRequest(actor, params);
++  mTransaction->StartRequest(request, params);
+ 
+   return request.forget();
+ }
+diff -r 04af83ef7060 -r e1a36d248eb8 dom/indexedDB/IDBTransaction.cpp
+--- a/dom/indexedDB/IDBTransaction.cpp	Thu Mar 26 12:00:55 2015 +0800
++++ b/dom/indexedDB/IDBTransaction.cpp	Wed Mar 18 14:20:59 2015 -0700
+@@ -325,25 +325,31 @@
+   mBackgroundActor.mNormalBackgroundActor = aBackgroundActor;
+ }
+ 
+-void
+-IDBTransaction::StartRequest(BackgroundRequestChild* aBackgroundActor,
+-                             const RequestParams& aParams)
++BackgroundRequestChild*
++IDBTransaction::StartRequest(IDBRequest* aRequest, const RequestParams& aParams)
+ {
+   AssertIsOnOwningThread();
+-  MOZ_ASSERT(aBackgroundActor);
++  MOZ_ASSERT(aRequest);
+   MOZ_ASSERT(aParams.type() != RequestParams::T__None);
+ 
++  BackgroundRequestChild* actor = new BackgroundRequestChild(aRequest);
++
+   if (mMode == VERSION_CHANGE) {
+     MOZ_ASSERT(mBackgroundActor.mVersionChangeBackgroundActor);
+ 
+     mBackgroundActor.mVersionChangeBackgroundActor->
+-      SendPBackgroundIDBRequestConstructor(aBackgroundActor, aParams);
++      SendPBackgroundIDBRequestConstructor(actor, aParams);
+   } else {
+     MOZ_ASSERT(mBackgroundActor.mNormalBackgroundActor);
+ 
+     mBackgroundActor.mNormalBackgroundActor->
+-      SendPBackgroundIDBRequestConstructor(aBackgroundActor, aParams);
++      SendPBackgroundIDBRequestConstructor(actor, aParams);
+   }
++
++  // Balanced in BackgroundRequestChild::Recv__delete__().
++  OnNewRequest();
++
++  return actor;
+ }
+ 
+ void
+@@ -402,7 +408,7 @@
+ }
+ 
+ void
+-IDBTransaction::OnRequestFinished()
++IDBTransaction::OnRequestFinished(bool aActorDestroyedNormally)
+ {
+   AssertIsOnOwningThread();
+   MOZ_ASSERT(mPendingRequestCount);
+@@ -412,10 +418,24 @@
+   if (!mPendingRequestCount && !mDatabase->IsInvalidated()) {
+     mReadyState = COMMITTING;
+ 
+-    if (NS_SUCCEEDED(mAbortCode)) {
+-      SendCommit();
++    if (aActorDestroyedNormally) {
++      if (NS_SUCCEEDED(mAbortCode)) {
++        SendCommit();
++      } else {
++        SendAbort(mAbortCode);
++      }
+     } else {
+-      SendAbort(mAbortCode);
++      // Don't try to send any more messages to the parent if the request actor
++      // was killed.
++#ifdef DEBUG
++      MOZ_ASSERT(!mSentCommitOrAbort);
++      mSentCommitOrAbort = true;
++#endif
++      IDB_LOG_MARK("IndexedDB %s: Child  Transaction[%lld]: "
++                     "Request actor was killed, transaction will be aborted",
++                   "IndexedDB %s: C T[%lld]: IDBTransaction abort",
++                   IDB_LOG_ID_STRING(),
++                   LoggingSerialNumber());
+     }
+   }
+ }
+diff -r 04af83ef7060 -r e1a36d248eb8 dom/indexedDB/IDBTransaction.h
+--- a/dom/indexedDB/IDBTransaction.h	Thu Mar 26 12:00:55 2015 +0800
++++ b/dom/indexedDB/IDBTransaction.h	Wed Mar 18 14:20:59 2015 -0700
+@@ -49,6 +49,9 @@
+   : public IDBWrapperCache
+   , public nsIRunnable
+ {
++  friend class BackgroundCursorChild;
++  friend class BackgroundRequestChild;
++
+   class WorkerFeature;
+   friend class WorkerFeature;
+ 
+@@ -150,9 +153,8 @@
+     }
+   }
+ 
+-  void
+-  StartRequest(BackgroundRequestChild* aBackgroundActor,
+-               const RequestParams& aParams);
++  BackgroundRequestChild*
++  StartRequest(IDBRequest* aRequest, const RequestParams& aParams);
+ 
+   void
+   OpenCursor(BackgroundCursorChild* aBackgroundActor,
+@@ -161,12 +163,6 @@
+   void
+   RefreshSpec(bool aMayDelete);
+ 
+-  void
+-  OnNewRequest();
+-
+-  void
+-  OnRequestFinished();
+-
+   bool
+   IsOpen() const;
+ 
+@@ -314,6 +310,12 @@
+ 
+   void
+   SendAbort(nsresult aResultCode);
++
++  void
++  OnNewRequest();
++
++  void
++  OnRequestFinished(bool aActorDestroyedNormally);
+ };
+ 
+ } // namespace indexedDB

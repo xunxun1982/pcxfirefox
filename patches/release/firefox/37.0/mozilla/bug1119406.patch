@@ -1,0 +1,37 @@
+# HG changeset patch
+# User Michal Novotny <michal.novotny@gmail.com>
+# Date 1422370218 -3600
+#      Tue Jan 27 15:50:18 2015 +0100
+# Branch MOBILE370b8_2015032422_RELBRANCH
+# Node ID 115c4a9e8cbf4a1f4b7d9d9ae0a0f72dfebd2772
+# Parent  67ed774b6a58fb706a890ef162137a86664d8fce
+Bug 1119406 - HTTP cache v2: Doom cache entry when writing of metadata fails, r=honzab
+
+diff -r 67ed774b6a58 -r 115c4a9e8cbf netwerk/cache2/CacheFile.cpp
+--- a/netwerk/cache2/CacheFile.cpp	Fri Feb 13 07:54:00 2015 -0500
++++ b/netwerk/cache2/CacheFile.cpp	Tue Jan 27 15:50:18 2015 +0100
+@@ -611,8 +611,9 @@
+   MOZ_ASSERT(!mMemoryOnly);
+   MOZ_ASSERT(!mOpeningFile);
+ 
+-  if (NS_FAILED(aResult)) {
++  if (NS_WARN_IF(NS_FAILED(aResult))) {
+     // TODO close streams with an error ???
++    SetError(aResult);
+   }
+ 
+   if (mOutput || mInputs.Length() || mChunks.Count())
+diff -r 67ed774b6a58 -r 115c4a9e8cbf netwerk/cache2/CacheFileIOManager.cpp
+--- a/netwerk/cache2/CacheFileIOManager.cpp	Fri Feb 13 07:54:00 2015 -0500
++++ b/netwerk/cache2/CacheFileIOManager.cpp	Tue Jan 27 15:50:18 2015 +0100
+@@ -706,6 +706,10 @@
+     } else {
+       rv = CacheFileIOManager::gInstance->WriteInternal(
+           mHandle, mOffset, mBuf, mCount, mValidate);
++      if (NS_FAILED(rv) && !mCallback) {
++        // No listener is going to handle the error, doom the file
++        CacheFileIOManager::gInstance->DoomFileInternal(mHandle);
++      }
+     }
+     MOZ_EVENT_TRACER_DONE(static_cast<nsIRunnable*>(this), "net::cache::write-background");
+ 

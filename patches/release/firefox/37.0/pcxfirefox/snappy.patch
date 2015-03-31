@@ -1,0 +1,25 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1411495342 -28800
+#      Wed Sep 24 02:02:22 2014 +0800
+# Branch MOBILE370b8_2015032422_RELBRANCH
+# Node ID eb916843e446abfebafac5c43a5c5ff20fa1eb59
+# Parent  e851107f42f3f34fac58ce49e128eafa2247fb0c
+snappy
+
+diff -r e851107f42f3 -r eb916843e446 other-licenses/snappy/src/snappy-stubs-internal.h
+--- a/other-licenses/snappy/src/snappy-stubs-internal.h	Wed Sep 24 02:01:34 2014 +0800
++++ b/other-licenses/snappy/src/snappy-stubs-internal.h	Wed Sep 24 02:02:22 2014 +0800
+@@ -128,6 +128,12 @@
+ class LogMessageCrash : public LogMessage {
+  public:
+   LogMessageCrash() { }
++#if _MSC_VER == 1700 || _MSC_VER == 1800
++// Bogus warning from VS 2012 and VS 2013:
++// warning C4722: 'snappy::LogMessageCrash::~LogMessageCrash' : destructor never returns, potential memory leak
++#pragma warning(push)
++#pragma warning(disable : 4722)
++#endif
+   ~LogMessageCrash() {
+     cerr << endl;
+     abort();

@@ -1,0 +1,112 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1427342455 -28800
+#      Thu Mar 26 12:00:55 2015 +0800
+# Branch MOBILE370b8_2015032422_RELBRANCH
+# Node ID 04af83ef70607ffc9ec05d4e930911f7bd588a2d
+# Parent  9b8c70acc77bdb15bb67e73e88912cd7f7c10a92
+Bug 1124189 - IndexedDB Unkown Error @ ActorsParent.cpp:414 when calling indexedDB.open; r=bent
+
+diff -r 9b8c70acc77b -r 04af83ef7060 dom/quota/QuotaCommon.h
+--- a/dom/quota/QuotaCommon.h	Thu Mar 26 09:10:57 2015 +0800
++++ b/dom/quota/QuotaCommon.h	Thu Mar 26 12:00:55 2015 +0800
+@@ -10,6 +10,7 @@
+ #include "nsAutoPtr.h"
+ #include "nsCOMPtr.h"
+ #include "nsDebug.h"
++#include "nsPrintfCString.h"
+ #include "nsString.h"
+ #include "nsTArray.h"
+ 
+@@ -23,6 +24,13 @@
+ #define DSSTORE_FILE_NAME ".DS_Store"
+ #define PERMISSION_STORAGE_UNLIMITED "indexedDB-unlimited"
+ 
++#define QM_WARNING(...)                                                        \
++  do {                                                                         \
++    nsPrintfCString str(__VA_ARGS__);                                          \
++    mozilla::dom::quota::ReportInternalError(__FILE__, __LINE__, str.get());   \
++    NS_WARNING(str.get());                                                     \
++  } while (0)
++
+ BEGIN_QUOTA_NAMESPACE
+ 
+ void
+@@ -34,6 +42,9 @@
+ bool
+ IsOnIOThread();
+ 
++void
++ReportInternalError(const char* aFile, uint32_t aLine, const char* aStr);
++
+ END_QUOTA_NAMESPACE
+ 
+ #endif // mozilla_dom_quota_quotacommon_h__
+diff -r 9b8c70acc77b -r 04af83ef7060 dom/quota/QuotaManager.cpp
+--- a/dom/quota/QuotaManager.cpp	Thu Mar 26 09:10:57 2015 +0800
++++ b/dom/quota/QuotaManager.cpp	Thu Mar 26 12:00:55 2015 +0800
+@@ -92,8 +92,6 @@
+ #define MB * 1024ULL KB
+ #define GB * 1024ULL MB
+ 
+-#define QM_WARNING(...) NS_WARNING(nsPrintfCString(__VA_ARGS__).get())
+-
+ USING_QUOTA_NAMESPACE
+ using namespace mozilla;
+ using namespace mozilla::dom;
+@@ -493,6 +491,22 @@
+ #endif
+ }
+ 
++void
++ReportInternalError(const char* aFile, uint32_t aLine, const char* aStr)
++{
++  // Get leaf of file path
++  for (const char* p = aFile; *p; ++p) {
++    if (*p == '/' && *(p + 1)) {
++      aFile = p + 1;
++    }
++  }
++
++  nsContentUtils::LogSimpleConsoleError(
++    NS_ConvertUTF8toUTF16(nsPrintfCString(
++                          "Quota %s: %s:%lu", aStr, aFile, aLine)),
++    "quota");
++}
++
+ END_QUOTA_NAMESPACE
+ 
+ namespace {
+@@ -1944,9 +1958,8 @@
+         continue;
+       }
+ 
+-      nsPrintfCString message("Something (%s) in the repository that doesn't "
+-                              "belong!", NS_ConvertUTF16toUTF8(leafName).get());
+-      NS_WARNING(message.get());
++      QM_WARNING("Something (%s) in the repository that doesn't belong!",
++                 NS_ConvertUTF16toUTF8(leafName).get());
+       return NS_ERROR_UNEXPECTED;
+     }
+ 
+@@ -4973,9 +4986,8 @@
+   }
+ 
+   if (mError) {
+-    nsPrintfCString message("Origin '%s' failed to parse, handled tokens: %s",
+-                            mOrigin.get(), mHandledTokens.get());
+-    NS_WARNING(message.get());
++    QM_WARNING("Origin '%s' failed to parse, handled tokens: %s", mOrigin.get(),
++               mHandledTokens.get());
+ 
+     return false;
+   }
+@@ -5230,7 +5242,7 @@
+       MOZ_ASSERT(mSchemaType == eFile);
+ 
+       if (aToken.IsEmpty()) {
+-        QM_WARNING("Expected a driver letter or pathname component "
++        QM_WARNING("Expected a drive letter or pathname component "
+                    "(not an empty string)!");
+ 
+         mError = true;

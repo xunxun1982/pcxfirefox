@@ -1,0 +1,21 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1411495294 -28800
+#      Wed Sep 24 02:01:34 2014 +0800
+# Branch MOBILE370b8_2015032422_RELBRANCH
+# Node ID e851107f42f3f34fac58ce49e128eafa2247fb0c
+# Parent  bd9b4f946424df6784d6836a8a1d0812f10f377f
+slim-little
+
+diff -r bd9b4f946424 -r e851107f42f3 configure.in
+--- a/configure.in	Wed Feb 25 15:44:12 2015 +0800
++++ b/configure.in	Wed Sep 24 02:01:34 2014 +0800
+@@ -1750,7 +1750,7 @@
+ dnl ========================================================
+ dnl SPS Profiler
+ dnl ========================================================
+-MOZ_ENABLE_PROFILER_SPS=1
++MOZ_ENABLE_PROFILER_SPS=
+ 
+ case "${OS_TARGET}" in
+ Android)

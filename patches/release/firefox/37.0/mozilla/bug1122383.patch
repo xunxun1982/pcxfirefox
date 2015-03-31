@@ -1,0 +1,51 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1424587954 -28800
+#      Sun Feb 22 14:52:34 2015 +0800
+# Branch MOBILE370b8_2015032422_RELBRANCH
+# Node ID 12f91bf33c9f9a8cc427ce908d96353697b2bd34
+# Parent  a77e3d937dec1ab2c4010d9305848cf827acd01c
+Bug 1122383 - Optimize Moz2D's ConvertBGRXToBGRA. r=jwatt
+
+diff -r a77e3d937dec -r 12f91bf33c9f gfx/2d/DataSurfaceHelpers.cpp
+--- a/gfx/2d/DataSurfaceHelpers.cpp	Fri Feb 13 07:55:00 2015 -0500
++++ b/gfx/2d/DataSurfaceHelpers.cpp	Sun Feb 22 14:52:34 2015 +0800
+@@ -45,19 +45,19 @@
+ }
+ 
+ void
+-ConvertBGRXToBGRA(uint8_t* aData, const IntSize &aSize, int32_t aStride)
++ConvertBGRXToBGRA(uint8_t* aData, const IntSize &aSize, const int32_t aStride)
+ {
+-  uint32_t* pixel = reinterpret_cast<uint32_t*>(aData);
++  int height = aSize.height, width = aSize.width * 4;
+ 
+-  for (int row = 0; row < aSize.height; ++row) {
+-    for (int column = 0; column < aSize.width; ++column) {
++  for (int row = 0; row < height; ++row) {
++    for (int column = 0; column < width; column += 4) {
+ #ifdef IS_BIG_ENDIAN
+-      pixel[column] |= 0x000000FF;
++      aData[column] = 0xFF;
+ #else
+-      pixel[column] |= 0xFF000000;
++      aData[column + 3] = 0xFF;
+ #endif
+     }
+-    pixel += (aStride/4);
++    aData += aStride;
+   }
+ }
+ 
+diff -r a77e3d937dec -r 12f91bf33c9f gfx/2d/DataSurfaceHelpers.h
+--- a/gfx/2d/DataSurfaceHelpers.h	Fri Feb 13 07:55:00 2015 -0500
++++ b/gfx/2d/DataSurfaceHelpers.h	Sun Feb 22 14:52:34 2015 +0800
+@@ -12,7 +12,7 @@
+ namespace gfx {
+ 
+ void
+-ConvertBGRXToBGRA(uint8_t* aData, const IntSize &aSize, int32_t aStride);
++ConvertBGRXToBGRA(uint8_t* aData, const IntSize &aSize, const int32_t aStride);
+ 
+ /**
+  * Copy the pixel data from aSrc and pack it into aDst. aSrcSize, aSrcStride
