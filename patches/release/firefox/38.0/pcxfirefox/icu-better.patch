@@ -1,0 +1,29 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1411492744 -28800
+#      Wed Sep 24 01:19:04 2014 +0800
+# Node ID c70b63a4eb6d632d7a6b2586cdb56c542de477ff
+# Parent  42b8d1ca84427e61e401552c8f39ecaefae7f006
+icu-better
+
+diff -r 42b8d1ca8442 -r c70b63a4eb6d intl/icu/source/common/Makefile.in
+--- a/intl/icu/source/common/Makefile.in	Wed Feb 25 16:05:05 2015 +0800
++++ b/intl/icu/source/common/Makefile.in	Wed Sep 24 01:19:04 2014 +0800
+@@ -223,3 +223,6 @@
+ endif
+ endif
+ 
++CFLAGS += -fp:precise -Qfast_transcendentals -GL
++CXXFLAGS += -fp:precise -Qfast_transcendentals -GL
++LDFLAGS += -opt:ref,icf -LARGEADDRESSAWARE
+diff -r 42b8d1ca8442 -r c70b63a4eb6d intl/icu/source/i18n/Makefile.in
+--- a/intl/icu/source/i18n/Makefile.in	Wed Feb 25 16:05:05 2015 +0800
++++ b/intl/icu/source/i18n/Makefile.in	Wed Sep 24 01:19:04 2014 +0800
+@@ -194,3 +194,7 @@
+ -include $(DEPS)
+ endif
+ endif
++
++CFLAGS += -fp:precise -Qfast_transcendentals -GL
++CXXFLAGS += -fp:precise -Qfast_transcendentals -GL
++LDFLAGS += -opt:ref,icf -LARGEADDRESSAWARE

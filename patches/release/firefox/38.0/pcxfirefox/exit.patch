@@ -1,0 +1,26 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1411492683 -28800
+#      Wed Sep 24 01:18:03 2014 +0800
+# Node ID fdb359897311c2f8bf529e30acc02bb19085591a
+# Parent  708a1921f0cb023acac39881b1078775892dc451
+exit
+
+diff -r 708a1921f0cb -r fdb359897311 toolkit/xre/nsAppRunner.cpp
+--- a/toolkit/xre/nsAppRunner.cpp	Sat Apr 25 14:10:46 2015 +0800
++++ b/toolkit/xre/nsAppRunner.cpp	Wed Sep 24 01:18:03 2014 +0800
+@@ -3520,13 +3520,7 @@
+ #ifdef DEBUG
+   gShutdownChecks = SCM_CRASH;
+ #else
+-  const char* releaseChannel = NS_STRINGIFY(MOZ_UPDATE_CHANNEL);
+-  if (strcmp(releaseChannel, "nightly") == 0 ||
+-      strcmp(releaseChannel, "default") == 0) {
+-    gShutdownChecks = SCM_RECORD;
+-  } else {
+-    gShutdownChecks = SCM_NOTHING;
+-  }
++  gShutdownChecks = SCM_NOTHING;
+ #endif
+ 
+   // We let an environment variable override the default so that addons

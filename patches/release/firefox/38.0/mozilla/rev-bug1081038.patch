@@ -1,0 +1,127 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1430033478 -28800
+#      Sun Apr 26 15:31:18 2015 +0800
+# Node ID cfbe92c179458ed46c5421be9bb413ef06f80435
+# Parent  21710ad7963a169567626c2aa8d3a890f26bf2d7
+Revert Bug 1081038 - createdCallback is not running during the constructor when run from the scratchpad
+
+Details in https://bugzilla.mozilla.org/show_bug.cgi?id=1149891
+
+diff -r 21710ad7963a -r cfbe92c17945 dom/base/ScriptSettings.cpp
+--- a/dom/base/ScriptSettings.cpp	Thu Mar 26 13:06:21 2015 +1300
++++ b/dom/base/ScriptSettings.cpp	Sun Apr 26 15:31:18 2015 +0800
+@@ -523,14 +523,10 @@
+   , ScriptSettingsStackEntry(aGlobalObject, /* aCandidate = */ true)
+   , mWebIDLCallerPrincipal(nullptr)
+   , mDocShellForJSRunToCompletion(nullptr)
+-  , mIsMainThread(aIsMainThread)
+ {
+   MOZ_ASSERT(aGlobalObject);
+   MOZ_ASSERT_IF(!aCx, aIsMainThread); // cx is mandatory off-main-thread.
+   MOZ_ASSERT_IF(aCx && aIsMainThread, aCx == FindJSContext(aGlobalObject));
+-  if (aIsMainThread) {
+-    nsContentUtils::EnterMicroTask();
+-  }
+ 
+   if (aIsMainThread && gRunToCompletionListeners > 0) {
+     nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(aGlobalObject);
+@@ -550,10 +546,6 @@
+     mDocShellForJSRunToCompletion->NotifyJSRunToCompletionStop();
+   }
+ 
+-  if (mIsMainThread) {
+-    nsContentUtils::LeaveMicroTask();
+-  }
+-
+   // GC when we pop a script entry point. This is a useful heuristic that helps
+   // us out on certain (flawed) benchmarks like sunspider, because it lets us
+   // avoid GCing during the timing loop.
+diff -r 21710ad7963a -r cfbe92c17945 dom/base/ScriptSettings.h
+--- a/dom/base/ScriptSettings.h	Thu Mar 26 13:06:21 2015 +1300
++++ b/dom/base/ScriptSettings.h	Sun Apr 26 15:31:18 2015 +0800
+@@ -345,8 +345,6 @@
+   friend nsIPrincipal* GetWebIDLCallerPrincipal();
+ 
+   nsCOMPtr<nsIDocShell> mDocShellForJSRunToCompletion;
+-
+-  bool mIsMainThread;
+ };
+ 
+ /*
+diff -r 21710ad7963a -r cfbe92c17945 dom/base/nsJSUtils.cpp
+--- a/dom/base/nsJSUtils.cpp	Thu Mar 26 13:06:21 2015 +1300
++++ b/dom/base/nsJSUtils.cpp	Sun Apr 26 15:31:18 2015 +0800
+@@ -219,6 +219,7 @@
+   // aCompileOptions.noScriptRval set to true.
+   aRetValue.setUndefined();
+ 
++  nsAutoMicroTask mt;
+   nsresult rv = NS_OK;
+ 
+   nsIScriptSecurityManager* ssm = nsContentUtils::GetSecurityManager();
+diff -r 21710ad7963a -r cfbe92c17945 dom/bindings/CallbackObject.cpp
+--- a/dom/bindings/CallbackObject.cpp	Thu Mar 26 13:06:21 2015 +1300
++++ b/dom/bindings/CallbackObject.cpp	Sun Apr 26 15:31:18 2015 +0800
+@@ -61,6 +61,10 @@
+   , mExceptionHandling(aExceptionHandling)
+   , mIsMainThread(NS_IsMainThread())
+ {
++  if (mIsMainThread) {
++    nsContentUtils::EnterMicroTask();
++  }
++
+   // Compute the caller's subject principal (if necessary) early, before we
+   // do anything that might perturb the relevant state.
+   nsIPrincipal* webIDLCallerPrincipal = nullptr;
+@@ -298,6 +302,12 @@
+ 
+   mAutoIncumbentScript.reset();
+   mAutoEntryScript.reset();
++
++  // It is important that this is the last thing we do, after leaving the
++  // compartment and undoing all our entry/incumbent script changes
++  if (mIsMainThread) {
++    nsContentUtils::LeaveMicroTask();
++  }
+ }
+ 
+ already_AddRefed<nsISupports>
+diff -r 21710ad7963a -r cfbe92c17945 dom/xbl/nsXBLProtoImplField.cpp
+--- a/dom/xbl/nsXBLProtoImplField.cpp	Thu Mar 26 13:06:21 2015 +1300
++++ b/dom/xbl/nsXBLProtoImplField.cpp	Sun Apr 26 15:31:18 2015 +0800
+@@ -392,6 +392,8 @@
+     return NS_OK;
+   }
+ 
++  nsAutoMicroTask mt;
++
+   nsAutoCString uriSpec;
+   aBindingDocURI->GetSpec(uriSpec);
+ 
+diff -r 21710ad7963a -r cfbe92c17945 dom/xbl/nsXBLProtoImplMethod.cpp
+--- a/dom/xbl/nsXBLProtoImplMethod.cpp	Thu Mar 26 13:06:21 2015 +1300
++++ b/dom/xbl/nsXBLProtoImplMethod.cpp	Sun Apr 26 15:31:18 2015 +0800
+@@ -292,6 +292,8 @@
+     return NS_OK;
+   }
+ 
++  nsAutoMicroTask mt;
++
+   // We are going to run script via JS::Call, so we need a script entry point,
+   // but as this is XBL related it does not appear in the HTML spec.
+   dom::AutoEntryScript aes(global);
+diff -r 21710ad7963a -r cfbe92c17945 dom/xul/XULDocument.cpp
+--- a/dom/xul/XULDocument.cpp	Thu Mar 26 13:06:21 2015 +1300
++++ b/dom/xul/XULDocument.cpp	Sun Apr 26 15:31:18 2015 +0800
+@@ -3561,7 +3561,9 @@
+     JS::HandleScript scriptObject = aScript->GetScriptObject();
+     NS_ENSURE_TRUE(scriptObject, NS_ERROR_UNEXPECTED);
+ 
+-    // Execute the precompiled script with the given version.
++    // Execute the precompiled script with the given version
++    nsAutoMicroTask mt;
++
+     // We're about to run script via JS::CloneAndExecuteScript, so we need an
+     // AutoEntryScript. This is Gecko specific and not in any spec.
+     AutoEntryScript aes(mScriptGlobalObject);

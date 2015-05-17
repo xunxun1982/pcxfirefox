@@ -1,0 +1,361 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1429939134 -28800
+#      Sat Apr 25 13:18:54 2015 +0800
+# Node ID 7d1163c040538e5b798ac5bb4f600c284ce444e4
+# Parent  bd5554d23bb58f14b54cf4489ca263083602b67b
+Bug 1133351 - Flash hangs on right-click on arbitrary SWFs
+
+diff -r bd5554d23bb5 -r 7d1163c04053 dom/plugins/ipc/COMMessageFilter.cpp
+--- a/dom/plugins/ipc/COMMessageFilter.cpp	Wed Mar 25 18:12:58 2015 -0700
++++ /dev/null	Thu Jan 01 00:00:00 1970 +0000
+@@ -1,84 +0,0 @@
+-/* This Source Code Form is subject to the terms of the Mozilla Public
+- * License, v. 2.0. If a copy of the MPL was not distributed with this
+- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+-
+-#include "base/basictypes.h"
+-
+-#include "COMMessageFilter.h"
+-#include "base/message_loop.h"
+-#include "mozilla/plugins/PluginModuleChild.h"
+-
+-#include <stdio.h>
+-
+-namespace mozilla {
+-namespace plugins {
+-
+-HRESULT
+-COMMessageFilter::QueryInterface(REFIID riid, void** ppv)
+-{
+-  if (riid == IID_IUnknown || riid == IID_IMessageFilter) {
+-    *ppv = static_cast<IMessageFilter*>(this);
+-    AddRef();
+-    return S_OK;
+-  }
+-  return E_NOINTERFACE;
+-}
+-
+-DWORD COMMessageFilter::AddRef()
+-{
+-  ++mRefCnt;
+-  return mRefCnt;
+-}
+-
+-DWORD COMMessageFilter::Release()
+-{
+-  DWORD r = --mRefCnt;
+-  if (0 == r)
+-    delete this;
+-  return r;
+-}
+-
+-DWORD 
+-COMMessageFilter::HandleInComingCall(DWORD dwCallType,
+-				     HTASK htaskCaller,
+-				     DWORD dwTickCount,
+-				     LPINTERFACEINFO lpInterfaceInfo)
+-{
+-  if (mPreviousFilter)
+-    return mPreviousFilter->HandleInComingCall(dwCallType, htaskCaller,
+-					       dwTickCount, lpInterfaceInfo);
+-  return SERVERCALL_ISHANDLED;
+-}
+-
+-DWORD
+-COMMessageFilter::RetryRejectedCall(HTASK htaskCallee,
+-				    DWORD dwTickCount,
+-				    DWORD dwRejectType)
+-{
+-  if (mPreviousFilter)
+-    return mPreviousFilter->RetryRejectedCall(htaskCallee, dwTickCount,
+-					      dwRejectType);
+-  return -1;
+-}
+-
+-DWORD
+-COMMessageFilter::MessagePending(HTASK htaskCallee,
+-				 DWORD dwTickCount,
+-				 DWORD dwPendingType)
+-{
+-  mPlugin->FlushPendingInterruptQueue();
+-  if (mPreviousFilter)
+-    return mPreviousFilter->MessagePending(htaskCallee, dwTickCount,
+-					   dwPendingType);
+-  return PENDINGMSG_WAITNOPROCESS;
+-}
+-
+-void
+-COMMessageFilter::Initialize(PluginModuleChild* module)
+-{
+-  nsRefPtr<COMMessageFilter> f = new COMMessageFilter(module);
+-  ::CoRegisterMessageFilter(f, getter_AddRefs(f->mPreviousFilter));
+-}
+-
+-} // namespace plugins
+-} // namespace mozilla
+diff -r bd5554d23bb5 -r 7d1163c04053 dom/plugins/ipc/COMMessageFilter.h
+--- a/dom/plugins/ipc/COMMessageFilter.h	Wed Mar 25 18:12:58 2015 -0700
++++ /dev/null	Thu Jan 01 00:00:00 1970 +0000
+@@ -1,50 +0,0 @@
+-/* This Source Code Form is subject to the terms of the Mozilla Public
+- * License, v. 2.0. If a copy of the MPL was not distributed with this
+- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+-
+-#ifndef mozilla_plugins_COMMessageFilter_h
+-#define mozilla_plugins_COMMessageFilter_h
+-
+-#include <objidl.h>
+-#include "nsISupportsImpl.h"
+-#include "nsAutoPtr.h"
+-
+-namespace mozilla {
+-namespace plugins {
+-
+-class PluginModuleChild;
+-
+-class COMMessageFilter final : public IMessageFilter
+-{
+-public:
+-  static void Initialize(PluginModuleChild* plugin);
+-
+-  COMMessageFilter(PluginModuleChild* plugin)
+-    : mPlugin(plugin)
+-  { }
+-
+-  HRESULT WINAPI QueryInterface(REFIID riid, void** ppv);
+-  DWORD WINAPI AddRef();
+-  DWORD WINAPI Release();
+-
+-  DWORD WINAPI HandleInComingCall(DWORD dwCallType,
+-                                  HTASK htaskCaller,
+-                                  DWORD dwTickCount,
+-                                  LPINTERFACEINFO lpInterfaceInfo);
+-  DWORD WINAPI RetryRejectedCall(HTASK htaskCallee,
+-                                 DWORD dwTickCount,
+-                                 DWORD dwRejectType);
+-  DWORD WINAPI MessagePending(HTASK htaskCallee,
+-                              DWORD dwTickCount,
+-                              DWORD dwPendingType);
+-
+-private:
+-  nsAutoRefCnt mRefCnt;
+-  PluginModuleChild* mPlugin;
+-  nsRefPtr<IMessageFilter> mPreviousFilter;
+-};
+-
+-} // namespace plugins
+-} // namespace mozilla
+-
+-#endif // COMMessageFilter_h
+diff -r bd5554d23bb5 -r 7d1163c04053 dom/plugins/ipc/PluginModuleChild.cpp
+--- a/dom/plugins/ipc/PluginModuleChild.cpp	Wed Mar 25 18:12:58 2015 -0700
++++ b/dom/plugins/ipc/PluginModuleChild.cpp	Sat Apr 25 13:18:54 2015 +0800
+@@ -42,7 +42,6 @@
+ #include "nsNPAPIPlugin.h"
+ 
+ #ifdef XP_WIN
+-#include "COMMessageFilter.h"
+ #include "nsWindowsDllInterceptor.h"
+ #include "mozilla/widget/AudioSession.h"
+ #endif
+@@ -264,10 +263,6 @@
+                                  MessageLoop* aIOLoop,
+                                  IPC::Channel* aChannel)
+ {
+-#ifdef XP_WIN
+-    COMMessageFilter::Initialize(this);
+-#endif
+-
+     NS_ASSERTION(aChannel, "need a channel");
+ 
+     if (!InitGraphics())
+diff -r bd5554d23bb5 -r 7d1163c04053 dom/plugins/ipc/moz.build
+--- a/dom/plugins/ipc/moz.build	Wed Mar 25 18:12:58 2015 -0700
++++ b/dom/plugins/ipc/moz.build	Sat Apr 25 13:18:54 2015 +0800
+@@ -50,7 +50,6 @@
+         'PluginSurfaceParent.h',
+     ]
+     UNIFIED_SOURCES += [
+-        'COMMessageFilter.cpp',
+         'PluginHangUIParent.cpp',
+         'PluginSurfaceParent.cpp',
+     ]
+diff -r bd5554d23bb5 -r 7d1163c04053 ipc/glue/WindowsMessageLoop.cpp
+--- a/ipc/glue/WindowsMessageLoop.cpp	Wed Mar 25 18:12:58 2015 -0700
++++ b/ipc/glue/WindowsMessageLoop.cpp	Sat Apr 25 13:18:54 2015 +0800
+@@ -16,6 +16,7 @@
+ #include "nsIXULAppInfo.h"
+ #include "WinUtils.h"
+ 
++#include "mozilla/ArrayUtils.h"
+ #include "mozilla/PaintTracker.h"
+ 
+ using namespace mozilla;
+@@ -104,10 +105,68 @@
+ HHOOK gDeferredCallWndProcHook = nullptr;
+ 
+ DWORD gUIThreadId = 0;
++HWND gCOMWindow = 0;
++// Once initialized, gWinEventHook is never unhooked. We save the handle so
++// that we can check whether or not the hook is initialized.
++HWINEVENTHOOK gWinEventHook = nullptr;
++const wchar_t kCOMWindowClassName[] = L"OleMainThreadWndClass";
+ 
+ // WM_GETOBJECT id pulled from uia headers
+ #define MOZOBJID_UIAROOT -25
+ 
++HWND
++FindCOMWindow()
++{
++  MOZ_ASSERT(gUIThreadId);
++
++  HWND last = 0;
++  while ((last = FindWindowExW(HWND_MESSAGE, last, kCOMWindowClassName, NULL))) {
++    if (GetWindowThreadProcessId(last, NULL) == gUIThreadId) {
++      return last;
++    }
++  }
++
++  return (HWND)0;
++}
++
++void CALLBACK
++WinEventHook(HWINEVENTHOOK aWinEventHook, DWORD aEvent, HWND aHwnd,
++             LONG aIdObject, LONG aIdChild, DWORD aEventThread,
++             DWORD aMsEventTime)
++{
++  MOZ_ASSERT(aWinEventHook == gWinEventHook);
++  MOZ_ASSERT(gUIThreadId == aEventThread);
++  switch (aEvent) {
++    case EVENT_OBJECT_CREATE: {
++      if (aIdObject != OBJID_WINDOW || aIdChild != CHILDID_SELF) {
++        // Not an event we're interested in
++        return;
++      }
++      wchar_t classBuf[256] = {0};
++      int result = ::GetClassNameW(aHwnd, classBuf,
++                                   MOZ_ARRAY_LENGTH(classBuf));
++      if (result != (MOZ_ARRAY_LENGTH(kCOMWindowClassName) - 1) ||
++          wcsncmp(kCOMWindowClassName, classBuf, result)) {
++        // Not a class we're interested in
++        return;
++      }
++      MOZ_ASSERT(FindCOMWindow() == aHwnd);
++      gCOMWindow = aHwnd;
++      break;
++    }
++    case EVENT_OBJECT_DESTROY: {
++      if (aHwnd == gCOMWindow && aIdObject == OBJID_WINDOW) {
++        MOZ_ASSERT(aIdChild == CHILDID_SELF);
++        gCOMWindow = 0;
++      }
++      break;
++    }
++    default: {
++      return;
++    }
++  }
++}
++
+ LRESULT CALLBACK
+ DeferredMessageHook(int nCode,
+                     WPARAM wParam,
+@@ -340,13 +399,15 @@
+    case WM_GETOBJECT: {
+       if (!::GetPropW(hwnd, k3rdPartyWindowProp)) {
+         DWORD objId = static_cast<DWORD>(lParam);
+-        WNDPROC oldWndProc = (WNDPROC)GetProp(hwnd, kOldWndProcProp);
+-        if ((objId == OBJID_CLIENT || objId == MOZOBJID_UIAROOT) && oldWndProc) {
+-          return CallWindowProcW(oldWndProc, hwnd, uMsg, wParam, lParam);
++        if ((objId == OBJID_CLIENT || objId == MOZOBJID_UIAROOT)) {
++          WNDPROC oldWndProc = (WNDPROC)GetProp(hwnd, kOldWndProcProp);
++          if (oldWndProc) {
++            return CallWindowProcW(oldWndProc, hwnd, uMsg, wParam, lParam);
++          }
+         }
+       }
+-      break;
+-    }
++      return DefWindowProc(hwnd, uMsg, wParam, lParam);
++   }
+ #endif // ACCESSIBILITY
+ 
+     default: {
+@@ -648,9 +709,21 @@
+   if (!gUIThreadId) {
+     gUIThreadId = GetCurrentThreadId();
+   }
++
+   MOZ_ASSERT(gUIThreadId);
+   MOZ_ASSERT(gUIThreadId == GetCurrentThreadId(),
+              "Called InitUIThread multiple times on different threads!");
++
++  if (!gWinEventHook) {
++    gWinEventHook = SetWinEventHook(EVENT_OBJECT_CREATE, EVENT_OBJECT_DESTROY,
++                                    NULL, &WinEventHook, GetCurrentProcessId(),
++                                    gUIThreadId, WINEVENT_OUTOFCONTEXT);
++
++    // We need to execute this after setting the hook in case the OLE window
++    // already existed.
++    gCOMWindow = FindCOMWindow();
++  }
++  MOZ_ASSERT(gWinEventHook);
+ }
+ 
+ } // namespace windows
+@@ -912,11 +985,20 @@
+       bool haveSentMessagesPending =
+         (HIWORD(GetQueueStatus(QS_SENDMESSAGE)) & QS_SENDMESSAGE) != 0;
+ 
+-      // This PeekMessage call will actually process all "nonqueued" messages
+-      // that are pending before returning. If we have "nonqueued" messages
+-      // pending then we should have switched out all the window procedures
+-      // above. In that case this PeekMessage call won't actually cause any
+-      // mozilla code (or plugin code) to run.
++      // Either of the PeekMessage calls below will actually process all
++      // "nonqueued" messages that are pending before returning. If we have
++      // "nonqueued" messages pending then we should have switched out all the
++      // window procedures above. In that case this PeekMessage call won't
++      // actually cause any mozilla code (or plugin code) to run.
++
++      // We have to manually pump all COM messages *after* looking at the queue
++      // queue status but before yielding our thread below.
++      if (gCOMWindow) {
++        if (PeekMessageW(&msg, gCOMWindow, 0, 0, PM_REMOVE)) {
++          TranslateMessage(&msg);
++          ::DispatchMessageW(&msg);
++        }
++      }
+ 
+       // If the following PeekMessage call fails to return a message for us (and
+       // returns false) and we didn't run any "nonqueued" messages then we must
+@@ -1067,6 +1149,14 @@
+     bool haveSentMessagesPending =
+       (HIWORD(GetQueueStatus(QS_SENDMESSAGE)) & QS_SENDMESSAGE) != 0;
+ 
++    // Run all COM messages *after* looking at the queue status.
++    if (gCOMWindow) {
++        if (PeekMessageW(&msg, gCOMWindow, 0, 0, PM_REMOVE)) {
++            TranslateMessage(&msg);
++            ::DispatchMessageW(&msg);
++        }
++    }
++
+     // PeekMessage markes the messages as "old" so that they don't wake up
+     // MsgWaitForMultipleObjects every time.
+     if (!PeekMessageW(&msg, nullptr, 0, 0, PM_NOREMOVE) &&
+diff -r bd5554d23bb5 -r 7d1163c04053 widget/windows/nsWindow.cpp
+--- a/widget/windows/nsWindow.cpp	Wed Mar 25 18:12:58 2015 -0700
++++ b/widget/windows/nsWindow.cpp	Sat Apr 25 13:18:54 2015 +0800
+@@ -4163,8 +4163,8 @@
+ void
+ nsWindow::IPCWindowProcHandler(UINT& msg, WPARAM& wParam, LPARAM& lParam)
+ {
+-  NS_ASSERTION(!mozilla::ipc::MessageChannel::IsPumpingMessages(),
+-               "Failed to prevent a nonqueued message from running!");
++  MOZ_ASSERT_IF(msg != WM_GETOBJECT,
++                !mozilla::ipc::MessageChannel::IsPumpingMessages());
+ 
+   // Modal UI being displayed in windowless plugins.
+   if (mozilla::ipc::MessageChannel::IsSpinLoopActive() &&

@@ -1,0 +1,30 @@
+# HG changeset patch
+# User Jeff Lu <jll544@yahoo.com>
+# Date 1426147200 -3600
+#      Thu Mar 12 09:00:00 2015 +0100
+# Node ID 939887ff233cb2021a6ec4279c22dc202e8cc45f
+# Parent  7866e680226bbd12026a8326f170aa2fd93c160d
+Bug 1098415 - Skip DNS prefetch requests that point to local resources. r=sworkman r=dragana
+
+diff -r 7866e680226b -r 939887ff233c dom/base/nsContentSink.cpp
+--- a/dom/base/nsContentSink.cpp	Wed Sep 24 00:56:22 2014 +0800
++++ b/dom/base/nsContentSink.cpp	Thu Mar 12 09:00:00 2015 +0100
+@@ -847,9 +847,15 @@
+     if (!uri) {
+       return;
+     }
+-    nsAutoCString host;
+-    uri->GetHost(host);
+-    CopyUTF8toUTF16(host, hostname);
++    nsresult rv;
++    bool isLocalResource = false;
++    rv = NS_URIChainHasFlags(uri, nsIProtocolHandler::URI_IS_LOCAL_RESOURCE,
++                             &isLocalResource);
++    if (NS_SUCCEEDED(rv) && !isLocalResource) {
++      nsAutoCString host;
++      uri->GetHost(host);
++      CopyUTF8toUTF16(host, hostname);
++    }
+   }
+ 
+   if (!hostname.IsEmpty() && nsHTMLDNSPrefetch::IsAllowed(mDocument)) {

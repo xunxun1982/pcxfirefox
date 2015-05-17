@@ -1,0 +1,22 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1425792956 -28800
+#      Sun Mar 08 13:35:56 2015 +0800
+# Node ID c5f4d6e543cccc30926035222458b6496072b964
+# Parent  9292523bd9713739cb303fb24d39163b186361a2
+plugin crash
+
+diff -r 9292523bd971 -r c5f4d6e543cc xpcom/glue/pldhash.cpp
+--- a/xpcom/glue/pldhash.cpp	Thu Dec 25 23:17:49 2014 +0800
++++ b/xpcom/glue/pldhash.cpp	Sun Mar 08 13:35:56 2015 +0800
+@@ -860,6 +860,10 @@
+ PL_DHashTableEnumerate(PLDHashTable* aTable, PLDHashEnumerator aEtor,
+                        void* aArg)
+ {
++  MOZ_ASSERT(aTable != nullptr, "aTable must not be null");
++  if (!aTable) {
++    return 0;
++  }
+   return aTable->Enumerate(aEtor, aArg);
+ }
+ 

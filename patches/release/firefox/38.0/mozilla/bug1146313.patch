@@ -1,0 +1,34 @@
+# HG changeset patch
+# User Matt Woodrow <mwoodrow@mozilla.com>
+# Date 1427328381 -46800
+#      Thu Mar 26 13:06:21 2015 +1300
+# Node ID 21710ad7963a169567626c2aa8d3a890f26bf2d7
+# Parent  7d1163c040538e5b798ac5bb4f600c284ce444e4
+Bug 1146313 - Null check pData in UpdateConstantBuffers. r=jrmuizel
+
+diff -r 7d1163c04053 -r 21710ad7963a gfx/layers/d3d11/CompositorD3D11.cpp
+--- a/gfx/layers/d3d11/CompositorD3D11.cpp	Sat Apr 25 13:18:54 2015 +0800
++++ b/gfx/layers/d3d11/CompositorD3D11.cpp	Thu Mar 26 13:06:21 2015 +1300
+@@ -1364,16 +1364,20 @@
+ {
+   HRESULT hr;
+   D3D11_MAPPED_SUBRESOURCE resource;
++  resource.pData = nullptr;
+ 
+   hr = mContext->Map(mAttachments->mVSConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+-  if (Failed(hr)) {
++  if (Failed(hr) || !resource.pData) {
++    gfxCriticalError() << "Failed to map VSConstantBuffer. Result: " << hr;
+     return false;
+   }
+   *(VertexShaderConstants*)resource.pData = mVSConstants;
+   mContext->Unmap(mAttachments->mVSConstantBuffer, 0);
++  resource.pData = nullptr;
+ 
+   hr = mContext->Map(mAttachments->mPSConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+-  if (Failed(hr)) {
++  if (Failed(hr) || !resource.pData) {
++    gfxCriticalError() << "Failed to map PSConstantBuffer. Result: " << hr;
+     return false;
+   }
+   *(PixelShaderConstants*)resource.pData = mPSConstants;

@@ -1,0 +1,88 @@
+# HG changeset patch
+# User Jeff Muizelaar <jmuizelaar@mozilla.com>
+# Date 1431547535 14400
+#      Wed May 13 16:05:35 2015 -0400
+# Node ID b629454c670d1399bab21a154ebc9fc1be1a3352
+# Parent  cde74838d3412eda11da7c6dca824b4557e2e874
+Bug 1157784. Avoid compositing at the same time as WM_SETTEXT. f=jimm
+
+The innards of Windows don't always recheck that the window is
+visible and it will forget to redraw if we Present at the same
+time that the window is invisible.
+
+diff -r cde74838d341 -r b629454c670d widget/windows/nsWindow.cpp
+--- a/widget/windows/nsWindow.cpp	Mon May 11 14:46:20 2015 +0800
++++ b/widget/windows/nsWindow.cpp	Wed May 13 16:05:35 2015 -0400
+@@ -401,6 +401,8 @@
+ 
+   mIdleService = nullptr;
+ 
++  ::InitializeCriticalSection(&mPresentLock);
++
+   sInstanceCount++;
+ }
+ 
+@@ -4692,12 +4694,19 @@
+       {
+         // From msdn, the way around this is to disable the visible state
+         // temporarily. We need the text to be set but we don't want the
+-        // redraw to occur.
++        // redraw to occur. However, we need to make sure that we don't
++        // do this at the same time that a Present is happening.
++        //
++        // To do this we take mPresentLock in nsWindow::PreRender and
++        // if that lock is taken we wait before doing WM_SETTEXT
++        EnterCriticalSection(&mPresentLock);
+         DWORD style = GetWindowLong(mWnd, GWL_STYLE);
+         SetWindowLong(mWnd, GWL_STYLE, style & ~WS_VISIBLE);
+         *aRetValue = CallWindowProcW(GetPrevWindowProc(), mWnd,
+                                      msg, wParam, lParam);
+         SetWindowLong(mWnd, GWL_STYLE, style);
++        LeaveCriticalSection(&mPresentLock);
++
+         return true;
+       }
+ 
+@@ -7539,6 +7548,21 @@
+   }
+ }
+ 
++bool nsWindow::PreRender(LayerManagerComposite*)
++{
++  // This can block waiting for WM_SETTEXT to finish
++  // Using PreRender is unnecessarily pessimistic because
++  // we technically only need to block during the present call
++  // not all of compositor rendering
++  EnterCriticalSection(&mPresentLock);
++  return true;
++}
++
++void nsWindow::PostRender(LayerManagerComposite*)
++{
++  LeaveCriticalSection(&mPresentLock);
++}
++
+ /**************************************************************
+  **************************************************************
+  **
+diff -r cde74838d341 -r b629454c670d widget/windows/nsWindow.h
+--- a/widget/windows/nsWindow.h	Mon May 11 14:46:20 2015 +0800
++++ b/widget/windows/nsWindow.h	Wed May 13 16:05:35 2015 -0400
+@@ -443,6 +443,8 @@
+   void                    ClearCachedResources();
+   nsIWidgetListener*      GetPaintListener();
+   static bool             IsRenderMode(gfxWindowsPlatform::RenderMode aMode);
++  virtual bool            PreRender(LayerManagerComposite*) override;
++  virtual void            PostRender(LayerManagerComposite*) override;
+ 
+ protected:
+   nsCOMPtr<nsIWidget>   mParent;
+@@ -576,6 +578,8 @@
+ 
+   static bool sNeedsToInitMouseWheelSettings;
+   static void InitMouseWheelScrollData();
++
++  CRITICAL_SECTION mPresentLock;
+ };
+ 
+ /**

@@ -1,0 +1,218 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1429938224 -28800
+#      Sat Apr 25 13:03:44 2015 +0800
+# Node ID 6f07dbd7312263af6ee2c770a2b3e0e993c4ab42
+# Parent  939887ff233cb2021a6ec4279c22dc202e8cc45f
+Bug 1103344 - Object.assign should stop when an exception is thrown. r=till
+
+diff -r 939887ff233c -r 6f07dbd73122 js/src/builtin/Object.cpp
+--- a/js/src/builtin/Object.cpp	Thu Mar 12 09:00:00 2015 +0100
++++ b/js/src/builtin/Object.cpp	Sat Apr 25 13:03:44 2015 +0800
+@@ -47,8 +47,8 @@
+ }
+ 
+ /* ES5 15.2.4.7. */
+-static bool
+-obj_propertyIsEnumerable(JSContext* cx, unsigned argc, Value* vp)
++bool
++js::obj_propertyIsEnumerable(JSContext* cx, unsigned argc, Value* vp)
+ {
+     CallArgs args = CallArgsFromVp(argc, vp);
+ 
+diff -r 939887ff233c -r 6f07dbd73122 js/src/builtin/Object.h
+--- a/js/src/builtin/Object.h	Thu Mar 12 09:00:00 2015 +0100
++++ b/js/src/builtin/Object.h	Sat Apr 25 13:03:44 2015 +0800
+@@ -23,6 +23,9 @@
+ obj_construct(JSContext* cx, unsigned argc, JS::Value* vp);
+ 
+ bool
++obj_propertyIsEnumerable(JSContext* cx, unsigned argc, JS::Value* vp);
++
++bool
+ obj_valueOf(JSContext* cx, unsigned argc, JS::Value* vp);
+ 
+ PlainObject*
+diff -r 939887ff233c -r 6f07dbd73122 js/src/builtin/Object.js
+--- a/js/src/builtin/Object.js	Thu Mar 12 09:00:00 2015 +0100
++++ b/js/src/builtin/Object.js	Sat Apr 25 13:03:44 2015 +0800
+@@ -2,7 +2,7 @@
+  * License, v. 2.0. If a copy of the MPL was not distributed with this
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+-/* ES6 draft 2014-07-18 19.1.2.1. */
++// ES6 draft rev36 2015-03-17 19.1.2.1
+ function ObjectStaticAssign(target, firstSource) {
+     // Steps 1-2.
+     var to = ToObject(target);
+@@ -11,60 +11,31 @@
+     if (arguments.length < 2)
+         return to;
+ 
+-    // Step 4.
+-    var i = 1;
+-    do {
+-        // Step 5.a-b, plus an unspecified flourish to skip null/undefined, so
+-        // any site depending on agreed-upon (but not-yet-drafted) semantics
+-        // from TC39 meeting minutes will work. (Yes, implausibly, such a site
+-        // exists. See bug 1054426.)
++    // Steps 4-5.
++    for (var i = 1; i < arguments.length; i++) {
++        // Step 5.a.
+         var nextSource = arguments[i];
+         if (nextSource === null || nextSource === undefined)
+             continue;
+ 
++        // Steps 5.b.i-ii.
+         var from = ToObject(nextSource);
+ 
+-        // Step 5.c-d.
+-        var keysArray = OwnPropertyKeys(from);
++        // Steps 5.b.iii-iv.
++        var keys = OwnPropertyKeys(from);
+ 
+-        // Steps 5.e-f.
+-        var len = keysArray.length;
++        // Step 5.c.
++        for (var nextIndex = 0, len = keys.length; nextIndex < len; nextIndex++) {
++            var nextKey = keys[nextIndex];
+ 
+-        // Step 5.h.
+-        var nextIndex = 0;
+-
+-        // Step 5.i (Modified a bit because we can't catch and store the
+-        // actual Completion Record). Instead we have a marker object.
+-        const MISSING = {};
+-        var pendingException = MISSING;
+-
+-        // Step 5.j.
+-        while (nextIndex < len) {
+-            // Step 5.j.i-ii.
+-            var nextKey = keysArray[nextIndex];
+-
+-            // Step 5.j.iii-v.
+-            try {
+-                // We'd like to use Object.propertyIsEnumerable here, but we
+-                // can't, because if a property doesn't exist, it won't properly
+-                // call getOwnPropertyDescriptor (important if |from| is a
+-                // proxy).
+-                var desc = std_Object_getOwnPropertyDescriptor(from, nextKey);
+-                if (desc !== undefined && desc.enumerable)
+-                    to[nextKey] = from[nextKey];
+-            } catch (e) {
+-                if (pendingException === MISSING)
+-                    pendingException = e;
++            // Steps 5.c.i-iii. We abbreviate this by calling propertyIsEnumerable
++            // which is faster and returns false for not defined properties.
++            if (callFunction(std_Object_propertyIsEnumerable, from, nextKey)) {
++                // Steps 5.c.iii.1-4.
++                to[nextKey] = from[nextKey];
+             }
+-
+-            // Step 5.j.vi.
+-            nextIndex++;
+         }
+-
+-        // Step 5.k.
+-        if (pendingException !== MISSING)
+-            throw pendingException;
+-    } while (++i < arguments.length);
++    }
+ 
+     // Step 6.
+     return to;
+diff -r 939887ff233c -r 6f07dbd73122 js/src/tests/ecma_6/Object/assign.js
+--- a/js/src/tests/ecma_6/Object/assign.js	Thu Mar 12 09:00:00 2015 +0100
++++ b/js/src/tests/ecma_6/Object/assign.js	Sat Apr 25 13:03:44 2015 +0800
+@@ -284,75 +284,20 @@
+ }
+ testStringAndSymbolPropertiesCopied();
+ 
+-// Intermediate exceptions do not stop property traversal, first exception is reported (1)
++// Intermediate exceptions stop traversal and throw exception
+ function testExceptionsDoNotStopFirstReported1() {
+-    var ErrorA = function ErrorA() {};
+-    var ErrorB = function ErrorB() {};
+-    var log = "";
++    var TestError = function TestError() {};
+     var source = new Proxy({}, {
+         getOwnPropertyDescriptor: function(t, pk) {
+-            log += pk;
+-            throw new (pk === "a" ? ErrorA : ErrorB);
++            assertEq(pk, "b");
++            throw new TestError();
+         },
+         ownKeys: () => ["b", "a"]
+     });
+-    assertThrowsInstanceOf(() => Object.assign({}, source), ErrorB);
+-    assertEq(log, "ba");
++    assertThrowsInstanceOf(() => Object.assign({}, source), TestError);
+ }
+ testExceptionsDoNotStopFirstReported1();
+ 
+-// Properties are retrieved through Get()
+-// Intermediate exceptions do not stop property traversal, first exception is reported (2)
+-function testExceptionsDoNotStopFirstReported2() {
+-    var ErrorA = function ErrorA() {};
+-    var ErrorB = function ErrorB() {};
+-    var log = "";
+-    var source = new Proxy({
+-        get a() { log += "a"; throw new ErrorA },
+-        get b() { log += "b"; throw new ErrorB },
+-    }, {
+-        ownKeys: () => ["b", "a"]
+-    });
+-    assertThrowsInstanceOf(() => Object.assign({}, source), ErrorB);
+-    assertEq(log, "ba");
+-}
+-testExceptionsDoNotStopFirstReported2();
+-
+-// Intermediate exceptions do not stop property traversal, first exception is reported (3)
+-function testExceptionsDoNotStopFirstReported3() {
+-    var ErrorA = function ErrorA() {};
+-    var ErrorB = function ErrorB() {};
+-    var log = "";
+-    var source = new Proxy({a: 1, b: 2}, {
+-        ownKeys: () => ["b", "a"]
+-    });
+-    var target = {
+-        set a(v) { log += "a"; throw new ErrorA },
+-        set b(v) { log += "b"; throw new ErrorB },
+-    };
+-    assertThrowsInstanceOf(() => Object.assign(target, source), ErrorB);
+-    assertEq(log, "ba");
+-}
+-testExceptionsDoNotStopFirstReported3();
+-
+-// Intermediate exceptions do not stop property traversal, first exception is reported (4)
+-function testExceptionsDoNotStopFirstReported4() {
+-    var ErrorGetOwnProperty = function ErrorGetOwnProperty() {};
+-    var ErrorGet = function ErrorGet() {};
+-    var ErrorSet = function ErrorSet() {};
+-    var source = new Proxy({
+-        get a() { throw new ErrorGet }
+-    }, {
+-        getOwnPropertyDescriptor: function(t, pk) {
+-            throw new ErrorGetOwnProperty;
+-        }
+-    });
+-    var target = {
+-        set a(v) { throw new ErrorSet }
+-    };
+-    assertThrowsInstanceOf(() => Object.assign({}, source), ErrorGetOwnProperty);
+-}
+-testExceptionsDoNotStopFirstReported4();
+ 
+ if (typeof reportCompare == "function")
+     reportCompare(true, true);
+diff -r 939887ff233c -r 6f07dbd73122 js/src/vm/SelfHosting.cpp
+--- a/js/src/vm/SelfHosting.cpp	Thu Mar 12 09:00:00 2015 +0100
++++ b/js/src/vm/SelfHosting.cpp	Sat Apr 25 13:03:44 2015 +0800
+@@ -823,6 +823,7 @@
+     JS_FN("std_Number_valueOf",                  js_num_valueOf,               0,0),
+ 
+     JS_FN("std_Object_create",                   obj_create,                   2,0),
++    JS_FN("std_Object_propertyIsEnumerable",     obj_propertyIsEnumerable,     1,0),
+     JS_FN("std_Object_defineProperty",           obj_defineProperty,           3,0),
+     JS_FN("std_Object_getPrototypeOf",           obj_getPrototypeOf,           1,0),
+     JS_FN("std_Object_getOwnPropertyNames",      obj_getOwnPropertyNames,      1,0),

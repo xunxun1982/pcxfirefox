@@ -1,0 +1,30 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1411493179 -28800
+#      Wed Sep 24 01:26:19 2014 +0800
+# Node ID ce7ae33e83ec0db77b7cd69fe52a11a77152ae1e
+# Parent  c22272d1433fe2f64c13792955429b1b2c0d810e
+libffi-better
+
+diff -r c22272d1433f -r ce7ae33e83ec build/autoconf/ffi.m4
+--- a/build/autoconf/ffi.m4	Sun Nov 16 15:48:21 2014 +0800
++++ b/build/autoconf/ffi.m4	Wed Sep 24 01:26:19 2014 +0800
+@@ -60,12 +60,16 @@
+         # Need target since MSYS tools into mozilla-build may be 32bit
+         ac_configure_args="$ac_configure_args \
+                            CC=\"$_topsrcdir/js/src/ctypes/libffi/msvcc.sh -m64$flags\" \
+-                           CXX=\"$_topsrcdir/js/src/ctypes/libffi/msvcc.sh -m64$flags\""
++                           CFLAGS=\"$MOZ_OPTIMIZE_FLAGS -fp:precise -Qfast_transcendentals -GL-\" \
++                           CXX=\"$_topsrcdir/js/src/ctypes/libffi/msvcc.sh -m64$flags\" \
++                           CXXFLAGS=\"$MOZ_OPTIMIZE_FLAGS -fp:precise -Qfast_transcendentals -GL-\""
+         ;;
+       *)
+         ac_configure_args="$ac_configure_args \
+                            CC=\"$_topsrcdir/js/src/ctypes/libffi/msvcc.sh$flags\" \
+-                           CXX=\"$_topsrcdir/js/src/ctypes/libffi/msvcc.sh$flags\""
++                           CFLAGS=\"$MOZ_OPTIMIZE_FLAGS -fp:precise -Qfast_transcendentals -GL-\" \
++                           CXX=\"$_topsrcdir/js/src/ctypes/libffi/msvcc.sh$flags\" \
++                           CXXFLAGS=\"$MOZ_OPTIMIZE_FLAGS -fp:precise -Qfast_transcendentals -GL-\""
+         ;;
+       esac
+     fi

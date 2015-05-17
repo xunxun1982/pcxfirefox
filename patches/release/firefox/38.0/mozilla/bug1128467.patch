@@ -1,0 +1,20 @@
+# HG changeset patch
+# User Seth Fowler <seth@mozilla.com>
+# Date 1427332378 25200
+#      Wed Mar 25 18:12:58 2015 -0700
+# Node ID bd5554d23bb58f14b54cf4489ca263083602b67b
+# Parent  6f07dbd7312263af6ee2c770a2b3e0e993c4ab42
+Bug 1128467 - Take scale factors into account when computing image size even if we aren't snapping. r=roc
+
+diff -r 6f07dbd73122 -r bd5554d23bb5 layout/base/nsLayoutUtils.cpp
+--- a/layout/base/nsLayoutUtils.cpp	Sat Apr 25 13:03:44 2015 +0800
++++ b/layout/base/nsLayoutUtils.cpp	Wed Mar 25 18:12:58 2015 -0700
+@@ -5796,7 +5796,7 @@
+   }
+ 
+   gfxSize destScale = didSnap ? gfxSize(currentMatrix._11, currentMatrix._22)
+-                              : gfxSize(1.0, 1.0);
++                              : currentMatrix.ScaleFactors(true);
+   gfxSize appUnitScaledDest(dest.width * destScale.width,
+                             dest.height * destScale.height);
+   gfxSize scaledDest = appUnitScaledDest / aAppUnitsPerDevPixel;

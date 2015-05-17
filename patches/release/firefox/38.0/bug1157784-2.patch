@@ -1,0 +1,19 @@
+# HG changeset patch
+# User Jeff Muizelaar <jmuizelaar@mozilla.com>
+# Date 1431548942 14400
+#      Wed May 13 16:29:02 2015 -0400
+# Node ID eecb2b517fe207b90952dfde47978aca32377dc9
+# Parent  b629454c670d1399bab21a154ebc9fc1be1a3352
+Bug 1157784. Add missing DeleteCriticalSection
+
+diff -r b629454c670d -r eecb2b517fe2 widget/windows/nsWindow.cpp
+--- a/widget/windows/nsWindow.cpp	Wed May 13 16:05:35 2015 -0400
++++ b/widget/windows/nsWindow.cpp	Wed May 13 16:29:02 2015 -0400
+@@ -436,6 +436,7 @@
+       sIsOleInitialized = FALSE;
+     }
+   }
++  ::DeleteCriticalSection(&mPresentLock);
+ 
+   NS_IF_RELEASE(mNativeDragTarget);
+ }

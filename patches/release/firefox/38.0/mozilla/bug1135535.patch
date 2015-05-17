@@ -1,0 +1,61 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1430911143 -28800
+#      Wed May 06 19:19:03 2015 +0800
+# Node ID b6d9c98f053bd1de85ef4ffeb07b27e3b9eccbf3
+# Parent  cfbe92c179458ed46c5421be9bb413ef06f80435
+Bug 1135535 - Fix MSVC compiler warnings in js/src and enable FAIL_ON_WARNINGS there
+
+diff -r cfbe92c17945 -r b6d9c98f053b js/public/Proxy.h
+--- a/js/public/Proxy.h	Sun Apr 26 15:31:18 2015 +0800
++++ b/js/public/Proxy.h	Wed May 06 19:19:03 2015 +0800
+@@ -355,7 +355,7 @@
+  * to add an override in CrossCompartmentWrapper. If you don't, you risk
+  * compartment mismatches. See bug 945826 comment 0.
+  */
+-class JS_PUBLIC_API(DirectProxyHandler) : public BaseProxyHandler
++class JS_FRIEND_API(DirectProxyHandler) : public BaseProxyHandler
+ {
+   public:
+     explicit MOZ_CONSTEXPR DirectProxyHandler(const void* aFamily, bool aHasPrototype = false,
+diff -r cfbe92c17945 -r b6d9c98f053b js/src/frontend/Parser.cpp
+--- a/js/src/frontend/Parser.cpp	Sun Apr 26 15:31:18 2015 +0800
++++ b/js/src/frontend/Parser.cpp	Wed May 06 19:19:03 2015 +0800
+@@ -2568,7 +2568,7 @@
+         }
+         funbox->bufEnd = pos().begin + 1;
+     } else {
+-#if not JS_HAS_EXPR_CLOSURES
++#if !JS_HAS_EXPR_CLOSURES
+         MOZ_ASSERT(kind == Arrow);
+ #endif
+         if (tokenStream.hadError())
+diff -r cfbe92c17945 -r b6d9c98f053b js/src/moz.build
+--- a/js/src/moz.build	Sun Apr 26 15:31:18 2015 +0800
++++ b/js/src/moz.build	Wed May 06 19:19:03 2015 +0800
+@@ -494,6 +494,11 @@
+     # Prevent floating point errors caused by VC++ optimizations
+     # XXX We should add this to CXXFLAGS, too?
+     CFLAGS += ['-fp:precise']
++    # C4805 warns mixing bool with other integral types in computation.
++    # But given the conversion from bool is specified, and this is a
++    # pattern widely used in code in js/src, suppress this warning here.
++    CXXFLAGS += ['-wd4805']
++    CXXFLAGS += ['-we4067', '-we4258', '-we4275']
+ 
+ if CONFIG['OS_ARCH'] not in ('WINNT', 'HP-UX'):
+     OS_LIBS += [
+diff -r cfbe92c17945 -r b6d9c98f053b js/src/vm/UnboxedObject.cpp
+--- a/js/src/vm/UnboxedObject.cpp	Sun Apr 26 15:31:18 2015 +0800
++++ b/js/src/vm/UnboxedObject.cpp	Wed May 06 19:19:03 2015 +0800
+@@ -206,8 +206,8 @@
+             TypeSet::TypeList types;
+             if (!property->types.enumerateTypes(&types))
+                 return false;
+-            for (size_t i = 0; i < types.length(); i++)
+-                AddTypePropertyId(cx, nativeGroup, property->id, types[i]);
++            for (size_t j = 0; j < types.length(); j++)
++                AddTypePropertyId(cx, nativeGroup, property->id, types[j]);
+             HeapTypeSet* nativeProperty = nativeGroup->maybeGetProperty(property->id);
+             if (nativeProperty->canSetDefinite(i))
+                 nativeProperty->setDefinite(i);
