@@ -1,0 +1,18 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1435046667 -28800
+#      Tue Jun 23 16:04:27 2015 +0800
+# Node ID 1293d69136608b6188ce0c290d41ef91723a4e8f
+# Parent  041e93c6dcda4aa35ebbe1d473d5e9e78ef5188a
+Bug 1162350 fix
+
+diff -r 041e93c6dcda -r 1293d6913660 image/src/Downscaler.h
+--- a/image/src/Downscaler.h	Sun Jun 21 16:54:06 2015 +0800
++++ b/image/src/Downscaler.h	Tue Jun 23 16:04:27 2015 +0800
+@@ -155,6 +155,4 @@
+ } // namespace image
+ } // namespace mozilla
+ 
+-#endif
+-
+ #endif // MOZILLA_IMAGELIB_DOWNSCALER_H_

@@ -1,0 +1,280 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1411491287 -28800
+#      Wed Sep 24 00:54:47 2014 +0800
+# Node ID cb2ce17605f7fba050aefd3ac11c660fde8bde1a
+# Parent  24e34d889e9cdcb2851c9415b2f8010cf98f5feb
+Bug 453200 - _cairo_hash_table_lookup_internal is O(n) slower than it should be
+
+diff --git a/gfx/cairo/cairo/src/cairo-hash.c b/gfx/cairo/cairo/src/cairo-hash.c
+--- a/gfx/cairo/cairo/src/cairo-hash.c
++++ b/gfx/cairo/cairo/src/cairo-hash.c
+@@ -54,31 +54,30 @@
+  */
+ 
+ #define DEAD_ENTRY ((cairo_hash_entry_t *) 0x1)
+ 
+ #define ENTRY_IS_FREE(entry) ((entry) == NULL)
+ #define ENTRY_IS_DEAD(entry) ((entry) == DEAD_ENTRY)
+ #define ENTRY_IS_LIVE(entry) ((entry) >  DEAD_ENTRY)
+ 
+-/* We expect keys will not be destroyed frequently, so our table does not
+- * contain any explicit shrinking code nor any chain-coalescing code for
+- * entries randomly deleted by memory pressure (except during rehashing, of
+- * course). These assumptions are potentially bad, but they make the
+- * implementation straightforward.
++/*
++ * This table is open-addressed with double hashing. Each table size
++ * is a prime and it makes for the "first" hash modulus; a second
++ * prime (2 less than the first prime) serves as the "second" hash
++ * modulus, which is smaller and thus guarantees a complete
++ * permutation of table indices.
+  *
+- * Revisit later if evidence appears that we're using excessive memory from
+- * a mostly-dead table.
++ * Hash tables are rehashed in order to keep between 12.5% and 50%
++ * entries in the hash table alive and at least 25% free. When table
++ * size is changed, the new table has about 25% live elements.
+  *
+- * This table is open-addressed with double hashing. Each table size is a
+- * prime chosen to be a little more than double the high water mark for a
+- * given arrangement, so the tables should remain < 50% full. The table
+- * size makes for the "first" hash modulus; a second prime (2 less than the
+- * first prime) serves as the "second" hash modulus, which is co-prime and
+- * thus guarantees a complete permutation of table indices.
++ * The free entries guarantee an expected constant-time lookup.
++ * Doubling/halving the table in the described fashion guarantees
++ * amortized O(1) insertion/removal.
+  *
+  * This structure, and accompanying table, is borrowed/modified from the
+  * file xserver/render/glyph.c in the freedesktop.org x server, with
+  * permission (and suggested modification of doubling sizes) by Keith
+  * Packard.
+  */
+ 
+ typedef struct _cairo_hash_table_arrangement {
+@@ -119,16 +118,17 @@ static const cairo_hash_table_arrangemen
+ 
+ struct _cairo_hash_table {
+     cairo_hash_keys_equal_func_t keys_equal;
+ 
+     const cairo_hash_table_arrangement_t *arrangement;
+     cairo_hash_entry_t **entries;
+ 
+     unsigned long live_entries;
++    unsigned long free_entries;
+     unsigned long iterating;   /* Iterating, no insert, no resize */
+ };
+ 
+ /**
+  * _cairo_hash_table_create:
+  * @keys_equal: a function to return %TRUE if two keys are equal
+  *
+  * Creates a new hash table which will use the keys_equal() function
+@@ -162,16 +162,17 @@ cairo_hash_table_t *
+ 				  sizeof(cairo_hash_entry_t *));
+     if (unlikely (hash_table->entries == NULL)) {
+ 	_cairo_error_throw (CAIRO_STATUS_NO_MEMORY);
+ 	free (hash_table);
+ 	return NULL;
+     }
+ 
+     hash_table->live_entries = 0;
++    hash_table->free_entries = hash_table->arrangement->size;
+     hash_table->iterating = 0;
+ 
+     return hash_table;
+ }
+ 
+ /**
+  * _cairo_hash_table_destroy:
+  * @hash_table: an empty hash table to destroy
+@@ -231,54 +232,64 @@ static cairo_hash_entry_t **
+ 	    return entry;
+     } while (++i < table_size);
+ 
+     ASSERT_NOT_REACHED;
+     return NULL;
+ }
+ 
+ /**
+- * _cairo_hash_table_resize:
++ * _cairo_hash_table_manage:
+  * @hash_table: a hash table
+  *
+  * Resize the hash table if the number of entries has gotten much
+  * bigger or smaller than the ideal number of entries for the current
+- * size.
++ * size and guarantee some free entries to be used as lookup
++ * termination points.
+  *
+  * Return value: %CAIRO_STATUS_SUCCESS if successful or
+  * %CAIRO_STATUS_NO_MEMORY if out of memory.
+  **/
+ static cairo_status_t
+-_cairo_hash_table_resize (cairo_hash_table_t *hash_table)
++_cairo_hash_table_manage (cairo_hash_table_t *hash_table)
+ {
+     cairo_hash_table_t tmp;
+     unsigned long new_size, i;
+ 
+-    /* This keeps the hash table between 25% and 50% full. */
+-    unsigned long high = hash_table->arrangement->high_water_mark;
+-    unsigned long low = high >> 2;
+-
+-    if (hash_table->live_entries >= low && hash_table->live_entries <= high)
+-	return CAIRO_STATUS_SUCCESS;
++    /* Keep between 12.5% and 50% entries in the hash table alive and
++     * at least 25% free. */
++     unsigned long live_high = hash_table->arrangement->size >> 1;
++     unsigned long live_low = live_high >> 2;
++     unsigned long free_low = live_high >> 1;
+ 
+     tmp = *hash_table;
+ 
+-    if (hash_table->live_entries > high)
++    if (hash_table->live_entries > live_high)
+     {
+ 	tmp.arrangement = hash_table->arrangement + 1;
+ 	/* This code is being abused if we can't make a table big enough. */
+ 	assert (tmp.arrangement - hash_table_arrangements <
+ 		NUM_HASH_TABLE_ARRANGEMENTS);
+     }
+-    else /* hash_table->live_entries < low */
++    else if (hash_table->live_entries < live_low)
+     {
+ 	/* Can't shrink if we're at the smallest size */
+ 	if (hash_table->arrangement == &hash_table_arrangements[0])
+-	    return CAIRO_STATUS_SUCCESS;
+-	tmp.arrangement = hash_table->arrangement - 1;
++        tmp.arrangement = hash_table->arrangement;
++    else
++        tmp.arrangement = hash_table->arrangement - 1;
++    }
++
++    if (tmp.arrangement == hash_table->arrangement &&
++        hash_table->free_entries > free_low)
++    {
++    /* The number of live entries is within the desired bounds
++     * (we're not going to resize the table) and we have enough
++     * free entries. Do nothing. */
++        return CAIRO_STATUS_SUCCESS;
+     }
+ 
+     new_size = tmp.arrangement->size;
+     tmp.entries = calloc (new_size, sizeof (cairo_hash_entry_t*));
+     if (unlikely (tmp.entries == NULL))
+ 	return _cairo_error (CAIRO_STATUS_NO_MEMORY);
+ 
+     for (i = 0; i < hash_table->arrangement->size; ++i) {
+@@ -286,16 +297,17 @@ static cairo_status_t
+ 	    *_cairo_hash_table_lookup_unique_key (&tmp, hash_table->entries[i])
+ 		= hash_table->entries[i];
+ 	}
+     }
+ 
+     free (hash_table->entries);
+     hash_table->entries = tmp.entries;
+     hash_table->arrangement = tmp.arrangement;
++    hash_table->free_entries = new_size - hash_table->live_entries;
+ 
+     return CAIRO_STATUS_SUCCESS;
+ }
+ 
+ /**
+  * _cairo_hash_table_lookup:
+  * @hash_table: a hash table
+  * @key: the key of interest
+@@ -335,16 +347,17 @@ void *
+ 	entry = hash_table->entries[idx];
+ 	if (ENTRY_IS_LIVE (entry)) {
+ 	    if (hash_table->keys_equal (key, entry))
+ 		return entry;
+ 	} else if (ENTRY_IS_FREE (entry))
+ 	    return NULL;
+     } while (++i < table_size);
+ 
++    ASSERT_NOT_REACHED;
+     return NULL;
+ }
+ 
+ /**
+  * _cairo_hash_table_random_entry:
+  * @hash_table: a hash table
+  * @predicate: a predicate function.
+  *
+@@ -416,31 +429,33 @@ void *
+  *
+  * Return value: %CAIRO_STATUS_SUCCESS if successful or
+  * %CAIRO_STATUS_NO_MEMORY if insufficient memory is available.
+  **/
+ cairo_status_t
+ _cairo_hash_table_insert (cairo_hash_table_t *hash_table,
+ 			  cairo_hash_entry_t *key_and_value)
+ {
++    cairo_hash_entry_t **entry;
+     cairo_status_t status;
+ 
+     /* Insert is illegal while an iterator is running. */
+     assert (hash_table->iterating == 0);
+ 
++    status = _cairo_hash_table_manage (hash_table);
++    if (unlikely (status))
++	return status;
++
++    entry = _cairo_hash_table_lookup_unique_key (hash_table, key_and_value);
++
++    if (ENTRY_IS_FREE (*entry))
++        hash_table->free_entries--;
++
++    *entry = key_and_value;
+     hash_table->live_entries++;
+-    status = _cairo_hash_table_resize (hash_table);
+-    if (unlikely (status)) {
+-	/* abort the insert... */
+-	hash_table->live_entries--;
+-	return status;
+-    }
+-
+-    *_cairo_hash_table_lookup_unique_key (hash_table,
+-					  key_and_value) = key_and_value;
+ 
+     return CAIRO_STATUS_SUCCESS;
+ }
+ 
+ static cairo_hash_entry_t **
+ _cairo_hash_table_lookup_exact_key (cairo_hash_table_t *hash_table,
+ 				    cairo_hash_entry_t *key)
+ {
+@@ -491,17 +506,17 @@ void
+     /* Check for table resize. Don't do this when iterating as this will
+      * reorder elements of the table and cause the iteration to potentially
+      * skip some elements. */
+     if (hash_table->iterating == 0) {
+ 	/* This call _can_ fail, but only in failing to allocate new
+ 	 * memory to shrink the hash table. It does leave the table in a
+ 	 * consistent state, and we've already succeeded in removing the
+ 	 * entry, so we don't examine the failure status of this call. */
+-	_cairo_hash_table_resize (hash_table);
++	_cairo_hash_table_manage (hash_table);
+     }
+ }
+ 
+ /**
+  * _cairo_hash_table_foreach:
+  * @hash_table: a hash table
+  * @hash_callback: function to be called for each live entry
+  * @closure: additional argument to be passed to @hash_callback
+@@ -532,11 +547,11 @@ void
+     }
+     /* If some elements were deleted during the iteration,
+      * the table may need resizing. Just do this every time
+      * as the check is inexpensive.
+      */
+     if (--hash_table->iterating == 0) {
+ 	/* Should we fail to shrink the hash table, it is left unaltered,
+ 	 * and we don't need to propagate the error status. */
+-	_cairo_hash_table_resize (hash_table);
++	_cairo_hash_table_manage (hash_table);
+     }
+ }

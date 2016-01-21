@@ -1,0 +1,159 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1434793282 -28800
+#      Sat Jun 20 17:41:22 2015 +0800
+# Node ID d2b413b7383554d718ad370fc633286b248e433d
+# Parent  545e9e9e7458589a9a07df3aa3c7594ccf96aa21
+pcx-tweak
+
+diff -r 545e9e9e7458 -r d2b413b73835 browser/app/profile/firefox.js
+--- a/browser/app/profile/firefox.js	Wed May 06 19:22:10 2015 +0800
++++ b/browser/app/profile/firefox.js	Sat Jun 20 17:41:22 2015 +0800
+@@ -381,6 +381,10 @@
+ // This records whether or not the panel has been shown at least once.
+ pref("browser.download.panel.shown", false);
+ 
++//pcxfirefox tweak
++pref("browser.download.manager.scanWhenDone", false);
++pref("browser.download.useDownloadDir", false);
++
+ #ifndef XP_MACOSX
+ pref("browser.helperApps.deleteTempFileOnExit", true);
+ #endif
+@@ -445,7 +449,7 @@
+ #endif
+ 
+ // Tabbed browser
+-pref("browser.tabs.closeWindowWithLastTab", true);
++pref("browser.tabs.closeWindowWithLastTab", false);
+ pref("browser.tabs.insertRelatedAfterCurrent", true);
+ pref("browser.tabs.warnOnClose", true);
+ pref("browser.tabs.warnOnCloseOtherTabs", true);
+@@ -853,6 +857,56 @@
+ pref("plugin.state.iprint", 2);
+ #endif
+ 
++//pcx other tweak
++#ifdef XP_WIN
++//WMP
++pref("plugin.state.np-mswmp", 2);
++//Alipay
++pref("plugin.state.npaliedit", 2);
++pref("plugin.state.npalidcp", 2);
++pref("plugin.state.npalicdo", 2);
++pref("plugin.state.npalisecctrl", 2);
++pref("plugin.state.npalissologin", 2);
++//BOC
++pref("plugin.state.npseceditctl", 2);
++pref("plugin.state.npseceditctl.boc.x86", 2);
++//ICBC
++pref("plugin.state.npclcache", 2);
++pref("plugin.state.npclientbinding", 2);
++pref("plugin.state.npfullscreen", 2);
++pref("plugin.state.npsubmit", 2);
++pref("plugin.state.npxxin", 2);
++//CMB
++pref("plugin.state.npcmbedit", 2);
++//Tenpay
++pref("plugin.state.npqqcert", 2);
++pref("plugin.state.npqqedit", 2);
++//QQ Login
++pref("plugin.state.npssoaxctrlforptlogin", 2);
++//AliWangwang
++pref("plugin.state.npwangwang", 2);
++//SumatraPDF
++pref("plugin.state.nppdfviewer", 2);
++//Baiduyun upload
++pref("plugin.state.npuploader", 2);
++//360yun upload
++pref("plugin.state.npuploadplugin", 2);
++//115 upload
++pref("plugin.state.npuploadfile", 2);
++//QQ upload
++pref("plugin.state.nptxftnWebKit", 2);
++//CNTV
++pref("plugin.state.npcntvlive2", 2);
++//QzoneMusic
++pref("plugin.state.npqzonemusic", 2);
++//UnionPay
++pref("plugin.state.npupeditor2", 2);
++//JDEdit
++pref("plugin.state.npjdedit", 2);
++//Baifubao
++pref("plugin.state.npbaiedit", 2);
++#endif
++
+ #ifdef XP_MACOSX
+ pref("browser.preferences.animateFadeIn", true);
+ #else
+@@ -971,8 +1025,8 @@
+ #ifdef MOZ_SAFE_BROWSING
+ pref("browser.safebrowsing.enabled", true);
+ pref("browser.safebrowsing.malware.enabled", true);
+-pref("browser.safebrowsing.downloads.enabled", true);
+-pref("browser.safebrowsing.downloads.remote.enabled", true);
++pref("browser.safebrowsing.downloads.enabled", false);
++pref("browser.safebrowsing.downloads.remote.enabled", false);
+ pref("browser.safebrowsing.debug", false);
+ 
+ pref("browser.safebrowsing.updateURL", "https://safebrowsing.google.com/safebrowsing/downloads?client=SAFEBROWSING_ID&appver=%VERSION%&pver=2.2&key=%GOOGLE_API_KEY%");
+@@ -1002,7 +1056,7 @@
+ pref("urlclassifier.gethashnoise", 4);
+ 
+ // Gethash timeout for Safebrowsing.
+-pref("urlclassifier.gethash.timeout_ms", 5000);
++pref("urlclassifier.gethash.timeout_ms", 200);
+ 
+ // If an urlclassifier table has not been updated in this number of seconds,
+ // a gethash request will be forced to check that the result is still in
+@@ -1869,6 +1923,12 @@
+ 
+ pref("browser.apps.URL", "https://marketplace.firefox.com/discovery/");
+ 
++//pcxfirefox tweak
++pref("config.trim_on_minimize", false);
++pref("datareporting.healthreport.uploadEnabled", false);
++pref("datareporting.healthreport.logging.consoleEnabled", false);
++pref("datareporting.policy.dataSubmissionEnabled", false);
++
+ #ifdef NIGHTLY_BUILD
+ pref("browser.polaris.enabled", false);
+ pref("privacy.trackingprotection.ui.enabled", false);
+diff -r 545e9e9e7458 -r d2b413b73835 browser/branding/official/pref/firefox-branding.js
+--- a/browser/branding/official/pref/firefox-branding.js	Wed May 06 19:22:10 2015 +0800
++++ b/browser/branding/official/pref/firefox-branding.js	Sat Jun 20 17:41:22 2015 +0800
+@@ -25,4 +25,20 @@
+ 
+ // Number of usages of the web console or scratchpad.
+ // If this is less than 5, then pasting code into the web console or scratchpad is disabled
+-pref("devtools.selfxss.count", 0);
+\ No newline at end of file
++pref("devtools.selfxss.count", 0);
++
++//pcxfirefox tweak
++//browser
++pref("browser.download.manager.scanWhenDone", false);
++pref("browser.download.useDownloadDir", false);
++pref("browser.tabs.closeWindowWithLastTab", false);
++//dom
++pref("dom.popup_maximum", 5);
++//datareporting
++pref("datareporting.healthreport.uploadEnabled", false);
++pref("datareporting.healthreport.logging.consoleEnabled", false);
++pref("datareporting.policy.dataSubmissionEnabled", false);
++//special
++pref("pdfjs.disabled", false);
++pref("config.trim_on_minimize", false);
++pref("plugin.expose_full_path", true);
+diff -r 545e9e9e7458 -r d2b413b73835 modules/libpref/init/all.js
+--- a/modules/libpref/init/all.js	Wed May 06 19:22:10 2015 +0800
++++ b/modules/libpref/init/all.js	Sat Jun 20 17:41:22 2015 +0800
+@@ -974,7 +974,7 @@
+ pref("dom.allow_scripts_to_close_windows",          false);
+ 
+ pref("dom.disable_open_during_load",                false);
+-pref("dom.popup_maximum",                           20);
++pref("dom.popup_maximum",                           5);
+ pref("dom.popup_allowed_events", "change click dblclick mouseup reset submit touchend");
+ pref("dom.disable_open_click_delay", 1000);
+ 

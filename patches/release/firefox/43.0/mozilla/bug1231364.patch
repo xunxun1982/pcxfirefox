@@ -1,0 +1,31 @@
+# HG changeset patch
+# User Andrea Marchesini <amarchesini@mozilla.com>
+# Date 1449772857 18000
+#      Thu Dec 10 13:40:57 2015 -0500
+# Branch GECKO4301_2015121620_RELBRANCH
+# Node ID 5739c12f43db21529ec430319bd9f8d741e94433
+# Parent  fcd71edcf92485f96ec2580332d72fc5ec13391f
+Bug 1231364 - the audio icon in tabs should be removed only if the location changes for real, r=ehsan
+
+diff --git a/browser/base/content/tabbrowser.xml b/browser/base/content/tabbrowser.xml
+--- a/browser/base/content/tabbrowser.xml
++++ b/browser/base/content/tabbrowser.xml
+@@ -791,17 +791,17 @@
+                 if (this.mBrowser.userTypedClear > 0 ||
+                     ((aFlags & Ci.nsIWebProgressListener.LOCATION_CHANGE_ERROR_PAGE) &&
+                      aLocation.spec != "about:blank") ||
+                      aFlags && Ci.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT) {
+                   this.mBrowser.userTypedValue = null;
+                 }
+ 
+                 // If the browser was playing audio, we should remove the playing state.
+-                if (this.mTab.hasAttribute("soundplaying")) {
++                if (this.mTab.hasAttribute("soundplaying") && this.mBrowser.lastURI != aLocation) {
+                   this.mTab.removeAttribute("soundplaying");
+                   this.mTabBrowser._tabAttrModified(this.mTab, ["soundplaying"]);
+                 }
+ 
+                 // If the browser was previously muted, we should restore the muted state.
+                 if (this.mTab.hasAttribute("muted")) {
+                   this.mTab.linkedBrowser.mute();
+                 }

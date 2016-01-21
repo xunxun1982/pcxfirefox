@@ -1,0 +1,49 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1416124101 -28800
+#      Sun Nov 16 15:48:21 2014 +0800
+# Branch MOBILE400b10_2015080313_RELBRANCH
+# Node ID 3d4fc029d28ac5e729e4ed0acc022f42a8e5d4c7
+# Parent  571cb35709002ec3a4440c7d4e5bfa38e4a37269
+jsshell
+
+diff --git a/js/src/configure.in b/js/src/configure.in
+--- a/js/src/configure.in
++++ b/js/src/configure.in
+@@ -3556,17 +3556,17 @@ dnl = Link js shell to system readline
+ dnl ========================================================
+ MOZ_ARG_ENABLE_BOOL(readline,
+ [  --enable-readline       Link js shell to system readline library],
+     JS_WANT_READLINE=1,
+     JS_WANT_READLINE= )
+ 
+ JS_BUNDLED_EDITLINE=
+ EDITLINE_LIBS=
+-JS_DISABLE_SHELL=
++JS_DISABLE_SHELL=1
+ 
+ case "$target" in
+ *-mingw*)
+     NO_EDITLINE=1
+     ;;
+ *)
+     ;;
+ esac
+@@ -3579,16 +3579,17 @@ if test -z "$SKIP_LIBRARY_CHECKS" -a -z 
+   else
+     dnl By default, we use editline
+     JS_BUNDLED_EDITLINE=1
+   fi
+ 
+   dnl Either way, we want to build with line editing support.
+   AC_DEFINE(EDITLINE)
+ fi
++AC_DEFINE(JS_DISABLE_SHELL)
+ AC_SUBST(JS_BUNDLED_EDITLINE)
+ AC_SUBST(JS_DISABLE_SHELL)
+ AC_SUBST_LIST(EDITLINE_LIBS)
+ 
+ dnl ========================================================
+ dnl =
+ dnl = Standalone module options
+ dnl =

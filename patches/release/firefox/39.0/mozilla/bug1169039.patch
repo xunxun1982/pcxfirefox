@@ -1,0 +1,104 @@
+# HG changeset patch
+# User Kyle <kfung@mozilla.com>
+# Date 1432842376 14400
+#      Thu May 28 15:46:16 2015 -0400
+# Node ID 683865cdde23c75e96c6fe308189d9a4a7bc49ef
+# Parent  b1fae3c833090112c6cee04652906942d54f1587
+Bug 1169039 - Check for NULL in every function that uses CreateEffect(). r=mstange
+
+diff -r b1fae3c83309 -r 683865cdde23 gfx/2d/DrawTargetD2D1.cpp
+--- a/gfx/2d/DrawTargetD2D1.cpp	Wed Sep 24 00:56:22 2014 +0800
++++ b/gfx/2d/DrawTargetD2D1.cpp	Thu May 28 15:46:16 2015 -0400
+@@ -203,7 +203,11 @@
+ 
+   // Step 1, create the shadow effect.
+   RefPtr<ID2D1Effect> shadowEffect;
+-  mDC->CreateEffect(CLSID_D2D1Shadow, byRef(shadowEffect));
++  HRESULT hr = mDC->CreateEffect(CLSID_D2D1Shadow, byRef(shadowEffect));
++  if (FAILED(hr) || !shadowEffect) {
++    gfxWarning() << "Failed to create shadow effect. Code: " << hexa(hr);
++    return;
++  }
+   shadowEffect->SetInput(0, image);
+   shadowEffect->SetValue(D2D1_SHADOW_PROP_BLUR_STANDARD_DEVIATION, aSigma);
+   D2D1_VECTOR_4F color = { aColor.r, aColor.g, aColor.b, aColor.a };
+@@ -1009,9 +1013,9 @@
+     }
+ 
+     if (!mBlendEffect) {
+-      mDC->CreateEffect(CLSID_D2D1Blend, byRef(mBlendEffect));
++      HRESULT hr = mDC->CreateEffect(CLSID_D2D1Blend, byRef(mBlendEffect));
+ 
+-      if (!mBlendEffect) {
++      if (FAILED(hr) || !mBlendEffect) {
+         gfxWarning() << "Failed to create blend effect!";
+         return;
+       }
+@@ -1054,7 +1058,11 @@
+ 
+   RefPtr<ID2D1Effect> radialGradientEffect;
+ 
+-  mDC->CreateEffect(CLSID_RadialGradientEffect, byRef(radialGradientEffect));
++  HRESULT hr = mDC->CreateEffect(CLSID_RadialGradientEffect, byRef(radialGradientEffect));
++  if (FAILED(hr) || !radialGradientEffect) {
++    gfxWarning() << "Failed to create radial gradient effect. Code: " << hexa(hr);
++    return;
++  }
+ 
+   radialGradientEffect->SetValue(RADIAL_PROP_STOP_COLLECTION,
+                                  static_cast<const GradientStopsD2D*>(pat->mStops.get())->mStopCollection);
+diff -r b1fae3c83309 -r 683865cdde23 gfx/2d/FilterNodeD2D1.cpp
+--- a/gfx/2d/FilterNodeD2D1.cpp	Wed Sep 24 00:56:22 2014 +0800
++++ b/gfx/2d/FilterNodeD2D1.cpp	Thu May 28 15:46:16 2015 -0400
+@@ -859,7 +859,7 @@
+   
+   hr = aDC->CreateEffect(CLSID_D2D1ConvolveMatrix, byRef(mEffect));
+ 
+-  if (FAILED(hr)) {
++  if (FAILED(hr) || !mEffect) {
+     gfxWarning() << "Failed to create ConvolveMatrix filter!";
+     return;
+   }
+@@ -868,14 +868,14 @@
+ 
+   hr = aDC->CreateEffect(CLSID_ExtendInputEffect, byRef(mExtendInputEffect));
+ 
+-  if (FAILED(hr)) {
++  if (FAILED(hr) || !mExtendInputEffect) {
+     gfxWarning() << "Failed to create ConvolveMatrix filter!";
+     return;
+   }
+ 
+   hr = aDC->CreateEffect(CLSID_D2D1Border, byRef(mBorderEffect));
+ 
+-  if (FAILED(hr)) {
++  if (FAILED(hr) || !mBorderEffect) {
+     gfxWarning() << "Failed to create ConvolveMatrix filter!";
+     return;
+   }
+@@ -1018,7 +1018,7 @@
+ 
+   hr = aDC->CreateEffect(CLSID_ExtendInputEffect, byRef(mExtendInputEffect));
+ 
+-  if (FAILED(hr)) {
++  if (FAILED(hr) || !mExtendInputEffect) {
+     gfxWarning() << "Failed to create extend input effect for filter: " << hexa(hr);
+     return;
+   }
+@@ -1062,14 +1062,14 @@
+ 
+   hr = aDC->CreateEffect(CLSID_D2D1Premultiply, byRef(mPrePremultiplyEffect));
+ 
+-  if (FAILED(hr)) {
++  if (FAILED(hr) || !mPrePremultiplyEffect) {
+     gfxWarning() << "Failed to create ComponentTransfer filter!";
+     return;
+   }
+ 
+   hr = aDC->CreateEffect(CLSID_D2D1UnPremultiply, byRef(mPostUnpremultiplyEffect));
+ 
+-  if (FAILED(hr)) {
++  if (FAILED(hr) || !mPostUnpremultiplyEffect) {
+     gfxWarning() << "Failed to create ComponentTransfer filter!";
+     return;
+   }

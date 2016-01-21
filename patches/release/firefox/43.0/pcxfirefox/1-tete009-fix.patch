@@ -1,0 +1,332 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1450342990 -28800
+#      Thu Dec 17 17:03:10 2015 +0800
+# Branch GECKO4301_2015121620_RELBRANCH
+# Node ID 1978292d4276f605910e4cc48fb12a6beb909fc6
+# Parent  1f8c13fb07c2e50d18ef8270456c6efa38cda7e8
+1-tete009-fix
+
+diff --git a/client.mk b/client.mk
+--- a/client.mk
++++ b/client.mk
+@@ -223,21 +223,17 @@ everything: clean build
+ # Profile-Guided Optimization
+ #  This is up here, outside of the MOZ_CURRENT_PROJECT logic so that this
+ #  is usable in multi-pass builds, where you might not have a runnable
+ #  application until all the build passes and postflight scripts have run.
+ profiledbuild::
+ 	$(MAKE) -f $(TOPSRCDIR)/client.mk realbuild MOZ_PROFILE_GENERATE=1 MOZ_PGO_INSTRUMENTED=1 CREATE_MOZCONFIG_JSON=
+ 	$(MAKE) -C $(OBJDIR) package MOZ_PGO_INSTRUMENTED=1 MOZ_INTERNAL_SIGNING_FORMAT= MOZ_EXTERNAL_SIGNING_FORMAT=
+ 	rm -f $(OBJDIR)/jarlog/en-US.log
+-ifdef PROFILE_GEN_SCRIPT
+-	MOZ_PGO_INSTRUMENTED=1 JARLOG_FILE=jarlog/en-US.log $(PROFILE_GEN_SCRIPT)
+-else
+ 	MOZ_PGO_INSTRUMENTED=1 JARLOG_FILE=jarlog/en-US.log EXTRA_TEST_ARGS=10 $(MAKE) -C $(OBJDIR) pgo-profile-run
+-endif
+ 	$(MAKE) -f $(TOPSRCDIR)/client.mk maybe_clobber_profiledbuild CREATE_MOZCONFIG_JSON=
+ 	$(MAKE) -f $(TOPSRCDIR)/client.mk realbuild MOZ_PROFILE_USE=1 CREATE_MOZCONFIG_JSON=
+ 
+ #####################################################
+ # Build date unification
+ 
+ ifdef MOZ_UNIFY_BDATE
+ ifndef MOZ_BUILD_DATE
+diff --git a/dom/base/nsContentUtils.cpp b/dom/base/nsContentUtils.cpp
+--- a/dom/base/nsContentUtils.cpp
++++ b/dom/base/nsContentUtils.cpp
+@@ -3576,33 +3576,25 @@ nsContentUtils::LogMessageToConsole(cons
+   if (!formatted) {
+     return;
+   }
+ 
+   sConsoleService->LogStringMessage(NS_ConvertUTF8toUTF16(formatted).get());
+   PR_smprintf_free(formatted);
+ }
+ 
+-#ifdef _MSC_VER
+-#pragma optimize("g", off)
+-#endif
+-
+ bool
+ nsContentUtils::IsChromeDoc(nsIDocument *aDocument)
+ {
+   if (!aDocument) {
+     return false;
+   }
+   return aDocument->NodePrincipal() == sSystemPrincipal;
+ }
+ 
+-#ifdef _MSC_VER
+-#pragma optimize("", on)
+-#endif
+-
+ bool
+ nsContentUtils::IsChildOfSameType(nsIDocument* aDoc)
+ {
+   nsCOMPtr<nsIDocShellTreeItem> docShellAsItem(aDoc->GetDocShell());
+   nsCOMPtr<nsIDocShellTreeItem> sameTypeParent;
+   if (docShellAsItem) {
+     docShellAsItem->GetSameTypeParent(getter_AddRefs(sameTypeParent));
+   }
+diff --git a/dom/media/moz.build b/dom/media/moz.build
+--- a/dom/media/moz.build
++++ b/dom/media/moz.build
+@@ -191,16 +191,17 @@ EXPORTS.mozilla.dom += [
+     'VideoTrackList.h',
+ ]
+ 
+ UNIFIED_SOURCES += [
+     'AudioCaptureStream.cpp',
+     'AudioChannelFormat.cpp',
+     'AudioCompactor.cpp',
+     'AudioSegment.cpp',
++    'AudioStream.cpp',
+     'AudioStreamTrack.cpp',
+     'AudioTrack.cpp',
+     'AudioTrackList.cpp',
+     'CanvasCaptureMediaStream.cpp',
+     'CubebUtils.cpp',
+     'DOMMediaStream.cpp',
+     'EncodedBufferCache.cpp',
+     'FileBlockCache.cpp',
+@@ -243,18 +244,16 @@ UNIFIED_SOURCES += [
+     'VideoStreamTrack.cpp',
+     'VideoTrack.cpp',
+     'VideoTrackList.cpp',
+     'VideoUtils.cpp',
+     'WebVTTListener.cpp',
+     'XiphExtradata.cpp',
+ ]
+ 
+-SOURCES += ['AudioStream.cpp']
+-
+ if CONFIG['OS_TARGET'] == 'WINNT':
+   SOURCES += [ 'ThreadPoolCOMListener.cpp' ]
+ 
+ if CONFIG['MOZ_B2G']:
+     SOURCES += [
+         'MediaPermissionGonk.cpp',
+     ]
+ 
+@@ -308,20 +307,16 @@ if CONFIG['ANDROID_VERSION'] > '15':
+     DEFINES['MOZ_OMX_WEBM_DECODER'] = True
+ 
+ if CONFIG['MOZ_GONK_MEDIACODEC']:
+     DEFINES['MOZ_GONK_MEDIACODEC'] = True
+ 
+ CFLAGS += CONFIG['GSTREAMER_CFLAGS']
+ CXXFLAGS += CONFIG['GSTREAMER_CFLAGS']
+ 
+-# Optimizer bug with MSVC PGO
+-if CONFIG['_MSC_VER']:
+-    SOURCES['AudioStream.cpp'].no_pgo = True
+-
+ include('/ipc/chromium/chromium-config.mozbuild')
+ 
+ # Suppress some GCC warnings being treated as errors:
+ #  - about attributes on forward declarations for types that are already
+ #    defined, which complains about an important MOZ_EXPORT for android::AString
+ if CONFIG['GNU_CC']:
+   CXXFLAGS += ['-Wno-error=attributes']
+ 
+diff --git a/image/decoders/icon/win/nsIconChannel.cpp b/image/decoders/icon/win/nsIconChannel.cpp
+--- a/image/decoders/icon/win/nsIconChannel.cpp
++++ b/image/decoders/icon/win/nsIconChannel.cpp
+@@ -518,19 +518,16 @@ CreateBitmapInfo(BITMAPINFOHEADER* aHead
+                                                  mozilla::fallible);
+   if (bmi) {
+     memcpy(bmi, aHeader, sizeof(BITMAPINFOHEADER));
+     memset(bmi->bmiColors, 0, aColorTableSize);
+   }
+   return bmi;
+ }
+ 
+-#ifdef _MSC_VER
+-#pragma function(memcpy)
+-#endif
+ nsresult
+ nsIconChannel::MakeInputStream(nsIInputStream** _retval, bool aNonBlocking)
+ {
+   // Check whether the icon requested's a file icon or a stock icon
+   nsresult rv = NS_ERROR_NOT_AVAILABLE;
+ 
+   // GetDIBits does not exist on windows mobile.
+   HICON hIcon = nullptr;
+@@ -665,19 +662,16 @@ nsIconChannel::MakeInputStream(nsIInputS
+   } // if we got an hIcon
+ 
+   // If we didn't make a stream, then fail.
+   if (!*_retval && NS_SUCCEEDED(rv)) {
+     rv = NS_ERROR_NOT_AVAILABLE;
+   }
+   return rv;
+ }
+-#ifdef _MSC_VER
+-#pragma intrinsic(memcpy)
+-#endif
+ 
+ NS_IMETHODIMP
+ nsIconChannel::GetContentType(nsACString& aContentType)
+ {
+   aContentType.AssignLiteral(IMAGE_ICO);
+   return NS_OK;
+ }
+ 
+diff --git a/js/src/Makefile.in b/js/src/Makefile.in
+--- a/js/src/Makefile.in
++++ b/js/src/Makefile.in
+@@ -343,19 +343,8 @@ clean::
+ 	DIST=$(DIST) \
+ 	MOZJS_MAJOR_VERSION=$(MOZJS_MAJOR_VERSION) \
+ 	MOZJS_MINOR_VERSION=$(MOZJS_MINOR_VERSION) \
+ 	MOZJS_PATCH_VERSION=$(MOZJS_PATCH_VERSION) \
+ 	MOZJS_ALPHA=$(MOZJS_ALPHA) \
+ 	$(srcdir)/make-source-package.sh clean
+ 
+ endif
+-
+-ifdef _MSC_VER
+-ifeq (WINNT_1,$(OS_ARCH)_$(MOZ_PROFILE_GENERATE)$(MOZ_PROFILE_USE))
+-ifneq (x86_64, $(TARGET_CPU))
+-ifdef ENABLE_ION
+-# Optimizer bug with MSVC PGO
+-Trampoline-x86.$(OBJ_SUFFIX): COMPILE_CXXFLAGS += -GL-
+-endif
+-endif
+-endif
+-endif # _MSC_VER
+diff --git a/js/xpconnect/src/XPCWrappedNative.cpp b/js/xpconnect/src/XPCWrappedNative.cpp
+--- a/js/xpconnect/src/XPCWrappedNative.cpp
++++ b/js/xpconnect/src/XPCWrappedNative.cpp
+@@ -1361,40 +1361,32 @@ public:
+     }
+ 
+     ~CallMethodHelper();
+ 
+     MOZ_ALWAYS_INLINE bool Call();
+ 
+ };
+ 
+-#ifdef _MSC_VER
+-#pragma optimize("g", off)
+-#endif
+-
+ // static
+ bool
+ XPCWrappedNative::CallMethod(XPCCallContext& ccx,
+                              CallMode mode /*= CALL_METHOD */)
+ {
+     MOZ_ASSERT(ccx.GetXPCContext()->CallerTypeIsJavaScript(),
+                "Native caller for XPCWrappedNative::CallMethod?");
+ 
+     nsresult rv = ccx.CanCallNow();
+     if (NS_FAILED(rv)) {
+         return Throw(rv, ccx);
+     }
+ 
+     return CallMethodHelper(ccx).Call();
+ }
+ 
+-#ifdef _MSC_VER
+-#pragma optimize("", on)
+-#endif
+-
+ bool
+ CallMethodHelper::Call()
+ {
+     mCallContext.SetRetVal(JS::UndefinedValue());
+ 
+     XPCJSRuntime::Get()->SetPendingException(nullptr);
+ 
+     if (mVTableIndex == 0) {
+diff --git a/layout/generic/nsContainerFrame.cpp b/layout/generic/nsContainerFrame.cpp
+--- a/layout/generic/nsContainerFrame.cpp
++++ b/layout/generic/nsContainerFrame.cpp
+@@ -223,20 +223,16 @@ nsContainerFrame::DestroyFrom(nsIFrame* 
+                              ExcessOverflowContainersProperty());
+ 
+   nsSplittableFrame::DestroyFrom(aDestructRoot);
+ }
+ 
+ /////////////////////////////////////////////////////////////////////////////
+ // Child frame enumeration
+ 
+-#ifdef _MSC_VER
+-#pragma optimize("g", off)
+-#endif
+-
+ const nsFrameList&
+ nsContainerFrame::GetChildList(ChildListID aListID) const
+ {
+   // We only know about the principal child list and the overflow lists.
+   switch (aListID) {
+     case kPrincipalList:
+       return mFrames;
+     case kOverflowList: {
+@@ -252,20 +248,16 @@ nsContainerFrame::GetChildList(ChildList
+         GetPropTableFrames(ExcessOverflowContainersProperty());
+       return list ? *list : nsFrameList::EmptyList();
+     }
+     default:
+       return nsSplittableFrame::GetChildList(aListID);
+   }
+ }
+ 
+-#ifdef _MSC_VER
+-#pragma optimize("", on)
+-#endif
+-
+ static void AppendIfNonempty(const nsIFrame* aFrame,
+                             FramePropertyTable* aPropTable,
+                             const FramePropertyDescriptor* aProperty,
+                             nsTArray<nsIFrame::ChildList>* aLists,
+                             nsIFrame::ChildListID aListID)
+ {
+   nsFrameList* list = static_cast<nsFrameList*>(
+     aPropTable->Get(aFrame, aProperty));
+diff --git a/layout/style/nsCSSDataBlock.cpp b/layout/style/nsCSSDataBlock.cpp
+--- a/layout/style/nsCSSDataBlock.cpp
++++ b/layout/style/nsCSSDataBlock.cpp
+@@ -479,20 +479,16 @@ nsCSSExpandedDataBlock::ComputeNumProps(
+             if (mPropertiesImportant.HasPropertyAt(iHigh, iLow))
+                 (*aNumPropsImportant)++;
+             else
+                 (*aNumPropsNormal)++;
+         }
+     }
+ }
+ 
+-#ifdef _MSC_VER
+-#pragma optimize("g", off)
+-#endif
+-
+ void
+ nsCSSExpandedDataBlock::Compress(nsCSSCompressedDataBlock **aNormalBlock,
+                                  nsCSSCompressedDataBlock **aImportantBlock,
+                                  const nsTArray<uint32_t>& aOrder)
+ {
+     nsAutoPtr<nsCSSCompressedDataBlock> result_normal, result_important;
+     uint32_t i_normal = 0, i_important = 0;
+ 
+@@ -566,20 +562,16 @@ nsCSSExpandedDataBlock::Compress(nsCSSCo
+ #endif
+ 
+     ClearSets();
+     AssertInitialState();
+     *aNormalBlock = result_normal.forget();
+     *aImportantBlock = result_important.forget();
+ }
+ 
+-#ifdef _MSC_VER
+-#pragma optimize("", on)
+-#endif
+-
+ void
+ nsCSSExpandedDataBlock::AddLonghandProperty(nsCSSProperty aProperty,
+                                             const nsCSSValue& aValue)
+ {
+     MOZ_ASSERT(!nsCSSProps::IsShorthand(aProperty),
+                "property out of range");
+     nsCSSValue& storage = *static_cast<nsCSSValue*>(PropertyAt(aProperty));
+     storage = aValue;

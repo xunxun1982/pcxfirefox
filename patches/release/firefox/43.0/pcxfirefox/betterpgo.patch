@@ -1,0 +1,61 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1450347569 -28800
+#      Thu Dec 17 18:19:29 2015 +0800
+# Branch GECKO4301_2015121620_RELBRANCH
+# Node ID 90f691803ee07ce8496f45debb704ab609ee7621
+# Parent  aeaa4fcd0bc492608656c29ab964ac241ec1fb12
+betterpgo
+
+diff --git a/gfx/layers/moz.build b/gfx/layers/moz.build
+--- a/gfx/layers/moz.build
++++ b/gfx/layers/moz.build
+@@ -348,24 +348,16 @@ SOURCES += [
+     'Layers.cpp',
+     'LayerTreeInvalidation.cpp',
+     'PersistentBufferProvider.cpp',
+ ]
+ 
+ # Disable RTTI in google protocol buffer
+ DEFINES['GOOGLE_PROTOBUF_NO_RTTI'] = True
+ 
+-# Workaround compiler bug (Bug 795594)
+-if CONFIG['_MSC_VER'] and CONFIG['CPU_ARCH'] == 'x86_64':
+-    for src in [
+-        'Layers.cpp',
+-        'LayerTreeInvalidation.cpp',
+-    ]:
+-        SOURCES[src].no_pgo = True
+-
+ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
+     SOURCES += [
+         'basic/MacIOSurfaceTextureHostBasic.cpp',
+         'opengl/MacIOSurfaceTextureClientOGL.cpp',
+         'opengl/MacIOSurfaceTextureHostOGL.cpp',
+     ]
+ 
+ IPDL_SOURCES = [
+diff --git a/js/src/moz.build b/js/src/moz.build
+--- a/js/src/moz.build
++++ b/js/src/moz.build
+@@ -586,20 +586,16 @@ if CONFIG['JS_HAS_CTYPES']:
+     DEFINES['JS_HAS_CTYPES'] = True
+     for var in ('DLL_PREFIX', 'DLL_SUFFIX'):
+         DEFINES[var] = '"%s"' % CONFIG[var]
+ 
+ if CONFIG['MOZ_LINKER']:
+     DEFINES['MOZ_LINKER'] = True
+ 
+ if CONFIG['_MSC_VER']:
+-    if CONFIG['CPU_ARCH'] == 'x86':
+-        SOURCES['builtin/RegExp.cpp'].no_pgo = True # Bug 772303
+-    elif CONFIG['CPU_ARCH'] == 'x86_64' and CONFIG['JS_HAS_CTYPES']:
+-        SOURCES['ctypes/CTypes.cpp'].no_pgo = True # Bug 810661
+     # Prevent floating point errors caused by VC++ optimizations
+     # XXX We should add this to CXXFLAGS, too?
+     CFLAGS += ['-fp:precise']
+     # C4805 warns mixing bool with other integral types in computation.
+     # But given the conversion from bool is specified, and this is a
+     # pattern widely used in code in js/src, suppress this warning here.
+     CXXFLAGS += ['-wd4805']
+     # C4661 ("no suitable definition provided for explicit template

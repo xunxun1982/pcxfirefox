@@ -1,0 +1,39 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1411492744 -28800
+#      Wed Sep 24 01:19:04 2014 +0800
+# Node ID 4a2480e2f31550158eea80054689c3c22b9f786f
+# Parent  fcbca1e66b4135453ef42e3b2e3c6b1f4111b796
+icu-better
+
+diff --git a/intl/icu/source/common/Makefile.in b/intl/icu/source/common/Makefile.in
+--- a/intl/icu/source/common/Makefile.in
++++ b/intl/icu/source/common/Makefile.in
+@@ -218,8 +218,11 @@ endif   # ENABLE_SHARED
+ ifeq (,$(MAKECMDGOALS))
+ -include $(DEPS)
+ else
+ ifneq ($(patsubst %clean,,$(MAKECMDGOALS)),)
+ -include $(DEPS)
+ endif
+ endif
+ 
++CFLAGS += -fp:precise -Qfast_transcendentals -GL
++CXXFLAGS += -fp:precise -Qfast_transcendentals -GL
++LDFLAGS += -opt:ref,icf -LARGEADDRESSAWARE
+diff --git a/intl/icu/source/i18n/Makefile.in b/intl/icu/source/i18n/Makefile.in
+--- a/intl/icu/source/i18n/Makefile.in
++++ b/intl/icu/source/i18n/Makefile.in
+@@ -189,8 +189,12 @@ endif   # ENABLE_SHARED
+ 
+ ifeq (,$(MAKECMDGOALS))
+ -include $(DEPS)
+ else
+ ifneq ($(patsubst %clean,,$(MAKECMDGOALS)),)
+ -include $(DEPS)
+ endif
+ endif
++
++CFLAGS += -fp:precise -Qfast_transcendentals -GL
++CXXFLAGS += -fp:precise -Qfast_transcendentals -GL
++LDFLAGS += -opt:ref,icf -LARGEADDRESSAWARE

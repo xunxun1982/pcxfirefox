@@ -1,0 +1,35 @@
+# HG changeset patch
+# User Jeff Walden <jwalden@mit.edu>
+# Date 1448492848 28800
+#      Wed Nov 25 15:07:28 2015 -0800
+# Branch GECKO4301_2015121620_RELBRANCH
+# Node ID a15b759ce9dc287ce1e6343a721c2f50a518317c
+# Parent  1978292d4276f605910e4cc48fb12a6beb909fc6
+Bug 1226188 - Define the DEFINED_ON_DISPATCH_RESULT macro such that it can be called with no arguments as well as with one argument.  r=nbp
+
+diff --git a/js/src/jit/MacroAssembler.h b/js/src/jit/MacroAssembler.h
+--- a/js/src/jit/MacroAssembler.h
++++ b/js/src/jit/MacroAssembler.h
+@@ -135,18 +135,20 @@
+ #else
+ # error "Unknown architecture!"
+ #endif
+ 
+ # define DEFINED_ON_RESULT_crash   { MOZ_CRASH(); }
+ # define DEFINED_ON_RESULT_define
+ # define DEFINED_ON_RESULT_        = delete
+ 
+-# define DEFINED_ON_DISPATCH_RESULT(Result)     \
+-    DEFINED_ON_RESULT_ ## Result
++# define DEFINED_ON_DISPATCH_RESULT_2(Macro, Result) \
++    Macro ## Result
++# define DEFINED_ON_DISPATCH_RESULT(...)     \
++    DEFINED_ON_DISPATCH_RESULT_2(DEFINED_ON_RESULT_, __VA_ARGS__)
+ 
+ // We need to let the evaluation of MOZ_FOR_EACH terminates.
+ # define DEFINED_ON_EXPAND_ARCH_RESULTS_3(ParenResult)  \
+     DEFINED_ON_DISPATCH_RESULT ParenResult
+ # define DEFINED_ON_EXPAND_ARCH_RESULTS_2(ParenResult)  \
+     DEFINED_ON_EXPAND_ARCH_RESULTS_3 (ParenResult)
+ # define DEFINED_ON_EXPAND_ARCH_RESULTS(ParenResult)    \
+     DEFINED_ON_EXPAND_ARCH_RESULTS_2 (ParenResult)

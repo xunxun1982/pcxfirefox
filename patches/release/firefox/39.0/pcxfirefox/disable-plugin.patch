@@ -1,0 +1,22 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1429942246 -28800
+#      Sat Apr 25 14:10:46 2015 +0800
+# Node ID 6e88fca0dcc3802712181fa635a3d5c235148d69
+# Parent  9c97ee1d3810e97e2dc946a46742aef0337c8aef
+Add MOZILLA_DISABLE_PLUGINS
+
+diff -r 9c97ee1d3810 -r 6e88fca0dcc3 dom/plugins/base/nsPluginHost.cpp
+--- a/dom/plugins/base/nsPluginHost.cpp	Wed Sep 24 01:16:59 2014 +0800
++++ b/dom/plugins/base/nsPluginHost.cpp	Sat Apr 25 14:10:46 2015 +0800
+@@ -264,6 +264,10 @@
+   Preferences::AddStrongObserver(this, "plugin.disable");
+   Preferences::AddStrongObserver(this, "plugins.click_to_play");
+ 
++  const char *env = PR_GetEnv("MOZILLA_DISABLE_PLUGINS");
++  if (env && env[0])
++    mPluginsDisabled = PR_TRUE;
++
+   nsCOMPtr<nsIObserverService> obsService =
+     mozilla::services::GetObserverService();
+   if (obsService) {

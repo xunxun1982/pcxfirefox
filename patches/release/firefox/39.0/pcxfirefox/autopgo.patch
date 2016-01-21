@@ -1,0 +1,45 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1430012847 -28800
+#      Sun Apr 26 09:47:27 2015 +0800
+# Node ID 19a04f0cd979ecbf3519042e730ca14354d7c521
+# Parent  4a4048096c259e6cecc128d8403091f10270e429
+autopgo
+
+diff -r 4a4048096c25 -r 19a04f0cd979 Makefile.in
+--- a/Makefile.in	Sat Jun 20 16:20:51 2015 +0800
++++ b/Makefile.in	Sun Apr 26 09:47:27 2015 +0800
+@@ -306,6 +306,9 @@
+ 	find $(DIST)/$(MOZ_APP_NAME) -name '*.pgc' -exec mv {} $(DIST)/bin \;
+ endif
+ 
++pgo-profile-run:
++	$(PYTHON) $(topsrcdir)/build/pgo/profileserver.py $(EXTRA_TEST_ARGS)
++
+ .PHONY: maybe_clobber_profiledbuild
+ 
+ # Look for R_386_PC32 relocations in shared libs, these
+diff -r 4a4048096c25 -r 19a04f0cd979 build/pgo/index.html
+--- a/build/pgo/index.html	Sat Jun 20 16:20:51 2015 +0800
++++ b/build/pgo/index.html	Sun Apr 26 09:47:27 2015 +0800
+@@ -38,7 +38,7 @@
+   "js-input/sunspider/string-unpack-code.html",
+   "js-input/sunspider/string-validate-input.html"
+      ];
+- var interval = 1000;
++ var interval = 6000;
+  var idx = 0;
+  var w;
+  
+diff -r 4a4048096c25 -r 19a04f0cd979 build/pgo/profileserver.py
+--- a/build/pgo/profileserver.py	Sat Jun 20 16:20:51 2015 +0800
++++ b/build/pgo/profileserver.py	Sun Apr 26 09:47:27 2015 +0800
+@@ -68,7 +68,7 @@
+       env["MOZ_JAR_LOG_FILE"] = os.path.abspath(jarlog)
+       print "jarlog: %s" % env["MOZ_JAR_LOG_FILE"]
+ 
+-    cmdargs = ["http://localhost:%d/index.html" % PORT]
++    cmdargs = ["http://127.0.0.1:%d/index.html" % PORT]
+     runner = FirefoxRunner(profile=profile,
+                            binary=build.get_binary_path(where="staged-package"),
+                            cmdargs=cmdargs,

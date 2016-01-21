@@ -1,0 +1,94 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1438742293 -28800
+#      Wed Aug 05 10:38:13 2015 +0800
+# Branch MOBILE400b10_2015080313_RELBRANCH
+# Node ID 134c283e135ceb31145d2cdf9cd9a7172336c573
+# Parent  1b0736a6e19113cd117040fdc816418e3ce46b06
+betterpgo
+
+diff --git a/dom/media/AudioStream.cpp b/dom/media/AudioStream.cpp
+--- a/dom/media/AudioStream.cpp
++++ b/dom/media/AudioStream.cpp
+@@ -821,29 +821,22 @@ AudioStream::Shutdown()
+ 
+ int64_t
+ AudioStream::GetPosition()
+ {
+   MonitorAutoLock mon(mMonitor);
+   return mAudioClock.GetPositionUnlocked();
+ }
+ 
+-// This function is miscompiled by PGO with MSVC 2010.  See bug 768333.
+-#ifdef _MSC_VER
+-#pragma optimize("", off)
+-#endif
+ int64_t
+ AudioStream::GetPositionInFrames()
+ {
+   MonitorAutoLock mon(mMonitor);
+   return mAudioClock.GetPositionInFrames();
+ }
+-#ifdef _MSC_VER
+-#pragma optimize("", on)
+-#endif
+ 
+ int64_t
+ AudioStream::GetPositionInFramesUnlocked()
+ {
+   mMonitor.AssertCurrentThreadOwns();
+ 
+   if (!mCubebStream || mState == ERRORED) {
+     return -1;
+diff --git a/gfx/layers/moz.build b/gfx/layers/moz.build
+--- a/gfx/layers/moz.build
++++ b/gfx/layers/moz.build
+@@ -330,24 +330,16 @@ SOURCES += [
+     'ImageContainer.cpp',
+     'Layers.cpp',
+     'LayerTreeInvalidation.cpp',
+ ]
+ 
+ # Disable RTTI in google protocol buffer
+ DEFINES['GOOGLE_PROTOBUF_NO_RTTI'] = True
+ 
+-# Workaround compiler bug (Bug 795594)
+-if CONFIG['_MSC_VER'] and CONFIG['CPU_ARCH'] == 'x86_64':
+-    for src in [
+-        'Layers.cpp',
+-        'LayerTreeInvalidation.cpp',
+-    ]:
+-        SOURCES[src].no_pgo = True
+-
+ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
+     SOURCES += [
+         'basic/MacIOSurfaceTextureHostBasic.cpp',
+         'opengl/MacIOSurfaceTextureClientOGL.cpp',
+         'opengl/MacIOSurfaceTextureHostOGL.cpp',
+     ]
+ 
+ IPDL_SOURCES = [
+diff --git a/js/src/moz.build b/js/src/moz.build
+--- a/js/src/moz.build
++++ b/js/src/moz.build
+@@ -523,20 +523,16 @@ if CONFIG['JS_HAS_CTYPES']:
+     DEFINES['JS_HAS_CTYPES'] = True
+     for var in ('DLL_PREFIX', 'DLL_SUFFIX'):
+         DEFINES[var] = '"%s"' % CONFIG[var]
+ 
+ if CONFIG['MOZ_LINKER']:
+     DEFINES['MOZ_LINKER'] = True
+ 
+ if CONFIG['_MSC_VER']:
+-    if CONFIG['CPU_ARCH'] == 'x86':
+-        SOURCES['builtin/RegExp.cpp'].no_pgo = True # Bug 772303
+-    elif CONFIG['CPU_ARCH'] == 'x86_64' and CONFIG['JS_HAS_CTYPES']:
+-        SOURCES['ctypes/CTypes.cpp'].no_pgo = True # Bug 810661
+     # Prevent floating point errors caused by VC++ optimizations
+     # XXX We should add this to CXXFLAGS, too?
+     CFLAGS += ['-fp:precise']
+     # C4805 warns mixing bool with other integral types in computation.
+     # But given the conversion from bool is specified, and this is a
+     # pattern widely used in code in js/src, suppress this warning here.
+     CXXFLAGS += ['-wd4805']
+     CXXFLAGS += ['-we4067', '-we4258', '-we4275']

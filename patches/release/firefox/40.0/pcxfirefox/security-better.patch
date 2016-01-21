@@ -1,0 +1,133 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1424850252 -28800
+#      Wed Feb 25 15:44:12 2015 +0800
+# Branch MOBILE400b10_2015080313_RELBRANCH
+# Node ID 1b84fbf6e8fb3c832bfde768f5e1012c7ca903ee
+# Parent  7b33b998801e420543b571b8cf20ff7909a67347
+security-better
+
+diff --git a/security/nss/coreconf/WIN32.mk b/security/nss/coreconf/WIN32.mk
+--- a/security/nss/coreconf/WIN32.mk
++++ b/security/nss/coreconf/WIN32.mk
+@@ -152,19 +152,19 @@ else # !NS_USE_GCC
+ 	ifdef USE_STATIC_RTL
+ 		OS_CFLAGS += -MT
+ 	else
+ 		OS_CFLAGS += -MD
+ 	endif
+     endif
+     ifdef BUILD_OPT
+ 	ifeq (11,$(ALLOW_OPT_CODE_SIZE)$(OPT_CODE_SIZE))
+-		OPTIMIZER += -O1
++		OPTIMIZER += -O2 -Ot -Oi -Ob2 -Oy -Gy -GF -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -Qpar -GL
+ 	else
+-		OPTIMIZER += -O2
++		OPTIMIZER += -O2 -Ot -Oi -Ob2 -Oy -Gy -GF -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -Qpar -GL
+ 	endif
+ 	DEFINES    += -UDEBUG -U_DEBUG -DNDEBUG
+ 	DLLFLAGS   += -OUT:$@
+ 	ifdef MOZ_DEBUG_SYMBOLS
+ 		ifdef MOZ_DEBUG_FLAGS
+ 			OPTIMIZER += $(MOZ_DEBUG_FLAGS) -Fd$(OBJDIR)/
+ 		else
+ 			OPTIMIZER += -Zi -Fd$(OBJDIR)/
+diff --git a/security/nss/coreconf/command.mk b/security/nss/coreconf/command.mk
+--- a/security/nss/coreconf/command.mk
++++ b/security/nss/coreconf/command.mk
+@@ -6,17 +6,17 @@
+ #######################################################################
+ # Master "Core Components" default command macros;                    #
+ # can be overridden in <arch>.mk                                      #
+ #######################################################################
+ 
+ AS            = $(CC)
+ ASFLAGS      += $(CFLAGS)
+ CCF           = $(CC) $(CFLAGS)
+-LINK_DLL      = $(LINK) $(OS_DLLFLAGS) $(DLLFLAGS) $(XLDFLAGS)
++LINK_DLL      = $(LINK) $(OS_DLLFLAGS) $(DLLFLAGS) $(XLDFLAGS) -opt:ref,icf -LARGEADDRESSAWARE 
+ CFLAGS        = $(OPTIMIZER) $(OS_CFLAGS) $(XP_DEFINE) $(DEFINES) $(INCLUDES) \
+ 		$(XCFLAGS)
+ PERL          = perl
+ RANLIB        = echo
+ TAR           = /bin/tar
+ #
+ # For purify
+ #
+diff --git a/security/nss/lib/freebl/Makefile b/security/nss/lib/freebl/Makefile
+--- a/security/nss/lib/freebl/Makefile
++++ b/security/nss/lib/freebl/Makefile
+@@ -127,17 +127,17 @@ ifdef NS_USE_GCC
+ # using assembler right now.
+     ASFILES  =
+     DEFINES += -DMP_NO_MP_WORD -DMP_USE_UINT_DIGIT
+ else
+ # MSVC
+     DEFINES += -DMP_ASSEMBLY_MULTIPLY -DMP_ASSEMBLY_SQUARE 
+     DEFINES += -DMP_ASSEMBLY_DIV_2DX1D -DMP_USE_UINT_DIGIT -DMP_NO_MP_WORD
+     ifdef BUILD_OPT
+-	OPTIMIZER += -O2  # maximum optimization for freebl
++	OPTIMIZER += -O2 -Ot -Oi -Ob2 -Oy -Gy -GF -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -Qpar -GL  # maximum optimization for freebl
+     endif
+     # The Intel AES assembly code requires Visual C++ 2010.
+     # if $(_MSC_VER) >= 1600 (Visual C++ 2010)
+     ifeq ($(firstword $(sort $(_MSC_VER) 1600)),1600)
+ 	DEFINES += -DUSE_HW_AES -DINTEL_GCM
+ 	ASFILES += intel-aes-x86-masm.asm intel-gcm-x86-masm.asm
+ 	EXTRA_SRCS += intel-gcm-wrap.c
+ 	ifeq ($(CLANG_CL),1)
+@@ -149,17 +149,17 @@ else
+     # -DMP_NO_MP_WORD
+     DEFINES += -DMP_CHAR_STORE_SLOW -DMP_IS_LITTLE_ENDIAN
+ ifdef NS_USE_GCC
+ # Ideally, we should use amd64 assembly code, but it's not yet mingw-w64
+ # compatible.
+ else
+ # MSVC
+     ifdef BUILD_OPT
+-	OPTIMIZER += -Ox  # maximum optimization for freebl
++	OPTIMIZER += -O2 -Ot -Oi -Ob2 -Oy -Gy -GF -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -Qpar -GL  # maximum optimization for freebl
+     endif
+     ASFILES  = arcfour-amd64-masm.asm mpi_amd64_masm.asm mp_comba_amd64_masm.asm
+     DEFINES += -DNSS_BEVAND_ARCFOUR -DMPI_AMD64 -DMP_ASSEMBLY_MULTIPLY
+     DEFINES += -DNSS_USE_COMBA
+     # The Intel AES assembly code requires Visual C++ 2010 (10.0). The _xgetbv
+     # compiler intrinsic function requires Visual C++ 2010 (10.0) SP1.
+     ifeq ($(_MSC_VER_GE_10SP1),1)
+ 	DEFINES += -DUSE_HW_AES -DINTEL_GCM
+diff --git a/security/nss/lib/freebl/mpi/Makefile.win b/security/nss/lib/freebl/mpi/Makefile.win
+--- a/security/nss/lib/freebl/mpi/Makefile.win
++++ b/security/nss/lib/freebl/mpi/Makefile.win
+@@ -30,30 +30,30 @@ endif
+ ##
+ ## Conditional compilation options are no longer here; see
+ ## the file 'mpi-config.h' instead.
+ ##
+ MPICMN = -I. -DMP_API_COMPATIBLE -DMP_IOFUNC
+ 
+ ifeq ($(CPU_ARCH),x86_64)
+ AS_SRCS = mpi_x86_64.asm
+-CFLAGS = -O2 -Z7 -MD -W3 -nologo -DXP_PC -UDEBUG -U_DEBUG -DNDEBUG \
++CFLAGS = -O2 -Ot -Oi -Ob2 -Oy -Gy -GF -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -Qpar -GL -Z7 -MD -W3 -nologo -DXP_PC -UDEBUG -U_DEBUG -DNDEBUG \
+  -DWIN32 -D_WIN64 -D_AMD64_ -D_M_AMD64 -D_WINDOWS -DWIN95 $(MPICMN)
+ ASFLAGS = -Cp -Sn -Zi -I.
+ else
+ #NT
+ AS_SRCS = mpi_x86.asm
+ MPICMN += -DMP_ASSEMBLY_MULTIPLY -DMP_ASSEMBLY_SQUARE -DMP_ASSEMBLY_DIV_2DX1D
+ #CFLAGS= -Od -Z7 -MD -W3 -nologo -D_X86_ -DXP_PC \
+  -DDEBUG -D_DEBUG -UNDEBUG -DWIN32 -D_WINDOWS -DWIN95 $(MPICMN)
+ #CFLAGS = -O2 -MD -W3 -nologo -D_X86_ -DXP_PC -UDEBUG -U_DEBUG -DNDEBUG \
+  -DWIN32 -D_WINDOWS -DWIN95 $(MPICMN)
+ #CFLAGS = -Od -Z7 -MD -W3 -nologo -D_X86_ -DXP_PC -UDEBUG -U_DEBUG -DNDEBUG \
+  -DWIN32 -D_WINDOWS -DWIN95 $(MPICMN)
+-CFLAGS = -O2 -Z7 -MD -W3 -nologo -D_X86_ -DXP_PC -UDEBUG -U_DEBUG -DNDEBUG \
++CFLAGS = -O2 -Ot -Oi -Ob2 -Oy -Gy -GF -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -Qpar -GL -Z7 -MD -W3 -nologo -D_X86_ -DXP_PC -UDEBUG -U_DEBUG -DNDEBUG \
+  -DWIN32 -D_WINDOWS -DWIN95 $(MPICMN)
+ ASFLAGS = -Cp -Sn -Zi -coff -I. 
+ endif
+ 
+ ##
+ ## Define LIBS to include any libraries you need to link against.
+ ## If NO_TABLE is define, LIBS should include '-lm' or whatever is
+ ## necessary to bring in the math library.  Otherwise, it can be

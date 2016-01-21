@@ -1,0 +1,115 @@
+# HG changeset patch
+# User Bas Schouten <bschouten@mozilla.com>
+# Date 1437756062 0
+#      Fri Jul 24 16:41:02 2015 +0000
+# Node ID b940d53a1bd0729e61d7c0663dc03f3408d03527
+# Parent  09d792707085be7791f8afd427c639c7f7e1a9a4
+Bug 1187075: Implement cairo atomics for Win32. r=jrmuizel
+
+diff --git a/gfx/cairo/cairo/src/cairo-atomic-private.h b/gfx/cairo/cairo/src/cairo-atomic-private.h
+--- a/gfx/cairo/cairo/src/cairo-atomic-private.h
++++ b/gfx/cairo/cairo/src/cairo-atomic-private.h
+@@ -40,16 +40,20 @@
+ #define CAIRO_ATOMIC_PRIVATE_H
+ 
+ # include "cairo-compiler-private.h"
+ 
+ #if HAVE_CONFIG_H
+ #include "config.h"
+ #endif
+ 
++#if HAVE_WIN32_ATOMIC_PRIMITIVES
++#include <Windows.h>
++#endif
++
+ /* The autoconf on OpenBSD 4.5 produces the malformed constant name
+  * SIZEOF_VOID__ rather than SIZEOF_VOID_P.  Work around that here. */
+ #if !defined(SIZEOF_VOID_P) && defined(SIZEOF_VOID__)
+ # define SIZEOF_VOID_P SIZEOF_VOID__
+ #endif
+ 
+ CAIRO_BEGIN_DECLS
+ 
+@@ -138,16 +142,38 @@ static cairo_always_inline void *
+     return expected;
+ }
+ 
+ #define _cairo_atomic_ptr_cmpxchg_return_old(x, oldv, newv) \
+   _cairo_atomic_ptr_cmpxchg_return_old_impl(x, oldv, newv)
+ 
+ #endif
+ 
++#if HAVE_WIN32_ATOMIC_PRIMITIVES
++
++#define HAS_ATOMIC_OPS 1
++
++typedef volatile long cairo_atomic_int_t;
++
++# define _cairo_atomic_int_get(x) ((int)*x)
++# define _cairo_atomic_ptr_get(x) ((void*)*x)
++
++# define _cairo_atomic_int_inc(x) ((void) InterlockedIncrement(x))
++# define _cairo_atomic_int_dec(x) ((void) InterlockedDecrement(x))
++# define _cairo_atomic_int_dec_and_test(x) (InterlockedDecrement(x) == 0)
++# define _cairo_atomic_int_cmpxchg(x, oldv, newv) (InterlockedCompareExchange(x, newv, oldv) == oldv)
++# define _cairo_atomic_int_cmpxchg_return_old(x, oldv, newv) InterlockedCompareExchange(x, newv, oldv)
++
++typedef volatile void* cairo_atomic_intptr_t;
++
++#define _cairo_atomic_ptr_cmpxchg(x, oldv, newv) (InterlockedCompareExchangePointer(x, newv, oldv) == oldv)
++#define _cairo_atomic_ptr_cmpxchg_return_old(x, oldv, newv) (InterlockedCompareExchangePointer(x, newv, oldv))
++
++#endif
++
+ #if HAVE_INTEL_ATOMIC_PRIMITIVES
+ 
+ #define HAS_ATOMIC_OPS 1
+ 
+ typedef int cairo_atomic_int_t;
+ 
+ #ifdef ATOMIC_OP_NEEDS_MEMORY_BARRIER
+ static cairo_always_inline cairo_atomic_int_t
+diff --git a/gfx/cairo/cairo/src/cairo-compiler-private.h b/gfx/cairo/cairo/src/cairo-compiler-private.h
+--- a/gfx/cairo/cairo/src/cairo-compiler-private.h
++++ b/gfx/cairo/cairo/src/cairo-compiler-private.h
+@@ -209,16 +209,19 @@
+ #if (defined(__WIN32__) && !defined(__WINE__)) || defined(_MSC_VER)
+ #define snprintf _snprintf
+ #define popen _popen
+ #define pclose _pclose
+ #define hypot _hypot
+ #endif
+ 
+ #ifdef _MSC_VER
++
++#define HAVE_WIN32_ATOMIC_PRIMITIVES 1
++
+ #ifndef __cplusplus
+ #undef inline
+ #define inline __inline
+ #endif
+ 
+ /* there are currently linkage problems that arise when trying to include intrin.h in c++:
+  * D:\sdks\v7.0\include\winnt.h(3674) : error C2733: second C linkage of overloaded function '_interlockedbittestandset' not allowed
+  * so avoid defining ffs in c++ code for now */
+diff --git a/gfx/cairo/cairo/src/cairo-reference-count-private.h b/gfx/cairo/cairo/src/cairo-reference-count-private.h
+--- a/gfx/cairo/cairo/src/cairo-reference-count-private.h
++++ b/gfx/cairo/cairo/src/cairo-reference-count-private.h
+@@ -46,16 +46,16 @@ typedef struct {
+ 
+ #define _cairo_reference_count_inc(RC) _cairo_atomic_int_inc (&(RC)->ref_count)
+ #define _cairo_reference_count_dec_and_test(RC) _cairo_atomic_int_dec_and_test (&(RC)->ref_count)
+ 
+ #define CAIRO_REFERENCE_COUNT_INIT(RC, VALUE) ((RC)->ref_count = (VALUE))
+ 
+ #define CAIRO_REFERENCE_COUNT_GET_VALUE(RC) _cairo_atomic_int_get (&(RC)->ref_count)
+ 
+-#define CAIRO_REFERENCE_COUNT_INVALID_VALUE ((cairo_atomic_int_t) -1)
++#define CAIRO_REFERENCE_COUNT_INVALID_VALUE (-1)
+ #define CAIRO_REFERENCE_COUNT_INVALID {CAIRO_REFERENCE_COUNT_INVALID_VALUE}
+ 
+ #define CAIRO_REFERENCE_COUNT_IS_INVALID(RC) (CAIRO_REFERENCE_COUNT_GET_VALUE (RC) == CAIRO_REFERENCE_COUNT_INVALID_VALUE)
+ 
+ #define CAIRO_REFERENCE_COUNT_HAS_REFERENCE(RC) (CAIRO_REFERENCE_COUNT_GET_VALUE (RC) > 0)
+ 
+ #endif

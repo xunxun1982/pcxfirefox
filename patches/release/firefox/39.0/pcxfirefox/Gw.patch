@@ -1,0 +1,36 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1424851505 -28800
+#      Wed Feb 25 16:05:05 2015 +0800
+# Node ID b5c8af933a5d1deb1bd98b8b5af8cbaf8c627fdd
+# Parent  d11f63f8d24a42399536911e1e0530bc22c9dab6
+remove -Gw
+
+diff -r d11f63f8d24a -r b5c8af933a5d nsprpub/configure
+--- a/nsprpub/configure	Sun Mar 08 13:35:56 2015 +0800
++++ b/nsprpub/configure	Wed Feb 25 16:05:05 2015 +0800
+@@ -7186,8 +7186,8 @@
+ 
+         if test "$MSC_VER" -ge "1800"; then
+                                                 CFLAGS="$CFLAGS -FS"
+-                                    PROFILE_GEN_CFLAGS="$PROFILE_GEN_CFLAGS -Gw"
+-            PROFILE_USE_CFLAGS="$PROFILE_USE_CFLAGS -Gw"
++                                    PROFILE_GEN_CFLAGS="$PROFILE_GEN_CFLAGS"
++            PROFILE_USE_CFLAGS="$PROFILE_USE_CFLAGS"
+         fi
+ 
+         if test -z "$MOZ_OPTIMIZE"; then
+diff -r d11f63f8d24a -r b5c8af933a5d nsprpub/configure.in
+--- a/nsprpub/configure.in	Sun Mar 08 13:35:56 2015 +0800
++++ b/nsprpub/configure.in	Wed Feb 25 16:05:05 2015 +0800
+@@ -2005,8 +2005,8 @@
+             CFLAGS="$CFLAGS -FS"
+             dnl -Gw can benefit when using linker optimization on PGO.
+             dnl http://blogs.msdn.com/b/vcblog/archive/2013/09/11/introducing-gw-compiler-switch.aspx
+-            PROFILE_GEN_CFLAGS="$PROFILE_GEN_CFLAGS -Gw"
+-            PROFILE_USE_CFLAGS="$PROFILE_USE_CFLAGS -Gw"
++            PROFILE_GEN_CFLAGS="$PROFILE_GEN_CFLAGS"
++            PROFILE_USE_CFLAGS="$PROFILE_USE_CFLAGS"
+         fi
+ 
+         if test -z "$MOZ_OPTIMIZE"; then

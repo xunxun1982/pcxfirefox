@@ -1,0 +1,35 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1450405785 -28800
+#      Fri Dec 18 10:29:45 2015 +0800
+# Branch GECKO4301_2015121620_RELBRANCH
+# Node ID fcd71edcf92485f96ec2580332d72fc5ec13391f
+# Parent  26cb1e0445cc0abd157db125606c255b5502ac2e
+pcx-tweak-fix
+
+See https://bugzilla.mozilla.org/show_bug.cgi?id=1164518
+
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -992,18 +992,18 @@ pref("gecko.handlerService.schemes.ircs.
+ pref("gecko.handlerService.schemes.ircs.2.uriTemplate", "chrome://browser-region/locale/region.properties");
+ pref("gecko.handlerService.schemes.ircs.3.name", "chrome://browser-region/locale/region.properties");
+ pref("gecko.handlerService.schemes.ircs.3.uriTemplate", "chrome://browser-region/locale/region.properties");
+ 
+ // By default, we don't want protocol/content handlers to be registered from a different host, see bug 402287
+ pref("gecko.handlerService.allowRegisterFromDifferentHost", false);
+ 
+ #ifdef MOZ_SAFE_BROWSING
+-pref("browser.safebrowsing.enabled", true);
+-pref("browser.safebrowsing.malware.enabled", true);
++pref("browser.safebrowsing.enabled", false);
++pref("browser.safebrowsing.malware.enabled", false);
+ pref("browser.safebrowsing.downloads.enabled", false);
+ pref("browser.safebrowsing.downloads.remote.enabled", false);
+ pref("browser.safebrowsing.downloads.remote.timeout_ms", 50);
+ pref("browser.safebrowsing.debug", false);
+ 
+ pref("browser.safebrowsing.provider.google.lists", "goog-badbinurl-shavar,goog-downloadwhite-digest256,goog-phish-shavar,goog-malware-shavar,goog-unwanted-shavar");
+ pref("browser.safebrowsing.provider.google.updateURL", "https://safebrowsing.google.com/safebrowsing/downloads?client=SAFEBROWSING_ID&appver=%VERSION%&pver=2.2&key=%GOOGLE_API_KEY%");
+ pref("browser.safebrowsing.provider.google.gethashURL", "https://safebrowsing.google.com/safebrowsing/gethash?client=SAFEBROWSING_ID&appver=%VERSION%&pver=2.2");

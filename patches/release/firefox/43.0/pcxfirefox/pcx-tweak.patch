@@ -1,0 +1,264 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1450348447 -28800
+#      Thu Dec 17 18:34:07 2015 +0800
+# Branch GECKO4301_2015121620_RELBRANCH
+# Node ID 743b9d73bcdeea5a51ede97526c5e053ca7b87ba
+# Parent  fd523b51b8ddff4c3d8c3e4e873a202140622cf2
+pcx tweak
+
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -340,16 +340,20 @@ pref("browser.download.manager.resumeOnW
+ 
+ // This allows disabling the animated notifications shown by
+ // the Downloads Indicator when a download starts or completes.
+ pref("browser.download.animateNotifications", true);
+ 
+ // This records whether or not the panel has been shown at least once.
+ pref("browser.download.panel.shown", false);
+ 
++//pcxfirefox tweak
++pref("browser.download.manager.scanWhenDone", false);
++pref("browser.download.useDownloadDir", false);
++
+ #ifndef XP_MACOSX
+ pref("browser.helperApps.deleteTempFileOnExit", true);
+ #endif
+ 
+ // search engines URL
+ pref("browser.search.searchEnginesURL",      "https://addons.mozilla.org/%LOCALE%/firefox/search-engines/");
+ 
+ // pointer to the default engine name
+@@ -416,17 +420,17 @@ pref("browser.link.open_newwindow.restri
+ // different.
+ #ifdef XP_MACOSX
+ pref("browser.link.open_newwindow.disabled_in_fullscreen", true);
+ #else
+ pref("browser.link.open_newwindow.disabled_in_fullscreen", false);
+ #endif
+ 
+ // Tabbed browser
+-pref("browser.tabs.closeWindowWithLastTab", true);
++pref("browser.tabs.closeWindowWithLastTab", false);
+ pref("browser.tabs.insertRelatedAfterCurrent", true);
+ pref("browser.tabs.warnOnClose", true);
+ pref("browser.tabs.warnOnCloseOtherTabs", true);
+ pref("browser.tabs.warnOnOpen", true);
+ pref("browser.tabs.maxOpenBeforeWarn", 15);
+ pref("browser.tabs.loadInBackground", true);
+ pref("browser.tabs.opentabfor.middleclick", true);
+ pref("browser.tabs.loadDivertedInBackground", false);
+@@ -825,16 +829,66 @@ pref("plugin.state.libplugins", 2);
+ #ifdef XP_WIN
+ pref("plugin.state.npnipp", 2);
+ pref("plugin.state.npnisp", 2);
+ #endif
+ #ifdef XP_MACOSX
+ pref("plugin.state.iprint", 2);
+ #endif
+ 
++//pcx other tweak
++#ifdef XP_WIN
++//WMP
++pref("plugin.state.np-mswmp", 2);
++//Alipay
++pref("plugin.state.npaliedit", 2);
++pref("plugin.state.npalidcp", 2);
++pref("plugin.state.npalicdo", 2);
++pref("plugin.state.npalisecctrl", 2);
++pref("plugin.state.npalissologin", 2);
++//BOC
++pref("plugin.state.npseceditctl", 2);
++pref("plugin.state.npseceditctl.boc.x86", 2);
++//ICBC
++pref("plugin.state.npclcache", 2);
++pref("plugin.state.npclientbinding", 2);
++pref("plugin.state.npfullscreen", 2);
++pref("plugin.state.npsubmit", 2);
++pref("plugin.state.npxxin", 2);
++//CMB
++pref("plugin.state.npcmbedit", 2);
++//Tenpay
++pref("plugin.state.npqqcert", 2);
++pref("plugin.state.npqqedit", 2);
++//QQ Login
++pref("plugin.state.npssoaxctrlforptlogin", 2);
++//AliWangwang
++pref("plugin.state.npwangwang", 2);
++//SumatraPDF
++pref("plugin.state.nppdfviewer", 2);
++//Baiduyun upload
++pref("plugin.state.npuploader", 2);
++//360yun upload
++pref("plugin.state.npuploadplugin", 2);
++//115 upload
++pref("plugin.state.npuploadfile", 2);
++//QQ upload
++pref("plugin.state.nptxftnWebKit", 2);
++//CNTV
++pref("plugin.state.npcntvlive2", 2);
++//QzoneMusic
++pref("plugin.state.npqzonemusic", 2);
++//UnionPay
++pref("plugin.state.npupeditor2", 2);
++//JDEdit
++pref("plugin.state.npjdedit", 2);
++//Baifubao
++pref("plugin.state.npbaiedit", 2);
++#endif
++
+ #ifdef XP_MACOSX
+ pref("browser.preferences.animateFadeIn", true);
+ #else
+ pref("browser.preferences.animateFadeIn", false);
+ #endif
+ 
+ #ifdef XP_WIN
+ pref("browser.preferences.instantApply", false);
+@@ -940,19 +994,19 @@ pref("gecko.handlerService.schemes.ircs.
+ pref("gecko.handlerService.schemes.ircs.3.uriTemplate", "chrome://browser-region/locale/region.properties");
+ 
+ // By default, we don't want protocol/content handlers to be registered from a different host, see bug 402287
+ pref("gecko.handlerService.allowRegisterFromDifferentHost", false);
+ 
+ #ifdef MOZ_SAFE_BROWSING
+ pref("browser.safebrowsing.enabled", true);
+ pref("browser.safebrowsing.malware.enabled", true);
+-pref("browser.safebrowsing.downloads.enabled", true);
+-pref("browser.safebrowsing.downloads.remote.enabled", true);
+-pref("browser.safebrowsing.downloads.remote.timeout_ms", 10000);
++pref("browser.safebrowsing.downloads.enabled", false);
++pref("browser.safebrowsing.downloads.remote.enabled", false);
++pref("browser.safebrowsing.downloads.remote.timeout_ms", 50);
+ pref("browser.safebrowsing.debug", false);
+ 
+ pref("browser.safebrowsing.provider.google.lists", "goog-badbinurl-shavar,goog-downloadwhite-digest256,goog-phish-shavar,goog-malware-shavar,goog-unwanted-shavar");
+ pref("browser.safebrowsing.provider.google.updateURL", "https://safebrowsing.google.com/safebrowsing/downloads?client=SAFEBROWSING_ID&appver=%VERSION%&pver=2.2&key=%GOOGLE_API_KEY%");
+ pref("browser.safebrowsing.provider.google.gethashURL", "https://safebrowsing.google.com/safebrowsing/gethash?client=SAFEBROWSING_ID&appver=%VERSION%&pver=2.2");
+ pref("browser.safebrowsing.provider.google.reportURL", "https://safebrowsing.google.com/safebrowsing/diagnostic?client=%NAME%&hl=%LOCALE%&site=");
+ pref("browser.safebrowsing.provider.google.appRepURL", "https://sb-ssl.google.com/safebrowsing/clientreport/download?key=%GOOGLE_API_KEY%");
+ 
+@@ -968,17 +1022,17 @@ pref("browser.safebrowsing.id", "navclie
+ // Name of the about: page contributed by safebrowsing to handle display of error
+ // pages on phishing/malware hits.  (bug 399233)
+ pref("urlclassifier.alternate_error_page", "blocked");
+ 
+ // The number of random entries to send with a gethash request.
+ pref("urlclassifier.gethashnoise", 4);
+ 
+ // Gethash timeout for Safebrowsing.
+-pref("urlclassifier.gethash.timeout_ms", 5000);
++pref("urlclassifier.gethash.timeout_ms", 50);
+ 
+ // If an urlclassifier table has not been updated in this number of seconds,
+ // a gethash request will be forced to check that the result is still in
+ // the database.
+ pref("urlclassifier.max-complete-age", 2700);
+ // Tables for application reputation.
+ pref("urlclassifier.downloadBlockTable", "goog-badbinurl-shavar");
+ #ifdef XP_WIN
+@@ -1160,17 +1214,17 @@ pref("security.sandbox.windows.log", fal
+ // 1 - sandbox with USER_NON_ADMIN access token level
+ // 2 - a more strict sandbox, which might cause functionality issues. This now
+ //     includes running at low integrity.
+ // 3 - the strongest settings we seem to be able to use without breaking
+ //     everything, but will probably cause some functionality restrictions
+ pref("dom.ipc.plugins.sandbox-level.default", 0);
+ #if defined(_AMD64_)
+ // The lines in PluginModuleParent.cpp should be changed in line with this.
+-pref("dom.ipc.plugins.sandbox-level.flash", 2);
++pref("dom.ipc.plugins.sandbox-level.flash", 0);
+ #else
+ pref("dom.ipc.plugins.sandbox-level.flash", 0);
+ #endif
+ 
+ #if defined(MOZ_CONTENT_SANDBOX)
+ // This controls the strength of the Windows content process sandbox for testing
+ // purposes. This will require a restart.
+ // On windows these levels are:
+@@ -1942,8 +1996,14 @@ pref("view_source.tab", true);
+ // Interception is still disabled on beta and release.
+ pref("dom.serviceWorkers.enabled", true);
+ 
+ pref("dom.serviceWorkers.interception.enabled", true);
+ 
+ // Enable Push API.
+ pref("dom.push.enabled", true);
+ #endif
++
++//pcxfirefox tweak
++pref("config.trim_on_minimize", false);
++pref("datareporting.healthreport.uploadEnabled", false);
++pref("datareporting.healthreport.logging.consoleEnabled", false);
++pref("datareporting.policy.dataSubmissionEnabled", false);
+diff --git a/browser/branding/official/pref/firefox-branding.js b/browser/branding/official/pref/firefox-branding.js
+--- a/browser/branding/official/pref/firefox-branding.js
++++ b/browser/branding/official/pref/firefox-branding.js
+@@ -30,8 +30,24 @@ pref("app.update.badgeWaitTime", 0);
+ 
+ // code usage depends on contracts, please contact the Firefox module owner if you have questions
+ pref("browser.search.param.yahoo-fr", "moz35");
+ pref("browser.search.param.yahoo-fr-ja", "mozff");
+ 
+ // Number of usages of the web console or scratchpad.
+ // If this is less than 5, then pasting code into the web console or scratchpad is disabled
+ pref("devtools.selfxss.count", 0);
++
++//pcxfirefox tweak
++//browser
++pref("browser.download.manager.scanWhenDone", false);
++pref("browser.download.useDownloadDir", false);
++pref("browser.tabs.closeWindowWithLastTab", false);
++//dom
++pref("dom.popup_maximum", 5);
++//datareporting
++pref("datareporting.healthreport.uploadEnabled", false);
++pref("datareporting.healthreport.logging.consoleEnabled", false);
++pref("datareporting.policy.dataSubmissionEnabled", false);
++//special
++pref("pdfjs.disabled", false);
++pref("config.trim_on_minimize", false);
++pref("plugin.expose_full_path", true);
+diff --git a/modules/libpref/init/all.js b/modules/libpref/init/all.js
+--- a/modules/libpref/init/all.js
++++ b/modules/libpref/init/all.js
+@@ -1025,17 +1025,17 @@ pref("dom.disable_window_open_feature.me
+ pref("dom.disable_window_open_feature.scrollbars",  false);
+ pref("dom.disable_window_open_feature.resizable",   true);
+ pref("dom.disable_window_open_feature.minimizable", false);
+ pref("dom.disable_window_open_feature.status",      true);
+ 
+ pref("dom.allow_scripts_to_close_windows",          false);
+ 
+ pref("dom.disable_open_during_load",                false);
+-pref("dom.popup_maximum",                           20);
++pref("dom.popup_maximum",                           5);
+ pref("dom.popup_allowed_events", "change click dblclick mouseup notificationclick reset submit touchend");
+ pref("dom.disable_open_click_delay", 1000);
+ 
+ pref("dom.storage.enabled", true);
+ pref("dom.storage.default_quota",      5120);
+ 
+ pref("dom.send_after_paint_to_content", false);
+ 
+@@ -4090,17 +4090,17 @@ pref("image.mem.discardable", true);
+ // Allows image locking of decoded image data in content processes.
+ pref("image.mem.allow_locking_in_content_processes", true);
+ 
+ // Chunk size for calls to the image decoders
+ pref("image.mem.decode_bytes_at_a_time", 16384);
+ 
+ // Minimum timeout for expiring unused images from the surface cache, in
+ // milliseconds. This controls how long we store cached temporary surfaces.
+-pref("image.mem.surfacecache.min_expiration_ms", 60000); // 60s
++pref("image.mem.surfacecache.min_expiration_ms", 30000); // 30s
+ 
+ // Maximum size for the surface cache, in kilobytes.
+ pref("image.mem.surfacecache.max_size_kb", 1048576); // 1GB
+ 
+ // The surface cache's size, within the constraints of the maximum size set
+ // above, is determined as a fraction of main memory size. The size factor is
+ // interpreted as a reciprocal, so a size factor of 4 means to use no more than
+ // 1/4 of main memory.  The default should be a good balance for most systems.

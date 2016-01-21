@@ -1,0 +1,257 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1441021101 -28800
+#      Mon Aug 31 19:38:21 2015 +0800
+# Node ID d7c8cfe97e24db5477e16fbf411b9ae722cee1e9
+# Parent  273420d4f4ea32694373fd3ec9eae6604f65ec12
+pcx-fpprecise
+
+diff --git a/db/sqlite3/src/Makefile.in b/db/sqlite3/src/Makefile.in
+--- a/db/sqlite3/src/Makefile.in
++++ b/db/sqlite3/src/Makefile.in
+@@ -25,8 +25,11 @@ ifeq (cocoa,$(MOZ_WIDGET_TOOLKIT))
+ MODULE_OPTIMIZE_FLAGS = -O2
+ endif
+ 
+ # Force /O2 optimisation on Windows because using the default /O1 causes
+ # crashes with MSVC2005 and PGO. See bug 719584.
+ ifeq ($(OS_ARCH),WINNT)
+ MODULE_OPTIMIZE_FLAGS = -O2
+ endif
++
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff --git a/ipc/app/Makefile.in b/ipc/app/Makefile.in
+--- a/ipc/app/Makefile.in
++++ b/ipc/app/Makefile.in
+@@ -35,8 +35,11 @@ libs::
+ 	rsync -a -C --exclude '*.in' $(srcdir)/macbuild/Contents $(DIST)/bin/$(PROGRAM).app 
+ 	sed -e 's/%PROGRAM%/$(PROGRAM)/' $(srcdir)/macbuild/Contents/Info.plist.in > $(DIST)/bin/$(PROGRAM).app/Contents/Info.plist
+ 	sed -e 's/%APP_NAME%/$(MOZ_APP_DISPLAYNAME)/' $(srcdir)/macbuild/Contents/Resources/English.lproj/InfoPlist.strings.in | \
+ 	  iconv -f UTF-8 -t UTF-16 > $(DIST)/bin/$(PROGRAM).app/Contents/Resources/English.lproj/InfoPlist.strings
+ 	$(NSINSTALL) -D $(DIST)/bin/$(PROGRAM).app/Contents/MacOS
+ 	$(NSINSTALL) $(PROGRAM) $(DIST)/bin/$(PROGRAM).app/Contents/MacOS
+ 	$(RM) $(DIST)/bin/$(PROGRAM)
+ endif #}
++
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff --git a/js/ductwork/debugger/moz.build b/js/ductwork/debugger/moz.build
+--- a/js/ductwork/debugger/moz.build
++++ b/js/ductwork/debugger/moz.build
+@@ -18,8 +18,13 @@ SOURCES += [
+ 
+ EXTRA_JS_MODULES += [
+     'jsdebugger.jsm',
+ ]
+ 
+ FINAL_LIBRARY = 'xul'
+ 
+ FAIL_ON_WARNINGS = True
++
++if CONFIG['_MSC_VER']:
++    CFLAGS += ['-fp:precise -Qfast_transcendentals']
++    CXXFLAGS += ['-fp:precise -Qfast_transcendentals']
++
+diff --git a/js/ipc/moz.build b/js/ipc/moz.build
+--- a/js/ipc/moz.build
++++ b/js/ipc/moz.build
+@@ -35,8 +35,12 @@ LOCAL_INCLUDES += [
+     '/dom/base',
+     '/js/ipc',
+     '/js/public',
+     '/js/src',
+     '/js/xpconnect/src',
+     '/js/xpconnect/wrappers',
+ ]
+ 
++if CONFIG['_MSC_VER']:
++    CFLAGS += ['-fp:precise -Qfast_transcendentals']
++    CXXFLAGS += ['-fp:precise -Qfast_transcendentals']
++
+diff --git a/js/src/moz.build b/js/src/moz.build
+--- a/js/src/moz.build
++++ b/js/src/moz.build
+@@ -556,27 +556,29 @@ if CONFIG['JS_HAS_CTYPES']:
+         DEFINES[var] = '"%s"' % CONFIG[var]
+ 
+ if CONFIG['MOZ_LINKER']:
+     DEFINES['MOZ_LINKER'] = True
+ 
+ if CONFIG['_MSC_VER']:
+     # Prevent floating point errors caused by VC++ optimizations
+     # XXX We should add this to CXXFLAGS, too?
+-    CFLAGS += ['-fp:precise']
++    CFLAGS += ['-fp:precise -Qfast_transcendentals']
+     # C4805 warns mixing bool with other integral types in computation.
+     # But given the conversion from bool is specified, and this is a
+     # pattern widely used in code in js/src, suppress this warning here.
+     CXXFLAGS += ['-wd4805']
+     # C4661 ("no suitable definition provided for explicit template
+     # instantiation request") is emitted for all Parser methods that
+     # have a Parser<FullParseHandler> definition but no
+     # Parser<SyntaxParseHandler> definition, see bug 1167030.
+     CXXFLAGS += ['-wd4661']
+     CXXFLAGS += ['-we4067', '-we4258', '-we4275']
++    if CONFIG['CPU_ARCH'] == 'x86_64':
++        CXXFLAGS += ['-fp:precise -Qfast_transcendentals']
+ 
+ if CONFIG['OS_ARCH'] not in ('WINNT', 'HP-UX'):
+     OS_LIBS += [
+         'm',
+     ]
+ 
+ if CONFIG['OS_ARCH'] == 'FreeBSD':
+     OS_LIBS += [
+diff --git a/js/xpconnect/loader/moz.build b/js/xpconnect/loader/moz.build
+--- a/js/xpconnect/loader/moz.build
++++ b/js/xpconnect/loader/moz.build
+@@ -21,8 +21,12 @@ FAIL_ON_WARNINGS = True
+ FINAL_LIBRARY = 'xul'
+ 
+ LOCAL_INCLUDES += [
+     '../src',
+     '../wrappers',
+     '/dom/base',
+ ]
+ 
++if CONFIG['_MSC_VER']:
++    CFLAGS += ['-fp:precise -Qfast_transcendentals']
++    CXXFLAGS += ['-fp:precise -Qfast_transcendentals']
++
+diff --git a/js/xpconnect/shell/moz.build b/js/xpconnect/shell/moz.build
+--- a/js/xpconnect/shell/moz.build
++++ b/js/xpconnect/shell/moz.build
+@@ -30,8 +30,13 @@ if CONFIG['_MSC_VER']:
+     # Always enter a Windows program through wmain, whether or not we're
+     # a console application.
+     WIN32_EXE_LDFLAGS += ['-ENTRY:wmainCRTStartup']
+ 
+ if CONFIG['OS_ARCH'] == 'WINNT':
+     RCINCLUDE = 'xpcshell.rc'
+ 
+ FAIL_ON_WARNINGS = True
++
++if CONFIG['_MSC_VER']:
++    CFLAGS += ['-fp:precise -Qfast_transcendentals']
++    CXXFLAGS += ['-fp:precise -Qfast_transcendentals']
++
+diff --git a/js/xpconnect/src/moz.build b/js/xpconnect/src/moz.build
+--- a/js/xpconnect/src/moz.build
++++ b/js/xpconnect/src/moz.build
+@@ -76,8 +76,12 @@ if CONFIG['MOZ_B2G_BT']:
+     if CONFIG['MOZ_B2G_BT_API_V1']:
+         LOCAL_INCLUDES += [
+             '/dom/bluetooth/bluetooth1',
+         ]
+     else:
+         LOCAL_INCLUDES += [
+             '/dom/bluetooth/bluetooth2',
+         ]
++
++if CONFIG['_MSC_VER']:
++    CFLAGS += ['-fp:precise -Qfast_transcendentals']
++    CXXFLAGS += ['-fp:precise -Qfast_transcendentals']
+diff --git a/js/xpconnect/wrappers/moz.build b/js/xpconnect/wrappers/moz.build
+--- a/js/xpconnect/wrappers/moz.build
++++ b/js/xpconnect/wrappers/moz.build
+@@ -34,8 +34,12 @@ include('/ipc/chromium/chromium-config.m
+ 
+ FINAL_LIBRARY = 'xul'
+ 
+ LOCAL_INCLUDES += [
+     '../../../dom/base',
+     '../src',
+ ]
+ 
++if CONFIG['_MSC_VER']:
++    CFLAGS += ['-fp:precise -Qfast_transcendentals']
++    CXXFLAGS += ['-fp:precise -Qfast_transcendentals']
++
+diff --git a/memory/build/Makefile.in b/memory/build/Makefile.in
+--- a/memory/build/Makefile.in
++++ b/memory/build/Makefile.in
+@@ -1,5 +1,8 @@
+ # This Source Code Form is subject to the terms of the Mozilla Public
+ # License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ # You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ STLFLAGS =
++
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff --git a/memory/build/moz.build b/memory/build/moz.build
+--- a/memory/build/moz.build
++++ b/memory/build/moz.build
+@@ -59,8 +59,12 @@ if CONFIG['MOZ_MEMORY'] and (CONFIG['OS_
+                              CONFIG['MOZ_NATIVE_JEMALLOC']):
+     FINAL_LIBRARY = 'mozglue'
+ 
+ if CONFIG['MOZ_REPLACE_MALLOC'] and CONFIG['OS_TARGET'] == 'Darwin':
+     # The zone allocator for OSX needs some jemalloc internal functions
+     LOCAL_INCLUDES += ['/memory/jemalloc/src/include']
+ 
+ FAIL_ON_WARNINGS = True
++
++if CONFIG['_MSC_VER']:
++    CFLAGS += ['-fp:precise -Qfast_transcendentals']
++    CXXFLAGS += ['-fp:precise -Qfast_transcendentals']
+diff --git a/memory/jemalloc/Makefile.in b/memory/jemalloc/Makefile.in
+--- a/memory/jemalloc/Makefile.in
++++ b/memory/jemalloc/Makefile.in
+@@ -2,8 +2,11 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ # You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ include $(topsrcdir)/config/rules.mk
+ 
+ ifdef GNU_CC
+ CFLAGS += -std=gnu99
+ endif
++
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff --git a/memory/jemalloc/src/Makefile.in b/memory/jemalloc/src/Makefile.in
+--- a/memory/jemalloc/src/Makefile.in
++++ b/memory/jemalloc/src/Makefile.in
+@@ -438,8 +438,11 @@ ifeq ($(enable_autogen), 1)
+ 	./$(objroot)config.status
+ 	@touch $@
+ 
+ # There must be some action in order for make to re-read Makefile when it is
+ # out of date.
+ $(cfgoutputs_out) $(cfghdrs_out) : $(objroot)config.stamp
+ 	@true
+ endif
++
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff --git a/memory/mozjemalloc/Makefile.in b/memory/mozjemalloc/Makefile.in
+--- a/memory/mozjemalloc/Makefile.in
++++ b/memory/mozjemalloc/Makefile.in
+@@ -12,8 +12,10 @@ MOZ_OPTIMIZE = 1
+ 
+ ifeq ($(OS_ARCH),SunOS)
+ ifndef GNU_CC
+ MODULE_OPTIMIZE_FLAGS = -xO5
+ endif
+ endif
+ endif
+ 
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff --git a/nsprpub/pr/src/misc/Makefile.in b/nsprpub/pr/src/misc/Makefile.in
+--- a/nsprpub/pr/src/misc/Makefile.in
++++ b/nsprpub/pr/src/misc/Makefile.in
+@@ -72,9 +72,10 @@ endif
+ #
+ # Generate prerr.h, prerr.c, and prerr.properties from prerr.et.
+ #
+ build_prerr:
+ 	cd $(srcdir); $(PERL) compile-et.pl prerr.et
+ 
+ export:: $(TARGETS)
+ 
+-
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals

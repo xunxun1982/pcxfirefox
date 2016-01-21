@@ -1,0 +1,265 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1450366022 -28800
+#      Thu Dec 17 23:27:02 2015 +0800
+# Branch GECKO4301_2015121620_RELBRANCH
+# Node ID d50b18752ba6aedbdebed6d91b57d6b4e052158a
+# Parent  6c5fdee8d20907ce97404c0082b2a5fd794a2f9e
+Bug 1215921 - Very slow Javascript performance when computing hash in Virustotal
+
+diff --git a/js/src/jit/BaselineBailouts.cpp b/js/src/jit/BaselineBailouts.cpp
+--- a/js/src/jit/BaselineBailouts.cpp
++++ b/js/src/jit/BaselineBailouts.cpp
+@@ -1877,16 +1877,18 @@ jit::FinishBailoutToBaseline(BaselineBai
+       case Bailout_NonSimdFloat32x4Input:
+       case Bailout_InitialState:
+       case Bailout_Debugger:
+         // Do nothing.
+         break;
+ 
+       // Invalid assumption based on baseline code.
+       case Bailout_OverflowInvalidate:
++       outerScript->setHadOverflowBailout();
++       // FALL THROUGH
+       case Bailout_NonStringInputInvalidate:
+       case Bailout_DoubleOutput:
+       case Bailout_ObjectIdentityOrTypeGuard:
+         if (!HandleBaselineInfoBailout(cx, outerScript, innerScript))
+             return false;
+         break;
+ 
+       case Bailout_ArgumentCheck:
+diff --git a/js/src/jit/CompileInfo.h b/js/src/jit/CompileInfo.h
+--- a/js/src/jit/CompileInfo.h
++++ b/js/src/jit/CompileInfo.h
+@@ -194,16 +194,17 @@ enum AnalysisMode {
+ class CompileInfo
+ {
+   public:
+     CompileInfo(JSScript* script, JSFunction* fun, jsbytecode* osrPc, bool constructing,
+                 AnalysisMode analysisMode, bool scriptNeedsArgsObj,
+                 InlineScriptTree* inlineScriptTree)
+       : script_(script), fun_(fun), osrPc_(osrPc), constructing_(constructing),
+         analysisMode_(analysisMode), scriptNeedsArgsObj_(scriptNeedsArgsObj),
++        hadOverflowBailout_(script->hadOverflowBailout()),
+         inlineScriptTree_(inlineScriptTree)
+     {
+         MOZ_ASSERT_IF(osrPc, JSOp(*osrPc) == JSOP_LOOPENTRY);
+ 
+         // The function here can flow in from anywhere so look up the canonical
+         // function to ensure that we do not try to embed a nursery pointer in
+         // jit-code. Precisely because it can flow in from anywhere, it's not
+         // guaranteed to be non-lazy. Hence, don't access its script!
+@@ -539,16 +540,22 @@ class CompileInfo
+             return false;
+ 
+         if (needsArgsObj() && isObservableArgumentSlot(slot))
+             return false;
+ 
+         return true;
+     }
+ 
++    // Check previous bailout states to prevent doing the same bailout in the
++    // next compilation.
++    bool hadOverflowBailout() const {
++        return hadOverflowBailout_;
++    }
++
+   private:
+     unsigned nimplicit_;
+     unsigned nargs_;
+     unsigned nbodyfixed_;
+     unsigned nlocals_;
+     unsigned nstack_;
+     unsigned nslots_;
+     unsigned fixedLexicalBegin_;
+@@ -559,15 +566,19 @@ class CompileInfo
+     bool constructing_;
+     AnalysisMode analysisMode_;
+ 
+     // Whether a script needs an arguments object is unstable over compilation
+     // since the arguments optimization could be marked as failed on the main
+     // thread, so cache a value here and use it throughout for consistency.
+     bool scriptNeedsArgsObj_;
+ 
++    // Record the state of previous bailouts in order to prevent compiling the
++    // same function identically the next time.
++    bool hadOverflowBailout_;
++
+     InlineScriptTree* inlineScriptTree_;
+ };
+ 
+ } // namespace jit
+ } // namespace js
+ 
+ #endif /* jit_CompileInfo_h */
+diff --git a/js/src/jit/RangeAnalysis.cpp b/js/src/jit/RangeAnalysis.cpp
+--- a/js/src/jit/RangeAnalysis.cpp
++++ b/js/src/jit/RangeAnalysis.cpp
+@@ -2795,28 +2795,31 @@ CloneForDeadBranches(TempAllocator& allo
+ 
+ // Examine all the users of |candidate| and determine the most aggressive
+ // truncate kind that satisfies all of them.
+ static MDefinition::TruncateKind
+ ComputeRequestedTruncateKind(MDefinition* candidate, bool* shouldClone)
+ {
+     bool isCapturedResult = false;
+     bool isObservableResult = false;
++    bool isRecoverableResult = true;
+     bool hasUseRemoved = candidate->isUseRemoved();
+ 
+     MDefinition::TruncateKind kind = MDefinition::Truncate;
+     for (MUseIterator use(candidate->usesBegin()); use != candidate->usesEnd(); use++) {
+         if (use->consumer()->isResumePoint()) {
+             // Truncation is a destructive optimization, as such, we need to pay
+             // attention to removed branches and prevent optimization
+             // destructive optimizations if we have no alternative. (see
+             // UseRemoved flag)
+             isCapturedResult = true;
+             isObservableResult = isObservableResult ||
+                 use->consumer()->toResumePoint()->isObservableOperand(*use);
++            isRecoverableResult = isRecoverableResult &&
++                use->consumer()->toResumePoint()->isRecoverableOperand(*use);
+             continue;
+         }
+ 
+         MDefinition* consumer = use->consumer()->toDefinition();
+         if (consumer->isRecoveredOnBailout()) {
+             isCapturedResult = true;
+             hasUseRemoved = hasUseRemoved || consumer->isUseRemoved();
+             continue;
+@@ -2838,35 +2841,34 @@ ComputeRequestedTruncateKind(MDefinition
+     bool needsConversion = !candidate->range() || !candidate->range()->isInt32();
+ 
+     // If the candidate instruction appears as operand of a resume point or a
+     // recover instruction, and we have to truncate its result, then we might
+     // have to either recover the result during the bailout, or avoid the
+     // truncation.
+     if (isCapturedResult && needsConversion) {
+ 
+-        // 1. Recover instructions are useless if there is no removed uses.  Not
+-        // having removed uses means that we know everything about where this
+-        // results flows into.
+-        //
+-        // 2. If the result is observable, then we cannot recover it.
+-        //
+-        // 3. The cloned instruction is expected to be used as a recover
+-        // instruction.
+-        if (hasUseRemoved && !isObservableResult && candidate->canRecoverOnBailout())
++        // These optimizations are pointless if there are no removed uses or any
++        // resume point observing the result.  Not having any means that we know
++        // everything about where this results flows into.
++        if ((hasUseRemoved || (isObservableResult && isRecoverableResult)) &&
++            candidate->canRecoverOnBailout())
++        {
++            // The cloned instruction is expected to be used as a recover
++            // instruction.
+             *shouldClone = true;
+ 
+-        // 1. If uses are removed, then we need to keep the expected result for
+-        // dead branches.
+-        //
+-        // 2. If the result is observable, then the result might be read while
+-        // the frame is on the stack.
+-        else if (hasUseRemoved || isObservableResult)
++        } else if (hasUseRemoved || isObservableResult) {
++            // 1. If uses are removed and we cannot recover the result, then we
++            // need to keep the expected result for dead branches.
++            //
++            // 2. If the result is observable and not recoverable, then the
++            // result might be read while the frame is on the stack.
+             kind = Min(kind, MDefinition::TruncateAfterBailouts);
+-
++        }
+     }
+ 
+     return kind;
+ }
+ 
+ static MDefinition::TruncateKind
+ ComputeTruncateKind(MDefinition* candidate, bool* shouldClone)
+ {
+@@ -3003,16 +3005,28 @@ RangeAnalysis::truncate()
+               default:;
+             }
+ 
+             bool shouldClone = false;
+             MDefinition::TruncateKind kind = ComputeTruncateKind(*iter, &shouldClone);
+             if (kind == MDefinition::NoTruncate)
+                 continue;
+ 
++            // Range Analysis is sometimes eager to do optimizations, even if we
++            // are not be able to truncate an instruction. In such case, we
++            // speculatively compile the instruction to an int32 instruction
++            // while adding a guard. This is what is implied by
++            // TruncateAfterBailout.
++            //
++            // If we already experienced an overflow bailout while executing
++            // code within the current JSScript, we no longer attempt to make
++            // this kind of eager optimizations.
++            if (kind <= MDefinition::TruncateAfterBailouts && block->info().hadOverflowBailout())
++                continue;
++
+             // Truncate this instruction if possible.
+             if (!iter->needTruncation(kind))
+                 continue;
+ 
+             // If needed, clone the current instruction for keeping it for the
+             // bailout path.  This give us the ability to truncate instructions
+             // even after the removal of branches.
+             if (shouldClone && !CloneForDeadBranches(alloc(), *iter))
+diff --git a/js/src/jsscript.h b/js/src/jsscript.h
+--- a/js/src/jsscript.h
++++ b/js/src/jsscript.h
+@@ -1104,16 +1104,17 @@ class JSScript : public js::gc::TenuredC
+ 
+     // 'this', 'arguments' and f.apply() are used. This is likely to be a wrapper.
+     bool usesArgumentsApplyAndThis_:1;
+ 
+     // IonMonkey compilation hints.
+     bool failedBoundsCheck_:1; /* script has had hoisted bounds checks fail */
+     bool failedShapeGuard_:1; /* script has had hoisted shape guard fail */
+     bool hadFrequentBailouts_:1;
++    bool hadOverflowBailout_:1;
+     bool uninlineable_:1;    /* explicitly marked as uninlineable */
+ 
+     // Idempotent cache has triggered invalidation.
+     bool invalidatedIdempotentCache_:1;
+ 
+     // Lexical check did fail and bail out.
+     bool failedLexicalCheck_:1;
+ 
+@@ -1371,29 +1372,33 @@ class JSScript : public js::gc::TenuredC
+         return failedBoundsCheck_;
+     }
+     bool failedShapeGuard() const {
+         return failedShapeGuard_;
+     }
+     bool hadFrequentBailouts() const {
+         return hadFrequentBailouts_;
+     }
++    bool hadOverflowBailout() const {
++        return hadOverflowBailout_;
++    }
+     bool uninlineable() const {
+         return uninlineable_;
+     }
+     bool invalidatedIdempotentCache() const {
+         return invalidatedIdempotentCache_;
+     }
+     bool failedLexicalCheck() const {
+         return failedLexicalCheck_;
+     }
+ 
+     void setFailedBoundsCheck() { failedBoundsCheck_ = true; }
+     void setFailedShapeGuard() { failedShapeGuard_ = true; }
+     void setHadFrequentBailouts() { hadFrequentBailouts_ = true; }
++    void setHadOverflowBailout() { hadOverflowBailout_ = true; }
+     void setUninlineable() { uninlineable_ = true; }
+     void setInvalidatedIdempotentCache() { invalidatedIdempotentCache_ = true; }
+     void setFailedLexicalCheck() { failedLexicalCheck_ = true; }
+ 
+     bool hasScriptCounts() const { return hasScriptCounts_; }
+ 
+     bool hasFreezeConstraints() const { return hasFreezeConstraints_; }
+     void setHasFreezeConstraints() { hasFreezeConstraints_ = true; }

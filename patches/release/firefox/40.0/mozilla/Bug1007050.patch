@@ -1,0 +1,31 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1411491382 -28800
+#      Wed Sep 24 00:56:22 2014 +0800
+# Branch MOBILE400b10_2015080313_RELBRANCH
+# Node ID 00be55eb3b858d998ea72b66148bd238fe3d0d7f
+# Parent  80c713675e3e8ae44b511d557ecd69471bdda422
+Bug 1007050 - backout bug 888159 since VS2013RTM supports std::isinf etc
+
+diff --git a/mfbt/decimal/moz-decimal-utils.h b/mfbt/decimal/moz-decimal-utils.h
+--- a/mfbt/decimal/moz-decimal-utils.h
++++ b/mfbt/decimal/moz-decimal-utils.h
+@@ -33,17 +33,17 @@
+ 
+ #define ASSERT_NOT_REACHED() MOZ_ASSERT_UNREACHABLE("moz-decimal-utils.h")
+ 
+ #define WTF_MAKE_NONCOPYABLE(ClassName) \
+   private: \
+     ClassName(const ClassName&) = delete; \
+     void operator=(const ClassName&) = delete;
+ 
+-#if defined(_MSC_VER)
++#if defined(_MSC_VER) && (_MSC_VER <= 1700)
+ namespace std {
+   inline bool isinf(double num) { return mozilla::IsInfinite(num); }
+   inline bool isnan(double num) { return mozilla::IsNaN(num); }
+   inline bool isfinite(double num) { return mozilla::IsFinite(num); }
+ }
+ #endif
+ 
+ typedef std::string String;

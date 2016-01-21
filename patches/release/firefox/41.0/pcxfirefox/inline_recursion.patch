@@ -1,0 +1,69 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1424849636 -28800
+#      Wed Feb 25 15:33:56 2015 +0800
+# Node ID d225fcb19f1724c7bc1873ea39942ee82713b099
+# Parent  4a2480e2f31550158eea80054689c3c22b9f786f
+inline_recursion
+
+diff --git a/dom/base/nsContentUtils.cpp b/dom/base/nsContentUtils.cpp
+--- a/dom/base/nsContentUtils.cpp
++++ b/dom/base/nsContentUtils.cpp
+@@ -3778,45 +3778,57 @@ nsContentUtils::DispatchEventOnlyToChrom
+                                           bool aCanBubble, bool aCancelable,
+                                           bool* aDefaultAction)
+ {
+   return DispatchEvent(aDoc, aTarget, aEventName, aCanBubble, aCancelable,
+                        true, aDefaultAction, true);
+ }
+ 
+ /* static */
++#ifdef _MSC_VER
++#pragma inline_recursion(on)
++#endif
+ Element*
+ nsContentUtils::MatchElementId(nsIContent *aContent, const nsIAtom* aId)
+ {
+   for (nsIContent* cur = aContent;
+        cur;
+        cur = cur->GetNextNode(aContent)) {
+     if (aId == cur->GetID()) {
+       return cur->AsElement();
+     }
+   }
+ 
+   return nullptr;
+ }
++#ifdef _MSC_VER
++#pragma inline_recursion(off)
++#endif
+ 
+ /* static */
++#ifdef _MSC_VER
++#pragma inline_recursion(on)
++#endif
+ Element *
+ nsContentUtils::MatchElementId(nsIContent *aContent, const nsAString& aId)
+ {
+   NS_PRECONDITION(!aId.IsEmpty(), "Will match random elements");
+   
+   // ID attrs are generally stored as atoms, so just atomize this up front
+   nsCOMPtr<nsIAtom> id(do_GetAtom(aId));
+   if (!id) {
+     // OOM, so just bail
+     return nullptr;
+   }
+ 
+   return MatchElementId(aContent, id);
+ }
++#ifdef _MSC_VER
++#pragma inline_recursion(off)
++#endif
+ 
+ // Convert the string from the given encoding to Unicode.
+ /* static */
+ nsresult
+ nsContentUtils::ConvertStringFromEncoding(const nsACString& aEncoding,
+                                           const nsACString& aInput,
+                                           nsAString& aOutput)
+ {

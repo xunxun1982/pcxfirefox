@@ -1,0 +1,396 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1434788451 -28800
+#      Sat Jun 20 16:20:51 2015 +0800
+# Node ID 4a4048096c259e6cecc128d8403091f10270e429
+# Parent  095cde488f224e1fc16b1f947c8ee72255829021
+Bug 1160628 - Speed up the DOM URL constructor
+
+diff -r 095cde488f22 -r 4a4048096c25 dom/base/URL.cpp
+--- a/dom/base/URL.cpp	Sat Jun 20 15:28:52 2015 +0800
++++ b/dom/base/URL.cpp	Sat Jun 20 16:20:51 2015 +0800
+@@ -17,6 +17,7 @@
+ #include "nsNetCID.h"
+ #include "nsNetUtil.h"
+ #include "nsIURL.h"
++#include "nsContentUtils.h"
+ 
+ namespace mozilla {
+ namespace dom {
+@@ -41,7 +42,7 @@
+   NS_INTERFACE_MAP_ENTRY(nsISupports)
+ NS_INTERFACE_MAP_END
+ 
+-URL::URL(nsIURI* aURI)
++URL::URL(already_AddRefed<nsIURI> aURI)
+   : mURI(aURI)
+ {
+ }
+@@ -56,56 +57,55 @@
+ URL::Constructor(const GlobalObject& aGlobal, const nsAString& aUrl,
+                  URL& aBase, ErrorResult& aRv)
+ {
+-  nsresult rv;
+-  nsCOMPtr<nsIIOService> ioService(do_GetService(NS_IOSERVICE_CONTRACTID, &rv));
+-  if (NS_FAILED(rv)) {
+-    aRv.Throw(rv);
+-    return nullptr;
+-  }
+-
+-  nsCOMPtr<nsIURI> uri;
+-  rv = ioService->NewURI(NS_ConvertUTF16toUTF8(aUrl), nullptr, aBase.GetURI(),
+-                         getter_AddRefs(uri));
+-  if (NS_FAILED(rv)) {
+-    nsAutoString label(aUrl);
+-    aRv.ThrowTypeError(MSG_INVALID_URL, &label);
+-    return nullptr;
+-  }
+-
+-  nsRefPtr<URL> url = new URL(uri);
+-  return url.forget();
++  return Constructor(aUrl, aBase.GetURI(), aRv);
+ }
+ 
+ /* static */ already_AddRefed<URL>
+ URL::Constructor(const GlobalObject& aGlobal, const nsAString& aUrl,
+-                  const nsAString& aBase, ErrorResult& aRv)
++                 const Optional<nsAString>& aBase, ErrorResult& aRv)
+ {
+-  nsresult rv;
+-  nsCOMPtr<nsIIOService> ioService(do_GetService(NS_IOSERVICE_CONTRACTID, &rv));
+-  if (NS_FAILED(rv)) {
+-    aRv.Throw(rv);
++  if (aBase.WasPassed()) {
++    return Constructor(aUrl, aBase.Value(), aRv);
++  }
++
++  return Constructor(aUrl, nullptr, aRv);
++}
++
++/* static */ already_AddRefed<URL>
++URL::Constructor(const GlobalObject& aGlobal, const nsAString& aUrl,
++                 const nsAString& aBase, ErrorResult& aRv)
++{
++  return Constructor(aUrl, aBase, aRv);
++}
++
++/* static */ already_AddRefed<URL>
++URL::Constructor(const nsAString& aUrl, const nsAString& aBase,
++                 ErrorResult& aRv)
++{
++  nsCOMPtr<nsIURI> baseUri;
++  nsresult rv = NS_NewURI(getter_AddRefs(baseUri), aBase, nullptr, nullptr,
++                          nsContentUtils::GetIOService());
++  if (NS_WARN_IF(NS_FAILED(rv))) {
++    aRv.ThrowTypeError(MSG_INVALID_URL, &aBase);
+     return nullptr;
+   }
+ 
+-  nsCOMPtr<nsIURI> baseUri;
+-  rv = ioService->NewURI(NS_ConvertUTF16toUTF8(aBase), nullptr, nullptr,
+-                         getter_AddRefs(baseUri));
+-  if (NS_FAILED(rv)) {
+-    nsAutoString label(aBase);
+-    aRv.ThrowTypeError(MSG_INVALID_URL, &label);
++  return Constructor(aUrl, baseUri, aRv);
++}
++
++/* static */
++already_AddRefed<URL>
++URL::Constructor(const nsAString& aUrl, nsIURI* aBase, ErrorResult& aRv)
++{
++  nsCOMPtr<nsIURI> uri;
++  nsresult rv = NS_NewURI(getter_AddRefs(uri), aUrl, nullptr, aBase,
++                          nsContentUtils::GetIOService());
++  if (NS_WARN_IF(NS_FAILED(rv))) {
++    aRv.ThrowTypeError(MSG_INVALID_URL, &aUrl);
+     return nullptr;
+   }
+ 
+-  nsCOMPtr<nsIURI> uri;
+-  rv = ioService->NewURI(NS_ConvertUTF16toUTF8(aUrl), nullptr, baseUri,
+-                         getter_AddRefs(uri));
+-  if (NS_FAILED(rv)) {
+-    nsAutoString label(aUrl);
+-    aRv.ThrowTypeError(MSG_INVALID_URL, &label);
+-    return nullptr;
+-  }
+-
+-  nsRefPtr<URL> url = new URL(uri);
++  nsRefPtr<URL> url = new URL(uri.forget());
+   return url.forget();
+ }
+ 
+diff -r 095cde488f22 -r 4a4048096c25 dom/base/URL.h
+--- a/dom/base/URL.h	Sat Jun 20 15:28:52 2015 +0800
++++ b/dom/base/URL.h	Sat Jun 20 16:20:51 2015 +0800
+@@ -40,7 +40,7 @@
+   NS_DECL_CYCLE_COLLECTING_ISUPPORTS
+   NS_DECL_CYCLE_COLLECTION_CLASS(URL)
+ 
+-  explicit URL(nsIURI* aURI);
++  explicit URL(already_AddRefed<nsIURI> aURI);
+ 
+   // WebIDL methods
+   bool
+@@ -51,7 +51,15 @@
+               URL& aBase, ErrorResult& aRv);
+   static already_AddRefed<URL>
+   Constructor(const GlobalObject& aGlobal, const nsAString& aUrl,
++              const Optional<nsAString>& aBase, ErrorResult& aRv);
++  // Versions of Constructor that we can share with workers and other code.
++  static already_AddRefed<URL>
++  Constructor(const GlobalObject& aGlobal, const nsAString& aUrl,
+               const nsAString& aBase, ErrorResult& aRv);
++  static already_AddRefed<URL>
++  Constructor(const nsAString& aUrl, const nsAString& aBase, ErrorResult& aRv);
++  static already_AddRefed<URL>
++  Constructor(const nsAString& aUrl, nsIURI* aBase, ErrorResult& aRv);
+ 
+   static void CreateObjectURL(const GlobalObject& aGlobal,
+                               File& aBlob,
+diff -r 095cde488f22 -r 4a4048096c25 dom/bindings/BindingUtils.cpp
+--- a/dom/bindings/BindingUtils.cpp	Sat Jun 20 15:28:52 2015 +0800
++++ b/dom/bindings/BindingUtils.cpp	Sat Jun 20 16:20:51 2015 +0800
+@@ -144,7 +144,7 @@
+   MOZ_ASSERT(argCount <= 10);
+   argCount = std::min<uint16_t>(argCount, 10);
+   while (argCount--) {
+-    message->mArgs.AppendElement(*va_arg(ap, nsString*));
++    message->mArgs.AppendElement(*va_arg(ap, const nsAString*));
+   }
+   mMessage = message;
+ }
+diff -r 095cde488f22 -r 4a4048096c25 dom/bindings/BindingUtils.h
+--- a/dom/bindings/BindingUtils.h	Sat Jun 20 15:28:52 2015 +0800
++++ b/dom/bindings/BindingUtils.h	Sat Jun 20 16:20:51 2015 +0800
+@@ -1048,7 +1048,7 @@
+   // We can end up here in all sorts of compartments, per above.  Make
+   // sure to JS_WrapValue!
+   rval.set(JS::ObjectValue(*obj));
+-  return JS_WrapValue(cx, rval);
++  return MaybeWrapObjectValue(cx, rval);
+ }
+ 
+ // Create a JSObject wrapping "value", for cases when "value" is a
+@@ -1096,7 +1096,7 @@
+   // We can end up here in all sorts of compartments, per above.  Make
+   // sure to JS_WrapValue!
+   rval.set(JS::ObjectValue(*obj));
+-  return JS_WrapValue(cx, rval);
++  return MaybeWrapObjectValue(cx, rval);
+ }
+ 
+ // Helper for smart pointers (nsRefPtr/nsCOMPtr).
+diff -r 095cde488f22 -r 4a4048096c25 dom/webidl/URL.webidl
+--- a/dom/webidl/URL.webidl	Sat Jun 20 15:28:52 2015 +0800
++++ b/dom/webidl/URL.webidl	Sat Jun 20 16:20:51 2015 +0800
+@@ -14,7 +14,7 @@
+ 
+ // [Constructor(DOMString url, optional (URL or DOMString) base = "about:blank")]
+ [Constructor(DOMString url, URL base),
+- Constructor(DOMString url, optional DOMString base = "about:blank"),
++ Constructor(DOMString url, optional DOMString base),
+  Exposed=(Window,Worker)]
+ interface URL {
+ };
+diff -r 095cde488f22 -r 4a4048096c25 dom/workers/URL.cpp
+--- a/dom/workers/URL.cpp	Sat Jun 20 15:28:52 2015 +0800
++++ b/dom/workers/URL.cpp	Sat Jun 20 16:20:51 2015 +0800
+@@ -33,7 +33,7 @@
+ public:
+   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(URLProxy)
+ 
+-  explicit URLProxy(mozilla::dom::URL* aURL)
++  explicit URLProxy(already_AddRefed<mozilla::dom::URL> aURL)
+     : mURL(aURL)
+   {
+     AssertIsOnMainThread();
+@@ -227,7 +227,7 @@
+ private:
+   const nsString mURL;
+ 
+-  const nsString mBase;
++  nsString mBase; // IsVoid() if we have no base URI string.
+   nsRefPtr<URLProxy> mBaseProxy;
+   mozilla::ErrorResult& mRv;
+ 
+@@ -235,13 +235,17 @@
+ 
+ public:
+   ConstructorRunnable(WorkerPrivate* aWorkerPrivate,
+-                      const nsAString& aURL, const nsAString& aBase,
++                      const nsAString& aURL, const Optional<nsAString>& aBase,
+                       mozilla::ErrorResult& aRv)
+   : WorkerMainThreadRunnable(aWorkerPrivate)
+   , mURL(aURL)
+-  , mBase(aBase)
+   , mRv(aRv)
+   {
++    if (aBase.WasPassed()) {
++      mBase = aBase.Value();
++    } else {
++      mBase.SetIsVoid(true);
++    }
+     mWorkerPrivate->AssertIsOnWorkerThread();
+   }
+ 
+@@ -253,6 +257,7 @@
+   , mBaseProxy(aBaseProxy)
+   , mRv(aRv)
+   {
++    mBase.SetIsVoid(true);
+     mWorkerPrivate->AssertIsOnWorkerThread();
+   }
+ 
+@@ -261,35 +266,20 @@
+   {
+     AssertIsOnMainThread();
+ 
+-    nsresult rv;
+-    nsCOMPtr<nsIIOService> ioService(do_GetService(NS_IOSERVICE_CONTRACTID, &rv));
+-    if (NS_FAILED(rv)) {
+-      mRv.Throw(rv);
++    nsRefPtr<mozilla::dom::URL> url;
++    if (mBaseProxy) {
++      url = mozilla::dom::URL::Constructor(mURL, mBaseProxy->URI(), mRv);
++    } else if (!mBase.IsVoid()) {
++      url = mozilla::dom::URL::Constructor(mURL, mBase, mRv);
++    } else {
++      url = mozilla::dom::URL::Constructor(mURL, nullptr, mRv);
++    }
++
++    if (mRv.Failed()) {
+       return true;
+     }
+ 
+-    nsCOMPtr<nsIURI> baseURL;
+-
+-    if (!mBaseProxy) {
+-      rv = ioService->NewURI(NS_ConvertUTF16toUTF8(mBase), nullptr, nullptr,
+-                             getter_AddRefs(baseURL));
+-      if (NS_FAILED(rv)) {
+-        mRv.Throw(NS_ERROR_DOM_SYNTAX_ERR);
+-        return true;
+-      }
+-    } else {
+-      baseURL = mBaseProxy->URI();
+-    }
+-
+-    nsCOMPtr<nsIURI> url;
+-    rv = ioService->NewURI(NS_ConvertUTF16toUTF8(mURL), nullptr, baseURL,
+-                           getter_AddRefs(url));
+-    if (NS_FAILED(rv)) {
+-      mRv.Throw(NS_ERROR_DOM_SYNTAX_ERR);
+-      return true;
+-    }
+-
+-    mRetval = new URLProxy(new mozilla::dom::URL(url));
++    mRetval = new URLProxy(url.forget());
+     return true;
+   }
+ 
+@@ -521,18 +511,21 @@
+   nsRefPtr<ConstructorRunnable> runnable =
+     new ConstructorRunnable(workerPrivate, aUrl, aBase.GetURLProxy(), aRv);
+ 
+-  if (!runnable->Dispatch(cx)) {
+-    JS_ReportPendingException(cx);
+-  }
++  return FinishConstructor(cx, workerPrivate, runnable, aRv);
++}
+ 
+-  nsRefPtr<URLProxy> proxy = runnable->GetURLProxy();
+-  if (!proxy) {
+-    aRv.Throw(NS_ERROR_DOM_SYNTAX_ERR);
+-    return nullptr;
+-  }
++// static
++already_AddRefed<URL>
++URL::Constructor(const GlobalObject& aGlobal, const nsAString& aUrl,
++                 const Optional<nsAString>& aBase, ErrorResult& aRv)
++{
++  JSContext* cx = aGlobal.Context();
++  WorkerPrivate* workerPrivate = GetWorkerPrivateFromContext(cx);
+ 
+-  nsRefPtr<URL> url = new URL(workerPrivate, proxy);
+-  return url.forget();
++  nsRefPtr<ConstructorRunnable> runnable =
++    new ConstructorRunnable(workerPrivate, aUrl, aBase, aRv);
++
++  return FinishConstructor(cx, workerPrivate, runnable, aRv);
+ }
+ 
+ // static
+@@ -543,20 +536,34 @@
+   JSContext* cx = aGlobal.Context();
+   WorkerPrivate* workerPrivate = GetWorkerPrivateFromContext(cx);
+ 
++  Optional<nsAString> base;
++  base = &aBase;
+   nsRefPtr<ConstructorRunnable> runnable =
+-    new ConstructorRunnable(workerPrivate, aUrl, aBase, aRv);
++    new ConstructorRunnable(workerPrivate, aUrl, base, aRv);
+ 
+-  if (!runnable->Dispatch(cx)) {
+-    JS_ReportPendingException(cx);
++  return FinishConstructor(cx, workerPrivate, runnable, aRv);
++}
++
++// static
++already_AddRefed<URL>
++URL::FinishConstructor(JSContext* aCx, WorkerPrivate* aPrivate,
++                       ConstructorRunnable* aRunnable, ErrorResult& aRv)
++{
++  if (!aRunnable->Dispatch(aCx)) {
++    JS_ReportPendingException(aCx);
+   }
+ 
+-  nsRefPtr<URLProxy> proxy = runnable->GetURLProxy();
++  if (aRv.Failed()) {
++    return nullptr;
++  }
++
++  nsRefPtr<URLProxy> proxy = aRunnable->GetURLProxy();
+   if (!proxy) {
+     aRv.Throw(NS_ERROR_DOM_SYNTAX_ERR);
+     return nullptr;
+   }
+ 
+-  nsRefPtr<URL> url = new URL(workerPrivate, proxy);
++  nsRefPtr<URL> url = new URL(aPrivate, proxy);
+   return url.forget();
+ }
+ 
+diff -r 095cde488f22 -r 4a4048096c25 dom/workers/URL.h
+--- a/dom/workers/URL.h	Sat Jun 20 15:28:52 2015 +0800
++++ b/dom/workers/URL.h	Sat Jun 20 16:20:51 2015 +0800
+@@ -25,6 +25,7 @@
+ BEGIN_WORKERS_NAMESPACE
+ 
+ class URLProxy;
++class ConstructorRunnable;
+ 
+ class URL final : public mozilla::dom::URLSearchParamsObserver
+ {
+@@ -55,6 +56,9 @@
+               URL& aBase, ErrorResult& aRv);
+   static already_AddRefed<URL>
+   Constructor(const GlobalObject& aGlobal, const nsAString& aUrl,
++              const Optional<nsAString>& aBase, ErrorResult& aRv);
++  static already_AddRefed<URL>
++  Constructor(const GlobalObject& aGlobal, const nsAString& aUrl,
+               const nsAString& aBase, ErrorResult& aRv);
+ 
+   static void
+@@ -125,6 +129,10 @@
+     return mURLProxy;
+   }
+ 
++  static already_AddRefed<URL>
++  FinishConstructor(JSContext* aCx, WorkerPrivate* aPrivate,
++                    ConstructorRunnable* aRunnable, ErrorResult& aRv);
++
+   void CreateSearchParamsIfNeeded();
+ 
+   void SetSearchInternal(const nsAString& aSearch);

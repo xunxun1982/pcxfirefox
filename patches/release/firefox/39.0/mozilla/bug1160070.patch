@@ -1,0 +1,73 @@
+# HG changeset patch
+# User Kyle Fung <kfung@mozilla.com>
+# Date 1434144505 14400
+#      Fri Jun 12 17:28:25 2015 -0400
+# Node ID e0593488aaca94f7c3b34432c41e431b3f3b58c4
+# Parent  440c52eb360e603b3b37b62762c8752c1945674c
+Bug 1160070 - Used BitmapBrush instead of ImageBrush when no sampling bounds. r=bas a=sledru
+
+diff -r 440c52eb360e -r e0593488aaca gfx/2d/DrawTargetD2D1.cpp
+--- a/gfx/2d/DrawTargetD2D1.cpp	Thu May 28 14:50:15 2015 -0400
++++ b/gfx/2d/DrawTargetD2D1.cpp	Fri Jun 12 17:28:25 2015 -0400
+@@ -1374,29 +1374,46 @@
+     D2D1_RECT_F samplingBounds;
+     Matrix mat = pat->mMatrix;
+ 
+-    bool useSamplingRect = false;
+-    if (!pat->mSamplingRect.IsEmpty() &&
+-        (pat->mSurface->GetType() == SurfaceType::D2D1_1_IMAGE)) {
+-      samplingBounds = D2DRect(pat->mSamplingRect);
+-      mat.PreTranslate(pat->mSamplingRect.x, pat->mSamplingRect.y);
+-    } else if (!pat->mSamplingRect.IsEmpty()) {
+-      // We will do a partial upload of the sampling restricted area from GetImageForSurface.
+-      samplingBounds = D2D1::RectF(0, 0, pat->mSamplingRect.width, pat->mSamplingRect.height);
+-    } else {
+-      samplingBounds = D2D1::RectF(0, 0,
+-                                   Float(pat->mSurface->GetSize().width),
+-                                   Float(pat->mSurface->GetSize().height));
+-    }
+-
+     MOZ_ASSERT(pat->mSurface->IsValid());
+ 
+-    RefPtr<ID2D1ImageBrush> imageBrush;
+     RefPtr<ID2D1Image> image = GetImageForSurface(pat->mSurface, mat, pat->mExtendMode, !pat->mSamplingRect.IsEmpty() ? &pat->mSamplingRect : nullptr);
+ 
+     if (!image) {
+       return CreateTransparentBlackBrush();
+     }
+ 
++    bool useSamplingRect = false;
++    if (pat->mSamplingRect.IsEmpty()) {
++      RefPtr<ID2D1Bitmap> bitmap;
++      image->QueryInterface((ID2D1Bitmap**)byRef(bitmap));
++      if (bitmap) {
++        RefPtr<ID2D1BitmapBrush> bitmapBrush;
++        mDC->CreateBitmapBrush(bitmap,
++                               D2D1::BitmapBrushProperties(D2DExtend(pat->mExtendMode),
++                                                           D2DExtend(pat->mExtendMode),
++                                                           D2DFilter(pat->mFilter)),
++                               D2D1::BrushProperties(aAlpha, D2DMatrix(mat)),
++                               byRef(bitmapBrush));
++        if (!bitmapBrush) {
++          gfxWarning() << "Couldn't create bitmap brush!";
++          return CreateTransparentBlackBrush();
++        }
++        return bitmapBrush.forget();
++      }
++    }
++
++    RefPtr<ID2D1ImageBrush> imageBrush;
++    if (pat->mSamplingRect.IsEmpty()) {
++      samplingBounds = D2D1::RectF(0, 0,
++                                   Float(pat->mSurface->GetSize().width),
++                                   Float(pat->mSurface->GetSize().height));
++    } else if (pat->mSurface->GetType() == SurfaceType::D2D1_1_IMAGE) {
++      samplingBounds = D2DRect(pat->mSamplingRect);
++      mat.PreTranslate(pat->mSamplingRect.x, pat->mSamplingRect.y);
++    } else {
++      // We will do a partial upload of the sampling restricted area from GetImageForSurface.
++      samplingBounds = D2D1::RectF(0, 0, pat->mSamplingRect.width, pat->mSamplingRect.height);
++    }
+     mDC->CreateImageBrush(image,
+                           D2D1::ImageBrushProperties(samplingBounds,
+                                                      D2DExtend(pat->mExtendMode),

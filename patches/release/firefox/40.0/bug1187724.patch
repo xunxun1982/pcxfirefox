@@ -1,0 +1,37 @@
+
+# HG changeset patch
+# User Masayuki Nakano <masayuki@d-toybox.com>
+# Date 1439218458 -32400
+# Node ID 06b7b3ee15095221cdd31417c6d2f3d329f18d24
+# Parent  8e1e749c21bff81f50cafc962523233c9b6ad959
+Bug 1187724 Don't dispatch KeyboardEvents when the target of WM_APPCOMMAND is a windowed plug-in for preventing deadlock r=jimm
+
+diff --git a/widget/windows/KeyboardLayout.cpp b/widget/windows/KeyboardLayout.cpp
+--- a/widget/windows/KeyboardLayout.cpp
++++ b/widget/windows/KeyboardLayout.cpp
+@@ -1291,16 +1291,24 @@ NativeKey::HandleAppCommandMessage() con
+ 
+   // Let's dispatch keydown message before our chrome handles the command
+   // when the message is caused by a keypress.  This behavior makes handling
+   // WM_APPCOMMAND be a default action of the keydown event.  This means that
+   // web applications can handle multimedia keys and prevent our default action.
+   // This allow web applications to provide better UX for multimedia keyboard
+   // users.
+   bool dispatchKeyEvent = (GET_DEVICE_LPARAM(mMsg.lParam) == FAPPCOMMAND_KEY);
++  if (dispatchKeyEvent) {
++    // If a plug-in window has focus but it didn't consume the message, our
++    // window receive WM_APPCOMMAND message.  In this case, we shouldn't
++    // dispatch KeyboardEvents because an event handler may access the
++    // plug-in process synchronously.
++    dispatchKeyEvent =
++      WinUtils::IsOurProcessWindow(reinterpret_cast<HWND>(mMsg.wParam));
++  }
+ 
+   bool consumed = false;
+ 
+   if (dispatchKeyEvent) {
+     WidgetKeyboardEvent keydownEvent(true, NS_KEY_DOWN, mWidget);
+     InitKeyEvent(keydownEvent, mModKeyState);
+     // NOTE: If the keydown event is consumed by web contents, we shouldn't
+     //       continue to handle the command.
+

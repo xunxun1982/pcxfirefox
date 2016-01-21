@@ -1,0 +1,33 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1425792956 -28800
+#      Sun Mar 08 13:35:56 2015 +0800
+# Branch MOBILE400b10_2015080313_RELBRANCH
+# Node ID 7b33b998801e420543b571b8cf20ff7909a67347
+# Parent  040bb505d57d8b7a5e5cfae154053617cb5ac71c
+plugin crash
+
+diff --git a/xpcom/glue/pldhash.cpp b/xpcom/glue/pldhash.cpp
+--- a/xpcom/glue/pldhash.cpp
++++ b/xpcom/glue/pldhash.cpp
+@@ -924,16 +924,20 @@ PLDHashTable::Enumerate(PLDHashEnumerato
+ 
+   return i;
+ }
+ 
+ uint32_t
+ PL_DHashTableEnumerate(PLDHashTable* aTable, PLDHashEnumerator aEtor,
+                        void* aArg)
+ {
++  MOZ_ASSERT(aTable != nullptr, "aTable must not be null");
++  if (!aTable) {
++    return 0;
++  }
+   return aTable->Enumerate(aEtor, aArg);
+ }
+ 
+ struct SizeOfEntryExcludingThisArg
+ {
+   size_t total;
+   PLDHashSizeOfEntryExcludingThisFun sizeOfEntryExcludingThis;
+   MallocSizeOf mallocSizeOf;

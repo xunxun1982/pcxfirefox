@@ -1,0 +1,184 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1438741018 -28800
+#      Wed Aug 05 10:16:58 2015 +0800
+# Branch MOBILE400b10_2015080313_RELBRANCH
+# Node ID c01fcff911a890d9afe4e36362b80eceb9d4cbe2
+# Parent  8ff65618672e550cfe5ef5f5baa3b85c4ce40013
+Bug 1171966 - Update SMIL animation styles only when there are pending changes; r=dholbert
+
+diff --git a/dom/smil/nsSMILAnimationController.cpp b/dom/smil/nsSMILAnimationController.cpp
+--- a/dom/smil/nsSMILAnimationController.cpp
++++ b/dom/smil/nsSMILAnimationController.cpp
+@@ -27,16 +27,17 @@ using namespace mozilla::dom;
+ // ctors, dtors, factory methods
+ 
+ nsSMILAnimationController::nsSMILAnimationController(nsIDocument* aDoc)
+   : mAvgTimeBetweenSamples(0),
+     mResampleNeeded(false),
+     mDeferredStartSampling(false),
+     mRunningSample(false),
+     mRegisteredWithRefreshDriver(false),
++    mMightHavePendingStyleUpdates(false),
+     mDocument(aDoc)
+ {
+   MOZ_ASSERT(aDoc, "need a non-null document");
+ 
+   nsRefreshDriver* refreshDriver = GetRefreshDriver();
+   if (refreshDriver) {
+     mStartTime = refreshDriver->MostRecentRefresh();
+   } else {
+@@ -457,16 +458,17 @@ nsSMILAnimationController::DoSample(bool
+   // XXXdholbert: This step traverses our animation targets in an effectively
+   // random order. For animation from/to 'inherit' values to work correctly
+   // when the inherited value is *also* being animated, we really should be
+   // traversing our animated nodes in an ancestors-first order (bug 501183)
+   currentCompositorTable->EnumerateEntries(DoComposeAttribute, nullptr);
+ 
+   // Update last compositor table
+   mLastCompositorTable = currentCompositorTable.forget();
++  mMightHavePendingStyleUpdates = true;
+ 
+   NS_ASSERTION(!mResampleNeeded, "Resample dirty flag set during sample!");
+ }
+ 
+ void
+ nsSMILAnimationController::RewindElements()
+ {
+   bool rewindNeeded = false;
+@@ -838,17 +840,22 @@ nsSMILAnimationController::AddStyleUpdat
+   restyleTracker->AddPendingRestyle(key.mElement, rshint, nsChangeHint(0));
+ 
+   return PL_DHASH_NEXT;
+ }
+ 
+ void
+ nsSMILAnimationController::AddStyleUpdatesTo(RestyleTracker& aTracker)
+ {
++  MOZ_ASSERT(mMightHavePendingStyleUpdates,
++             "Should only add style updates when we think we might have some");
++
+   mAnimationElementTable.EnumerateEntries(AddStyleUpdate, &aTracker);
++  
++  mMightHavePendingStyleUpdates = false;
+ }
+ 
+ //----------------------------------------------------------------------
+ // Add/remove child time containers
+ 
+ nsresult
+ nsSMILAnimationController::AddChild(nsSMILTimeContainer& aChild)
+ {
+diff --git a/dom/smil/nsSMILAnimationController.h b/dom/smil/nsSMILAnimationController.h
+--- a/dom/smil/nsSMILAnimationController.h
++++ b/dom/smil/nsSMILAnimationController.h
+@@ -69,20 +69,18 @@ public:
+   // Methods for resampling all animations
+   // (A resample performs the same operations as a sample but doesn't advance
+   // the current time and doesn't check if the container is paused)
+   // This will flush pending style changes for the document.
+   void Resample() { DoSample(false); }
+ 
+   void SetResampleNeeded()
+   {
+-    if (!mRunningSample) {
+-      if (!mResampleNeeded) {
+-        FlagDocumentNeedsFlush();
+-      }
++    if (!mRunningSample && !mResampleNeeded) {
++      FlagDocumentNeedsFlush();
+       mResampleNeeded = true;
+     }
+   }
+ 
+   // This will flush pending style changes for the document.
+   void FlushResampleRequests()
+   {
+     if (!mResampleNeeded)
+@@ -99,20 +97,26 @@ public:
+   void Traverse(nsCycleCollectionTraversalCallback* aCallback);
+   void Unlink();
+ 
+   // Methods for relaying the availability of the refresh driver
+   void NotifyRefreshDriverCreated(nsRefreshDriver* aRefreshDriver);
+   void NotifyRefreshDriverDestroying(nsRefreshDriver* aRefreshDriver);
+ 
+   // Helper to check if we have any animation elements at all
+-  bool HasRegisteredAnimations()
+-  { return mAnimationElementTable.Count() != 0; }
++  bool HasRegisteredAnimations() const
++  {
++    return mAnimationElementTable.Count() != 0;
++  }
+ 
+   void AddStyleUpdatesTo(mozilla::RestyleTracker& aTracker);
++  bool MightHavePendingStyleUpdates() const
++  {
++    return mMightHavePendingStyleUpdates;
++  }
+ 
+ protected:
+   ~nsSMILAnimationController();
+ 
+   // Typedefs
+   typedef nsPtrHashKey<nsSMILTimeContainer> TimeContainerPtrKey;
+   typedef nsTHashtable<TimeContainerPtrKey> TimeContainerHashtable;
+   typedef nsPtrHashKey<mozilla::dom::SVGAnimationElement> AnimationElementPtrKey;
+@@ -220,16 +224,19 @@ protected:
+   // record the time, set the following flag, and then wait until we have an
+   // animation element. Then we'll reset this flag and actually start sampling.
+   bool                       mDeferredStartSampling;
+   bool                       mRunningSample;
+ 
+   // Are we registered with our document's refresh driver?
+   bool                       mRegisteredWithRefreshDriver;
+ 
++  // Have we updated animated values without adding them to the restyle tracker?
++  bool                       mMightHavePendingStyleUpdates;
++
+   // Store raw ptr to mDocument.  It owns the controller, so controller
+   // shouldn't outlive it
+   nsIDocument* mDocument;
+ 
+   // Contains compositors used in our last sample.  We keep this around
+   // so we can detect when an element/attribute used to be animated,
+   // but isn't anymore for some reason. (e.g. if its <animate> element is
+   // removed or retargeted)
+diff --git a/layout/base/RestyleManager.cpp b/layout/base/RestyleManager.cpp
+--- a/layout/base/RestyleManager.cpp
++++ b/layout/base/RestyleManager.cpp
+@@ -1754,28 +1754,23 @@ RestyleManager::EndProcessingRestyles()
+ 
+ void
+ RestyleManager::UpdateOnlyAnimationStyles()
+ {
+   TimeStamp now = mPresContext->RefreshDriver()->MostRecentRefresh();
+   bool doCSS = mLastUpdateForThrottledAnimations != now;
+   mLastUpdateForThrottledAnimations = now;
+ 
+-  bool doSMIL = false;
+   nsIDocument* document = mPresContext->Document();
+-  nsSMILAnimationController* animationController = nullptr;
+-  if (document->HasAnimationController()) {
+-    animationController = document->GetAnimationController();
+-    // FIXME:  Ideally, we only want to do this if animation timelines
+-    // have advanced.  However, different SMIL animations could be
+-    // getting their time from different outermost SVG elements, so
+-    // finding all of them might be a pain.  So this could be optimized
+-    // to set doSMIL to true in fewer cases.
+-    doSMIL = true;
+-  }
++  nsSMILAnimationController* animationController =
++    document->HasAnimationController() ?
++    document->GetAnimationController() :
++    nullptr;
++  bool doSMIL = animationController &&
++                animationController->MightHavePendingStyleUpdates();
+ 
+   if (!doCSS && !doSMIL) {
+     return;
+   }
+ 
+   nsTransitionManager* transitionManager = mPresContext->TransitionManager();
+   nsAnimationManager* animationManager = mPresContext->AnimationManager();
+ 

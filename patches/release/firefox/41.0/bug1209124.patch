@@ -1,0 +1,31 @@
+
+# HG changeset patch
+# User Cameron McCormack <cam@mcc.id.au>
+# Date 1443552432 25200
+# Node ID c77dd0d90ddb7bea0b291b679d94575c2c2a62df
+# Parent  989787953aca5060041539e7f31e149a74f8573b
+Uplift nsStyleSet.cpp portion of bug 1209124's patch a=ritu r=dbaron
+
+diff --git a/layout/style/nsStyleSet.cpp b/layout/style/nsStyleSet.cpp
+--- a/layout/style/nsStyleSet.cpp
++++ b/layout/style/nsStyleSet.cpp
+@@ -380,16 +380,18 @@ SortStyleSheetsByScope(nsTArray<CSSStyle
+   for (uint32_t i = 0; i < n; i++) {
+     aSheets[i] = sheets[i].mSheet;
+   }
+ }
+ 
+ nsresult
+ nsStyleSet::GatherRuleProcessors(sheetType aType)
+ {
++  NS_ENSURE_FALSE(mInShutdown, NS_ERROR_FAILURE);
++
+   nsCOMPtr<nsIStyleRuleProcessor> oldRuleProcessor(mRuleProcessors[aType]);
+   nsTArray<nsCOMPtr<nsIStyleRuleProcessor>> oldScopedDocRuleProcessors;
+   if (aType == eAgentSheet || aType == eUserSheet) {
+     // drop reference to cached rule processor
+     nsCSSRuleProcessor* rp =
+       static_cast<nsCSSRuleProcessor*>(mRuleProcessors[aType].get());
+     if (rp) {
+       MOZ_ASSERT(rp->IsShared());
+

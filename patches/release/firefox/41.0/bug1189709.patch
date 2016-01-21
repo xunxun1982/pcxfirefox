@@ -1,0 +1,105 @@
+
+# HG changeset patch
+# User Aaron Klotz <aklotz@mozilla.com>
+# Date 1440626249 21600
+# Node ID 97c700862ca4fc2651a61e0e96d25a4dad9b7788
+# Parent  a2db956f1fb909c4cac2d17d1a14795456d13531
+Bug 1189709 - Reduce scope of MessageChannel window neutering. r=jimm, a=sledru
+
+diff --git a/ipc/glue/MessageChannel.cpp b/ipc/glue/MessageChannel.cpp
+--- a/ipc/glue/MessageChannel.cpp
++++ b/ipc/glue/MessageChannel.cpp
+@@ -990,17 +990,16 @@ MessageChannel::Send(Message* aMsg, Mess
+ bool
+ MessageChannel::Call(Message* aMsg, Message* aReply)
+ {
+     AssertWorkerThread();
+     mMonitor->AssertNotCurrentThreadOwns();
+ 
+ #ifdef OS_WIN
+     SyncStackFrame frame(this, true);
+-    NeuteredWindowRegion neuteredRgn(mFlags & REQUIRE_DEFERRED_MESSAGE_PROTECTION);
+ #endif
+ 
+     // This must come before MonitorAutoLock, as its destructor acquires the
+     // monitor lock.
+     CxxStackFrame cxxframe(*this, OUT_MESSAGE, aMsg);
+ 
+     MonitorAutoLock lock(*mMonitor);
+     if (!Connected()) {
+@@ -1030,19 +1029,26 @@ MessageChannel::Call(Message* aMsg, Mess
+         // trying another loop iteration will be futile because
+         // channel state will have been cleared
+         if (!Connected()) {
+             ReportConnectionError("MessageChannel::Call");
+             return false;
+         }
+ 
+ #ifdef OS_WIN
+-        /* We should pump messages at this point to ensure that the IPC peer
+-           does not become deadlocked on a pending inter-thread SendMessage() */
+-        neuteredRgn.PumpOnce();
++        // We need to limit the scoped of neuteredRgn to this spot in the code.
++        // Window neutering can't be enabled during some plugin calls because
++        // we then risk the neutered window procedure being subclassed by a
++        // plugin.
++        {
++            NeuteredWindowRegion neuteredRgn(mFlags & REQUIRE_DEFERRED_MESSAGE_PROTECTION);
++            /* We should pump messages at this point to ensure that the IPC peer
++               does not become deadlocked on a pending inter-thread SendMessage() */
++            neuteredRgn.PumpOnce();
++        }
+ #endif
+ 
+         // Now might be the time to process a message deferred because of race
+         // resolution.
+         MaybeUndeferIncall();
+ 
+         // Wait for an event to occur.
+         while (!InterruptEventOccurred()) {
+diff --git a/ipc/glue/WindowsMessageLoop.cpp b/ipc/glue/WindowsMessageLoop.cpp
+--- a/ipc/glue/WindowsMessageLoop.cpp
++++ b/ipc/glue/WindowsMessageLoop.cpp
+@@ -889,34 +889,39 @@ StopNeutering()
+   // we received during the IPC call. The hook will unset itself as soon as
+   // someone else calls GetMessage, PeekMessage, or runs code that generates
+   // a "nonqueued" message.
+   ::ScheduleDeferredMessageRun();
+   MessageChannel::SetIsPumpingMessages(false);
+ }
+ 
+ NeuteredWindowRegion::NeuteredWindowRegion(bool aDoNeuter MOZ_GUARD_OBJECT_NOTIFIER_PARAM_IN_IMPL)
+-  : mNeuteredByThis(!gWindowHook)
++  : mNeuteredByThis(!gWindowHook && aDoNeuter)
+ {
+   MOZ_GUARD_OBJECT_NOTIFIER_INIT;
+-  if (aDoNeuter && mNeuteredByThis) {
++  if (mNeuteredByThis) {
+     StartNeutering();
+   }
+ }
+ 
+ NeuteredWindowRegion::~NeuteredWindowRegion()
+ {
+   if (gWindowHook && mNeuteredByThis) {
+     StopNeutering();
+   }
+ }
+ 
+ void
+ NeuteredWindowRegion::PumpOnce()
+ {
++  if (!gWindowHook) {
++    // This should be a no-op if nothing has been neutered.
++    return;
++  }
++
+   MSG msg = {0};
+   // Pump any COM messages so that we don't hang due to STA marshaling.
+   if (gCOMWindow && ::PeekMessageW(&msg, gCOMWindow, 0, 0, PM_REMOVE)) {
+       ::TranslateMessage(&msg);
+       ::DispatchMessageW(&msg);
+   }
+   // Expunge any nonqueued messages on the current thread.
+   ::PeekMessageW(&msg, nullptr, 0, 0, PM_NOREMOVE);
+

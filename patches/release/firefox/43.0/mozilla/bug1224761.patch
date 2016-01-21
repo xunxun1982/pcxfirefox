@@ -1,0 +1,126 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1450366732 -28800
+#      Thu Dec 17 23:38:52 2015 +0800
+# Branch GECKO4301_2015121620_RELBRANCH
+# Node ID f8f5c1115e0844ecdb2df6c41dfb97371107a380
+# Parent  d50b18752ba6aedbdebed6d91b57d6b4e052158a
+Bug 1224761 - Gradient with two color-stops at 0% renders as if second color stop were at 100%
+
+diff --git a/layout/base/nsCSSRendering.cpp b/layout/base/nsCSSRendering.cpp
+--- a/layout/base/nsCSSRendering.cpp
++++ b/layout/base/nsCSSRendering.cpp
+@@ -2665,16 +2665,17 @@ nsCSSRendering::PaintGradient(nsPresCont
+ 
+     gradientPattern = new gfxPattern(gradientStart.x, gradientStart.y,
+                                       gradientEnd.x, gradientEnd.y);
+ 
+     // When the gradient line is parallel to the x axis from the left edge
+     // to the right edge of a tile, then we can repeat by just repeating the
+     // gradient.
+     if (!cellContainsFill &&
++        stopDelta != 0.0 && // if 0.0, gradientStopEnd is bogus (see above)
+         ((gradientStopStart.y == gradientStopEnd.y && gradientStopStart.x == 0 &&
+           gradientStopEnd.x == srcSize.width) ||
+           (gradientStopStart.x == gradientStopEnd.x && gradientStopStart.y == 0 &&
+           gradientStopEnd.y == srcSize.height))) {
+       forceRepeatToCoverTiles = true;
+     }
+   } else {
+     NS_ASSERTION(firstStop >= 0.0,
+diff --git a/layout/reftests/css-gradients/1224761-1-ref.html b/layout/reftests/css-gradients/1224761-1-ref.html
+new file mode 100644
+--- /dev/null
++++ b/layout/reftests/css-gradients/1224761-1-ref.html
+@@ -0,0 +1,37 @@
++<!DOCTYPE html>
++<html>
++<head>
++<style>
++div {
++    border: 1px solid black;
++    width: 30px;
++    height: 30px;
++    margin: 1px;
++}
++.grad-5 {
++    background: yellow;
++}
++.grad0 {
++    background: yellow;
++}
++.grad30 {
++    /* not much of a test, but this isn't where the bug was anyway! */
++    background: linear-gradient(to right, blue 30%, yellow 30%);
++}
++.grad100 {
++    background: blue;
++}
++.grad150 {
++    background: blue;
++}
++</style>
++</head>
++<body>
++  You shouldn't see a gradual gradient in any of the divs below.
++  <div class="grad-5"></div>
++  <div class="grad0"></div>
++  <div class="grad30"></div>
++  <div class="grad100"></div>
++  <div class="grad150"></div>
++</body>
++</html>
+diff --git a/layout/reftests/css-gradients/1224761-1.html b/layout/reftests/css-gradients/1224761-1.html
+new file mode 100644
+--- /dev/null
++++ b/layout/reftests/css-gradients/1224761-1.html
+@@ -0,0 +1,36 @@
++<!DOCTYPE html>
++<html>
++<head>
++<style>
++div {
++    border: 1px solid black;
++    width: 30px;
++    height: 30px;
++    margin: 1px;
++}
++.grad-5 {
++    background: linear-gradient(to right, blue -5%, yellow -5%);
++}
++.grad0 {
++    background: linear-gradient(to right, blue 0%, yellow 0%);
++}
++.grad30 {
++    background: linear-gradient(to right, blue 30%, yellow 30%);
++}
++.grad100 {
++    background: linear-gradient(to right, blue 100%, yellow 100%);
++}
++.grad150 {
++    background: linear-gradient(to right, blue 150%, yellow 150%);
++}
++</style>
++</head>
++<body>
++  You shouldn't see a gradual gradient in any of the divs below.
++  <div class="grad-5"></div>
++  <div class="grad0"></div>
++  <div class="grad30"></div>
++  <div class="grad100"></div>
++  <div class="grad150"></div>
++</body>
++</html>
+diff --git a/layout/reftests/css-gradients/reftest.list b/layout/reftests/css-gradients/reftest.list
+--- a/layout/reftests/css-gradients/reftest.list
++++ b/layout/reftests/css-gradients/reftest.list
+@@ -145,8 +145,9 @@ fuzzy-if(d2d,47,400) == linear-onestoppo
+ == repeating-radial-onestopposition-1a.html orange-square.html
+ == repeating-radial-onestopposition-1b.html orange-square.html
+ == repeating-radial-onestopposition-1c.html orange-square.html
+ == bug-916535-background-repeat-linear.html bug-916535-background-repeat-linear-ref.html
+ fuzzy(1,800000) == large-gradient-1.html large-gradient-1-ref.html
+ fuzzy-if(Android,4,1) == large-gradient-2.html large-gradient-2-ref.html # Bug 1182082
+ fails-if(browserIsRemote&&!B2G) fuzzy-if(!browserIsRemote||B2G,1,800000) == large-gradient-3.html large-gradient-3-ref.html
+ == large-gradient-4.html large-gradient-4-ref.html
++== 1224761-1.html 1224761-1-ref.html

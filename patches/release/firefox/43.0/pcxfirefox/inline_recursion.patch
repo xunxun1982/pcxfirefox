@@ -1,0 +1,70 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1450347835 -28800
+#      Thu Dec 17 18:23:55 2015 +0800
+# Branch GECKO4301_2015121620_RELBRANCH
+# Node ID 1eb8ac437c7a70483381b4579762c22722cff212
+# Parent  9fc1ebde85a6f97b6e90c91f3bc4d1c5ad0e0bf9
+inline_recursion
+
+diff --git a/dom/base/nsContentUtils.cpp b/dom/base/nsContentUtils.cpp
+--- a/dom/base/nsContentUtils.cpp
++++ b/dom/base/nsContentUtils.cpp
+@@ -3874,45 +3874,57 @@ nsContentUtils::DispatchEventOnlyToChrom
+                                           bool aCanBubble, bool aCancelable,
+                                           bool* aDefaultAction)
+ {
+   return DispatchEvent(aDoc, aTarget, aEventName, aCanBubble, aCancelable,
+                        true, aDefaultAction, true);
+ }
+ 
+ /* static */
++#ifdef _MSC_VER
++#pragma inline_recursion(on)
++#endif
+ Element*
+ nsContentUtils::MatchElementId(nsIContent *aContent, const nsIAtom* aId)
+ {
+   for (nsIContent* cur = aContent;
+        cur;
+        cur = cur->GetNextNode(aContent)) {
+     if (aId == cur->GetID()) {
+       return cur->AsElement();
+     }
+   }
+ 
+   return nullptr;
+ }
++#ifdef _MSC_VER
++#pragma inline_recursion(off)
++#endif
+ 
+ /* static */
++#ifdef _MSC_VER
++#pragma inline_recursion(on)
++#endif
+ Element *
+ nsContentUtils::MatchElementId(nsIContent *aContent, const nsAString& aId)
+ {
+   NS_PRECONDITION(!aId.IsEmpty(), "Will match random elements");
+   
+   // ID attrs are generally stored as atoms, so just atomize this up front
+   nsCOMPtr<nsIAtom> id(do_GetAtom(aId));
+   if (!id) {
+     // OOM, so just bail
+     return nullptr;
+   }
+ 
+   return MatchElementId(aContent, id);
+ }
++#ifdef _MSC_VER
++#pragma inline_recursion(off)
++#endif
+ 
+ /* static */
+ nsIDocument*
+ nsContentUtils::GetSubdocumentWithOuterWindowId(nsIDocument *aDocument,
+                                                 uint64_t aOuterWindowId)
+ {
+   if (!aDocument || !aOuterWindowId) {
+     return nullptr;

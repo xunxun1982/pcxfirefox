@@ -1,0 +1,113 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1450347265 -28800
+#      Thu Dec 17 18:14:25 2015 +0800
+# Branch GECKO4301_2015121620_RELBRANCH
+# Node ID 40cb1c43aea1bef1a748ccb4ca22354c9a7c990d
+# Parent  5a940a324c3b3c26a571b1448e04b3bc720866e8
+back out Bug 1165981
+
+diff --git a/dom/plugins/base/nsPluginHost.cpp b/dom/plugins/base/nsPluginHost.cpp
+--- a/dom/plugins/base/nsPluginHost.cpp
++++ b/dom/plugins/base/nsPluginHost.cpp
+@@ -2029,55 +2029,19 @@ struct CompareFilesByTime
+   Equals(const nsCOMPtr<nsIFile>& a, const nsCOMPtr<nsIFile>& b) const
+   {
+     return GetPluginLastModifiedTime(a) == GetPluginLastModifiedTime(b);
+   }
+ };
+ 
+ } // namespace
+ 
+-bool
+-nsPluginHost::ShouldAddPlugin(nsPluginTag* aPluginTag)
+-{
+-#if defined(XP_WIN) && (defined(__x86_64__) || defined(_M_X64))
+-  // On 64-bit windows, the only plugins we should load are flash and
+-  // silverlight. Use library filename and MIME type to check.
+-  if (StringBeginsWith(aPluginTag->FileName(), NS_LITERAL_CSTRING("NPSWF"), nsCaseInsensitiveCStringComparator()) &&
+-      (aPluginTag->HasMimeType(NS_LITERAL_CSTRING("application/x-shockwave-flash")) ||
+-       aPluginTag->HasMimeType(NS_LITERAL_CSTRING("application/x-shockwave-flash-test")))) {
+-    return true;
+-  }
+-  if (StringBeginsWith(aPluginTag->FileName(), NS_LITERAL_CSTRING("npctrl"), nsCaseInsensitiveCStringComparator()) &&
+-      (aPluginTag->HasMimeType(NS_LITERAL_CSTRING("application/x-silverlight-test")) ||
+-       aPluginTag->HasMimeType(NS_LITERAL_CSTRING("application/x-silverlight-2")) ||
+-       aPluginTag->HasMimeType(NS_LITERAL_CSTRING("application/x-silverlight")))) {
+-    return true;
+-  }
+-  // Accept the test plugin MIME types, so mochitests still work.
+-  if (aPluginTag->HasMimeType(NS_LITERAL_CSTRING("application/x-test")) ||
+-      aPluginTag->HasMimeType(NS_LITERAL_CSTRING("application/x-Second-Test")) ||
+-      aPluginTag->HasMimeType(NS_LITERAL_CSTRING("application/x-java-test"))) {
+-    return true;
+-  }
+-#ifdef PLUGIN_LOGGING
+-  PLUGIN_LOG(PLUGIN_LOG_NORMAL,
+-             ("ShouldAddPlugin : Ignoring non-flash plugin library %s\n", aPluginTag->FileName().get()));
+-#endif // PLUGIN_LOGGING
+-  return false;
+-#else
+-  return true;
+-#endif // defined(XP_WIN) && (defined(__x86_64__) || defined(_M_X64))
+-}
+-
+ void
+ nsPluginHost::AddPluginTag(nsPluginTag* aPluginTag)
+ {
+-  if (!ShouldAddPlugin(aPluginTag)) {
+-    return;
+-  }
+   aPluginTag->mNext = mPlugins;
+   mPlugins = aPluginTag;
+ 
+   if (aPluginTag->IsActive()) {
+     nsAdoptingCString disableFullPage =
+       Preferences::GetCString(kPrefDisableFullPage);
+     for (uint32_t i = 0; i < aPluginTag->MimeTypes().Length(); i++) {
+       if (!IsTypeInList(aPluginTag->MimeTypes()[i], disableFullPage)) {
+@@ -3244,20 +3208,16 @@ nsPluginHost::ReadPluginInfo()
+     // Import flags from registry into prefs for old registry versions
+     if (hasValidFlags && !pluginStateImported) {
+       tag->ImportFlagsToPrefs(tagflag);
+     }
+ 
+     MOZ_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_BASIC,
+       ("LoadCachedPluginsInfo : Loading Cached plugininfo for %s\n", tag->FileName().get()));
+ 
+-    if (!ShouldAddPlugin(tag)) {
+-      continue;
+-    }
+-
+     tag->mNext = mCachedPlugins;
+     mCachedPlugins = tag;
+   }
+ 
+ // On Android we always want to try to load a plugin again (Flash). Bug 935676.
+ #ifndef MOZ_WIDGET_ANDROID
+   if (hasInvalidPlugins) {
+     if (!ReadSectionHeader(reader, "INVALID")) {
+diff --git a/dom/plugins/base/nsPluginHost.h b/dom/plugins/base/nsPluginHost.h
+--- a/dom/plugins/base/nsPluginHost.h
++++ b/dom/plugins/base/nsPluginHost.h
+@@ -358,20 +358,16 @@ private:
+   // To be used by the chrome process; returns the current epoch.
+   uint32_t ChromeEpoch();
+ 
+   // To be used by the content process to get/set the last observed epoch value
+   // from the chrome process.
+   uint32_t ChromeEpochForContent();
+   void SetChromeEpochForContent(uint32_t aEpoch);
+ 
+-  // On certain platforms, we only want to load certain plugins. This function
+-  // centralizes loading rules.
+-  bool ShouldAddPlugin(nsPluginTag* aPluginTag);
+-
+   nsRefPtr<nsPluginTag> mPlugins;
+   nsRefPtr<nsPluginTag> mCachedPlugins;
+   nsRefPtr<nsInvalidPluginTag> mInvalidPlugins;
+ 
+   nsTArray< nsRefPtr<nsFakePluginTag> > mFakePlugins;
+ 
+   bool mPluginsLoaded;
+ 

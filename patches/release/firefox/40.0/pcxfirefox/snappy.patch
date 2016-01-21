@@ -1,0 +1,35 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1411495342 -28800
+#      Wed Sep 24 02:02:22 2014 +0800
+# Branch MOBILE400b10_2015080313_RELBRANCH
+# Node ID 677c3e77d58b79e3a58a85918f021726fef33f76
+# Parent  e24a69d62ac9799dc1889fd04a447ac74eb8ce20
+snappy
+
+diff --git a/other-licenses/snappy/src/snappy-stubs-internal.h b/other-licenses/snappy/src/snappy-stubs-internal.h
+--- a/other-licenses/snappy/src/snappy-stubs-internal.h
++++ b/other-licenses/snappy/src/snappy-stubs-internal.h
+@@ -123,16 +123,22 @@ class LogMessage {
+ 
+ #define CRASH_UNLESS(condition) \
+     PREDICT_TRUE(condition) ? (void)0 : \
+     snappy::LogMessageVoidify() & snappy::LogMessageCrash()
+ 
+ class LogMessageCrash : public LogMessage {
+  public:
+   LogMessageCrash() { }
++#if _MSC_VER == 1700 || _MSC_VER == 1800
++// Bogus warning from VS 2012 and VS 2013:
++// warning C4722: 'snappy::LogMessageCrash::~LogMessageCrash' : destructor never returns, potential memory leak
++#pragma warning(push)
++#pragma warning(disable : 4722)
++#endif
+   ~LogMessageCrash() {
+     cerr << endl;
+     abort();
+   }
+ };
+ 
+ // This class is used to explicitly ignore values in the conditional
+ // logging macros.  This avoids compiler warnings like "value computed

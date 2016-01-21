@@ -1,0 +1,72 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1434876625 -28800
+#      Sun Jun 21 16:50:25 2015 +0800
+# Node ID e718d0e339ecce83878400274beac411d5ea52bf
+# Parent  9bf93637f4badbe78ea9c199bde8b2e5129725ed
+Bug 1162350 - Define and use DownscalerInvalidRect for non-skia builds. r=seth
+
+diff -r 9bf93637f4ba -r e718d0e339ec image/src/Downscaler.h
+--- a/image/src/Downscaler.h	Sun Jun 21 16:45:38 2015 +0800
++++ b/image/src/Downscaler.h	Sun Jun 21 16:50:25 2015 +0800
+@@ -15,8 +15,6 @@
+ #include "mozilla/UniquePtr.h"
+ #include "nsRect.h"
+ 
+-#ifdef MOZ_ENABLE_SKIA
+-
+ namespace skia {
+   class ConvolutionFilter1D;
+ } // namespace skia
+@@ -34,6 +32,8 @@
+   nsIntRect mTargetSizeRect;
+ };
+ 
++#ifdef MOZ_ENABLE_SKIA
++
+ /**
+  * Downscaler is a high-quality, streaming image downscaler based upon Skia's
+  * scaling implementation.
+@@ -119,21 +119,13 @@
+   bool mHasAlpha;
+ };
+ 
+-} // namespace image
+-} // namespace mozilla
+-
+-
+ #else
+ 
+-
+ /**
+  * Downscaler requires Skia to work, so we provide a dummy implementation if
+  * Skia is disabled that asserts if constructed.
+  */
+ 
+-namespace mozilla {
+-namespace image {
+-
+ class Downscaler
+ {
+ public:
+@@ -144,6 +136,7 @@
+ 
+   const nsIntSize& OriginalSize() const { return nsIntSize(); }
+   const nsIntSize& TargetSize() const { return nsIntSize(); }
++  const gfxSize& Scale() const { return gfxSize(1.0, 1.0); }
+ 
+   nsresult BeginFrame(const nsIntSize&, uint8_t*, bool)
+   {
+@@ -153,10 +146,11 @@
+   uint8_t* RowBuffer() { return nullptr; }
+   void CommitRow() { }
+   bool HasInvalidation() const { return false; }
+-  nsIntRect TakeInvalidRect() { return nsIntRect(); }
++  DownscalerInvalidRect TakeInvalidRect() { return DownscalerInvalidRect(); }
+   void ResetForNextProgressivePass() { }
+ };
+ 
++#endif // MOZ_ENABLE_SKIA
+ 
+ } // namespace image
+ } // namespace mozilla

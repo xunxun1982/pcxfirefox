@@ -1,0 +1,33 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1429942246 -28800
+#      Sat Apr 25 14:10:46 2015 +0800
+# Branch GECKO4301_2015121620_RELBRANCH
+# Node ID f3697d7c6eab72a41be44956a6ef6729c0bb5acb
+# Parent  847fb65793330ab559ef4c79ee99ed4b791e275e
+Add MOZILLA_DISABLE_PLUGINS
+
+diff --git a/dom/plugins/base/nsPluginHost.cpp b/dom/plugins/base/nsPluginHost.cpp
+--- a/dom/plugins/base/nsPluginHost.cpp
++++ b/dom/plugins/base/nsPluginHost.cpp
+@@ -303,16 +303,20 @@ nsPluginHost::nsPluginHost()
+     Preferences::GetBool("plugin.override_internal_types", false);
+ 
+   mPluginsDisabled = Preferences::GetBool("plugin.disable", false);
+   mPluginsClickToPlay = Preferences::GetBool("plugins.click_to_play", false);
+ 
+   Preferences::AddStrongObserver(this, "plugin.disable");
+   Preferences::AddStrongObserver(this, "plugins.click_to_play");
+ 
++  const char *env = PR_GetEnv("MOZILLA_DISABLE_PLUGINS");
++  if (env && env[0])
++    mPluginsDisabled = PR_TRUE;
++
+   nsCOMPtr<nsIObserverService> obsService =
+     mozilla::services::GetObserverService();
+   if (obsService) {
+     obsService->AddObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID, false);
+     obsService->AddObserver(this, "blocklist-updated", false);
+ #ifdef MOZ_WIDGET_ANDROID
+     obsService->AddObserver(this, "application-foreground", false);
+     obsService->AddObserver(this, "application-background", false);

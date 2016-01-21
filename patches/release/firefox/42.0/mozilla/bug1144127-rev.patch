@@ -1,0 +1,106 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1441674702 -28800
+#      Tue Sep 08 09:11:42 2015 +0800
+# Node ID 02d9acc8fe448777cb8ee78eb9fe1f80e1fe46be
+# Parent  cb2ce17605f7fba050aefd3ac11c660fde8bde1a
+back out Bug 1144127
+
+diff --git a/toolkit/xre/nsXREDirProvider.cpp b/toolkit/xre/nsXREDirProvider.cpp
+--- a/toolkit/xre/nsXREDirProvider.cpp
++++ b/toolkit/xre/nsXREDirProvider.cpp
+@@ -110,25 +110,22 @@ nsXREDirProvider::Initialize(nsIFile *aX
+   mGREBinDir->SetNativeLeafName(NS_LITERAL_CSTRING("MacOS"));
+ #endif
+ 
+   if (!mProfileDir) {
+     nsCOMPtr<nsIDirectoryServiceProvider> app(do_QueryInterface(mAppProvider));
+     if (app) {
+       bool per = false;
+       app->GetFile(NS_APP_USER_PROFILE_50_DIR, &per, getter_AddRefs(mProfileDir));
+-      NS_ASSERTION(per, "NS_APP_USER_PROFILE_50_DIR must be persistent!");
+-      NS_ASSERTION(mProfileDir, "NS_APP_USER_PROFILE_50_DIR not defined! This shouldn't happen!");
++      NS_ASSERTION(per, "NS_APP_USER_PROFILE_50_DIR must be persistent!"); 
++      NS_ASSERTION(mProfileDir, "NS_APP_USER_PROFILE_50_DIR not defined! This shouldn't happen!"); 
+     }
+   }
+ 
+-#ifdef MOZ_B2G
+   LoadAppBundleDirs();
+-#endif
+-
+   return NS_OK;
+ }
+ 
+ nsresult
+ nsXREDirProvider::SetProfile(nsIFile* aDir, nsIFile* aLocalDir)
+ {
+   NS_ASSERTION(aDir && aLocalDir, "We don't support no-profile apps yet!");
+ 
+@@ -653,17 +650,16 @@ nsXREDirProvider::LoadExtensionBundleDir
+       themeManifest->AppendNative(NS_LITERAL_CSTRING("{972ce4c6-7e08-4474-a285-3208198ce6fd}"));
+       themeManifest->AppendNative(NS_LITERAL_CSTRING("chrome.manifest"));
+       XRE_AddManifestLocation(NS_SKIN_LOCATION, themeManifest);
+ #endif
+     }
+   }
+ }
+ 
+-#ifdef MOZ_B2G
+ void
+ nsXREDirProvider::LoadAppBundleDirs()
+ {
+   nsCOMPtr<nsIFile> dir;
+   bool persistent = false;
+   nsresult rv = GetFile(XRE_APP_DISTRIBUTION_DIR, &persistent, getter_AddRefs(dir));
+   if (NS_FAILED(rv))
+     return;
+@@ -680,20 +676,23 @@ nsXREDirProvider::LoadAppBundleDirs()
+     return;
+ 
+   nsCOMPtr<nsIFile> subdir;
+   while (NS_SUCCEEDED(files->GetNextFile(getter_AddRefs(subdir))) && subdir) {
+     mAppBundleDirectories.AppendObject(subdir);
+ 
+     nsCOMPtr<nsIFile> manifest =
+       CloneAndAppend(subdir, "chrome.manifest");
++#ifdef MOZ_B2G
+     XRE_AddManifestLocation(NS_APP_LOCATION, manifest);
++#else
++    XRE_AddManifestLocation(NS_EXTENSION_LOCATION, manifest);
++#endif
+   }
+ }
+-#endif
+ 
+ static const char *const kAppendPrefDir[] = { "defaults", "preferences", nullptr };
+ 
+ #ifdef DEBUG_bsmedberg
+ static void
+ DumpFileArray(const char *key,
+               nsCOMArray<nsIFile> dirs)
+ {
+diff --git a/toolkit/xre/nsXREDirProvider.h b/toolkit/xre/nsXREDirProvider.h
+--- a/toolkit/xre/nsXREDirProvider.h
++++ b/toolkit/xre/nsXREDirProvider.h
+@@ -122,20 +122,18 @@ protected:
+ 
+   // Internal helper that splits a path into components using the '/' and '\\'
+   // delimiters.
+   static inline nsresult AppendProfileString(nsIFile* aFile, const char* aPath);
+ 
+   // Calculate and register extension and theme bundle directories.
+   void LoadExtensionBundleDirectories();
+ 
+-#ifdef MOZ_B2G
+   // Calculate and register app-bundled extension directories.
+   void LoadAppBundleDirs();
+-#endif
+ 
+   void Append(nsIFile* aDirectory);
+ 
+   nsCOMPtr<nsIDirectoryServiceProvider> mAppProvider;
+   // On OSX, mGREDir points to .app/Contents/Resources
+   nsCOMPtr<nsIFile>      mGREDir;
+   // On OSX, mGREBinDir points to .app/Contents/MacOS
+   nsCOMPtr<nsIFile>      mGREBinDir;

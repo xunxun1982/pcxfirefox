@@ -1,0 +1,121 @@
+# HG changeset patch
+# User Hannes Verschore <hv1989@gmail.com>
+# Date 1437552575 -7200
+#      Wed Jul 22 10:09:35 2015 +0200
+# Node ID b3138cc68227449197bbbbb54ad454ade2a196e8
+# Parent  52fbbffa7d08dfa886fbe2efbba7e60bc3d6c4e4
+Bug 1184945: Increase the default MatchResult size of a regexp, r=bhackett
+
+diff --git a/js/src/jit/CodeGenerator.cpp b/js/src/jit/CodeGenerator.cpp
+--- a/js/src/jit/CodeGenerator.cpp
++++ b/js/src/jit/CodeGenerator.cpp
+@@ -1001,23 +1001,20 @@ static const VMFunction CloneRegExpObjec
+ 
+ void
+ CodeGenerator::visitRegExp(LRegExp* lir)
+ {
+     pushArg(ImmGCPtr(lir->mir()->source()));
+     callVM(CloneRegExpObjectInfo, lir);
+ }
+ 
+-// The maximum number of pairs we can handle when executing RegExps inline.
+-static const size_t RegExpMaxPairCount = 6;
+-
+ // Amount of space to reserve on the stack when executing RegExps inline.
+ static const size_t RegExpReservedStack = sizeof(irregexp::InputOutputData)
+                                         + sizeof(MatchPairs)
+-                                        + RegExpMaxPairCount * sizeof(MatchPair);
++                                        + RegExpObject::MaxPairCount * sizeof(MatchPair);
+ 
+ static size_t
+ RegExpPairsVectorStartOffset(size_t inputOutputDataStartOffset)
+ {
+     return inputOutputDataStartOffset + sizeof(irregexp::InputOutputData) + sizeof(MatchPairs);
+ }
+ 
+ static Address
+@@ -1086,17 +1083,17 @@ PrepareAndExecuteRegExp(JSContext* cx, M
+ 
+     // Don't handle RegExps which read and write to lastIndex.
+     masm.branchTest32(Assembler::NonZero, Address(temp1, RegExpShared::offsetOfFlags()),
+                       Imm32(StickyFlag | GlobalFlag), failure);
+ 
+     if (mode == RegExpShared::Normal) {
+         // Don't handle RegExps with excessive parens.
+         masm.load32(Address(temp1, RegExpShared::offsetOfParenCount()), temp2);
+-        masm.branch32(Assembler::AboveOrEqual, temp2, Imm32(RegExpMaxPairCount), failure);
++        masm.branch32(Assembler::AboveOrEqual, temp2, Imm32(RegExpObject::MaxPairCount), failure);
+ 
+         // Fill in the paren count in the MatchPairs on the stack.
+         masm.add32(Imm32(1), temp2);
+         masm.store32(temp2, pairCountAddress);
+     }
+ 
+     // Load the code pointer for the type of input string we have, and compute
+     // the input start/end pointers in the InputOutputData.
+@@ -1335,17 +1332,17 @@ JitCompartment::generateRegExpExecStub(J
+     Register temp4 = regs.takeAny();
+ 
+     ArrayObject* templateObject = cx->compartment()->regExps.getOrCreateMatchResultTemplateObject(cx);
+     if (!templateObject)
+         return nullptr;
+ 
+     // The template object should have enough space for the maximum number of
+     // pairs this stub can handle.
+-    MOZ_ASSERT(ObjectElements::VALUES_PER_HEADER + RegExpMaxPairCount ==
++    MOZ_ASSERT(ObjectElements::VALUES_PER_HEADER + RegExpObject::MaxPairCount ==
+                gc::GetGCKindSlots(templateObject->asTenured().getAllocKind()));
+ 
+     MacroAssembler masm(cx);
+ 
+     // The InputOutputData is placed above the return address on the stack.
+     size_t inputOutputDataStartOffset = sizeof(void*);
+ 
+     Label notFound, oolEntry;
+diff --git a/js/src/vm/RegExpObject.cpp b/js/src/vm/RegExpObject.cpp
+--- a/js/src/vm/RegExpObject.cpp
++++ b/js/src/vm/RegExpObject.cpp
+@@ -820,17 +820,18 @@ RegExpCompartment::~RegExpCompartment()
+ }
+ 
+ ArrayObject*
+ RegExpCompartment::createMatchResultTemplateObject(JSContext* cx)
+ {
+     MOZ_ASSERT(!matchResultTemplateObject_);
+ 
+     /* Create template array object */
+-    RootedArrayObject templateObject(cx, NewDenseUnallocatedArray(cx, 0, nullptr, TenuredObject));
++    RootedArrayObject templateObject(cx, NewDenseUnallocatedArray(cx, RegExpObject::MaxPairCount,
++                                     nullptr, TenuredObject));
+     if (!templateObject)
+         return matchResultTemplateObject_; // = nullptr
+ 
+     // Create a new group for the template.
+     Rooted<TaggedProto> proto(cx, templateObject->getTaggedProto());
+     ObjectGroup* group = ObjectGroupCompartment::makeGroup(cx, templateObject->getClass(), proto);
+     if (!group)
+         return matchResultTemplateObject_; // = nullptr
+diff --git a/js/src/vm/RegExpObject.h b/js/src/vm/RegExpObject.h
+--- a/js/src/vm/RegExpObject.h
++++ b/js/src/vm/RegExpObject.h
+@@ -355,16 +355,20 @@ class RegExpObject : public NativeObject
+     static const unsigned STICKY_FLAG_SLOT         = 5;
+ 
+   public:
+     static const unsigned RESERVED_SLOTS = 6;
+     static const unsigned PRIVATE_SLOT = 7;
+ 
+     static const Class class_;
+ 
++    // The maximum number of pairs a MatchResult can have, without having to
++    // allocate a bigger MatchResult.
++    static const size_t MaxPairCount = 14;
++
+     /*
+      * Note: The regexp statics flags are OR'd into the provided flags,
+      * so this function is really meant for object creation during code
+      * execution, as opposed to during something like XDR.
+      */
+     static RegExpObject*
+     create(ExclusiveContext* cx, RegExpStatics* res, const char16_t* chars, size_t length,
+            RegExpFlag flags, frontend::TokenStream* ts, LifoAlloc& alloc);

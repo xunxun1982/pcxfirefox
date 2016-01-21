@@ -1,0 +1,70 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1424849636 -28800
+#      Wed Feb 25 15:33:56 2015 +0800
+# Branch MOBILE400b10_2015080313_RELBRANCH
+# Node ID 571cb35709002ec3a4440c7d4e5bfa38e4a37269
+# Parent  288d4e3781eb9fb66fb9c787087c176706906d3c
+inline_recursion
+
+diff --git a/dom/base/nsContentUtils.cpp b/dom/base/nsContentUtils.cpp
+--- a/dom/base/nsContentUtils.cpp
++++ b/dom/base/nsContentUtils.cpp
+@@ -3739,45 +3739,57 @@ nsContentUtils::DispatchEventOnlyToChrom
+                                           bool aCanBubble, bool aCancelable,
+                                           bool* aDefaultAction)
+ {
+   return DispatchEvent(aDoc, aTarget, aEventName, aCanBubble, aCancelable,
+                        true, aDefaultAction, true);
+ }
+ 
+ /* static */
++#ifdef _MSC_VER
++#pragma inline_recursion(on)
++#endif
+ Element*
+ nsContentUtils::MatchElementId(nsIContent *aContent, const nsIAtom* aId)
+ {
+   for (nsIContent* cur = aContent;
+        cur;
+        cur = cur->GetNextNode(aContent)) {
+     if (aId == cur->GetID()) {
+       return cur->AsElement();
+     }
+   }
+ 
+   return nullptr;
+ }
++#ifdef _MSC_VER
++#pragma inline_recursion(off)
++#endif
+ 
+ /* static */
++#ifdef _MSC_VER
++#pragma inline_recursion(on)
++#endif
+ Element *
+ nsContentUtils::MatchElementId(nsIContent *aContent, const nsAString& aId)
+ {
+   NS_PRECONDITION(!aId.IsEmpty(), "Will match random elements");
+   
+   // ID attrs are generally stored as atoms, so just atomize this up front
+   nsCOMPtr<nsIAtom> id(do_GetAtom(aId));
+   if (!id) {
+     // OOM, so just bail
+     return nullptr;
+   }
+ 
+   return MatchElementId(aContent, id);
+ }
++#ifdef _MSC_VER
++#pragma inline_recursion(off)
++#endif
+ 
+ // Convert the string from the given encoding to Unicode.
+ /* static */
+ nsresult
+ nsContentUtils::ConvertStringFromEncoding(const nsACString& aEncoding,
+                                           const nsACString& aInput,
+                                           nsAString& aOutput)
+ {

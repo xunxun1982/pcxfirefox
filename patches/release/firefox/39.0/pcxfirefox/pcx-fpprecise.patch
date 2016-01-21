@@ -1,0 +1,165 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1430911330 -28800
+#      Wed May 06 19:22:10 2015 +0800
+# Node ID 545e9e9e7458589a9a07df3aa3c7594ccf96aa21
+# Parent  f594bacef3bbbb7d9c817a30d7b1c44b590354f0
+pcx-fpprecise
+
+diff -r f594bacef3bb -r 545e9e9e7458 db/sqlite3/src/Makefile.in
+--- a/db/sqlite3/src/Makefile.in	Wed Sep 24 01:26:19 2014 +0800
++++ b/db/sqlite3/src/Makefile.in	Wed May 06 19:22:10 2015 +0800
+@@ -30,3 +30,6 @@
+ ifeq ($(OS_ARCH),WINNT)
+ MODULE_OPTIMIZE_FLAGS = -O2
+ endif
++
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff -r f594bacef3bb -r 545e9e9e7458 ipc/app/Makefile.in
+--- a/ipc/app/Makefile.in	Wed Sep 24 01:26:19 2014 +0800
++++ b/ipc/app/Makefile.in	Wed May 06 19:22:10 2015 +0800
+@@ -44,3 +44,6 @@
+ 	$(NSINSTALL) $(PROGRAM) $(DIST)/bin/$(PROGRAM).app/Contents/MacOS
+ 	$(RM) $(DIST)/bin/$(PROGRAM)
+ endif #}
++
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff -r f594bacef3bb -r 545e9e9e7458 js/ductwork/debugger/moz.build
+--- a/js/ductwork/debugger/moz.build	Wed Sep 24 01:26:19 2014 +0800
++++ b/js/ductwork/debugger/moz.build	Wed May 06 19:22:10 2015 +0800
+@@ -23,3 +23,8 @@
+ FINAL_LIBRARY = 'xul'
+ 
+ FAIL_ON_WARNINGS = True
++
++if CONFIG['_MSC_VER']:
++    CFLAGS += ['-fp:precise -Qfast_transcendentals']
++    CXXFLAGS += ['-fp:precise -Qfast_transcendentals']
++
+diff -r f594bacef3bb -r 545e9e9e7458 js/ipc/moz.build
+--- a/js/ipc/moz.build	Wed Sep 24 01:26:19 2014 +0800
++++ b/js/ipc/moz.build	Wed May 06 19:22:10 2015 +0800
+@@ -39,3 +39,7 @@
+     '/js/xpconnect/wrappers',
+ ]
+ 
++if CONFIG['_MSC_VER']:
++    CFLAGS += ['-fp:precise -Qfast_transcendentals']
++    CXXFLAGS += ['-fp:precise -Qfast_transcendentals']
++
+diff -r f594bacef3bb -r 545e9e9e7458 js/src/moz.build
+--- a/js/src/moz.build	Wed Sep 24 01:26:19 2014 +0800
++++ b/js/src/moz.build	Wed May 06 19:22:10 2015 +0800
+@@ -531,12 +531,14 @@
+ if CONFIG['_MSC_VER']:
+     # Prevent floating point errors caused by VC++ optimizations
+     # XXX We should add this to CXXFLAGS, too?
+-    CFLAGS += ['-fp:precise']
++    CFLAGS += ['-fp:precise -Qfast_transcendentals']
+     # C4805 warns mixing bool with other integral types in computation.
+     # But given the conversion from bool is specified, and this is a
+     # pattern widely used in code in js/src, suppress this warning here.
+     CXXFLAGS += ['-wd4805']
+     CXXFLAGS += ['-we4067', '-we4258', '-we4275']
++    if CONFIG['CPU_ARCH'] == 'x86_64':
++        CXXFLAGS += ['-fp:precise -Qfast_transcendentals']
+ 
+ if CONFIG['OS_ARCH'] not in ('WINNT', 'HP-UX'):
+     OS_LIBS += [
+diff -r f594bacef3bb -r 545e9e9e7458 js/xpconnect/loader/moz.build
+--- a/js/xpconnect/loader/moz.build	Wed Sep 24 01:26:19 2014 +0800
++++ b/js/xpconnect/loader/moz.build	Wed May 06 19:22:10 2015 +0800
+@@ -28,3 +28,7 @@
+     '/dom/base',
+ ]
+ 
++if CONFIG['_MSC_VER']:
++    CFLAGS += ['-fp:precise -Qfast_transcendentals']
++    CXXFLAGS += ['-fp:precise -Qfast_transcendentals']
++
+diff -r f594bacef3bb -r 545e9e9e7458 js/xpconnect/shell/moz.build
+--- a/js/xpconnect/shell/moz.build	Wed Sep 24 01:26:19 2014 +0800
++++ b/js/xpconnect/shell/moz.build	Wed May 06 19:22:10 2015 +0800
+@@ -35,3 +35,8 @@
+     RCINCLUDE = 'xpcshell.rc'
+ 
+ FAIL_ON_WARNINGS = True
++
++if CONFIG['_MSC_VER']:
++    CFLAGS += ['-fp:precise -Qfast_transcendentals']
++    CXXFLAGS += ['-fp:precise -Qfast_transcendentals']
++
+diff -r f594bacef3bb -r 545e9e9e7458 js/xpconnect/src/moz.build
+--- a/js/xpconnect/src/moz.build	Wed Sep 24 01:26:19 2014 +0800
++++ b/js/xpconnect/src/moz.build	Wed May 06 19:22:10 2015 +0800
+@@ -75,3 +75,8 @@
+     LOCAL_INCLUDES += [
+         '/dom/bluetooth',
+     ]
++
++if CONFIG['_MSC_VER']:
++    CFLAGS += ['-fp:precise -Qfast_transcendentals']
++    CXXFLAGS += ['-fp:precise -Qfast_transcendentals']
++
+diff -r f594bacef3bb -r 545e9e9e7458 js/xpconnect/wrappers/moz.build
+--- a/js/xpconnect/wrappers/moz.build	Wed Sep 24 01:26:19 2014 +0800
++++ b/js/xpconnect/wrappers/moz.build	Wed May 06 19:22:10 2015 +0800
+@@ -41,3 +41,7 @@
+     '../src',
+ ]
+ 
++if CONFIG['_MSC_VER']:
++    CFLAGS += ['-fp:precise -Qfast_transcendentals']
++    CXXFLAGS += ['-fp:precise -Qfast_transcendentals']
++
+diff -r f594bacef3bb -r 545e9e9e7458 memory/build/Makefile.in
+--- a/memory/build/Makefile.in	Wed Sep 24 01:26:19 2014 +0800
++++ b/memory/build/Makefile.in	Wed May 06 19:22:10 2015 +0800
+@@ -6,3 +6,6 @@
+ ifdef MOZ_GLUE_IN_PROGRAM
+ DIST_INSTALL = 1
+ endif
++
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff -r f594bacef3bb -r 545e9e9e7458 memory/jemalloc/Makefile.in
+--- a/memory/jemalloc/Makefile.in	Wed Sep 24 01:26:19 2014 +0800
++++ b/memory/jemalloc/Makefile.in	Wed May 06 19:22:10 2015 +0800
+@@ -11,3 +11,6 @@
+ ifdef GNU_CC
+ CFLAGS += -std=gnu99
+ endif
++
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff -r f594bacef3bb -r 545e9e9e7458 memory/jemalloc/src/Makefile.in
+--- a/memory/jemalloc/src/Makefile.in	Wed Sep 24 01:26:19 2014 +0800
++++ b/memory/jemalloc/src/Makefile.in	Wed May 06 19:22:10 2015 +0800
+@@ -443,3 +443,6 @@
+ $(cfgoutputs_out) $(cfghdrs_out) : $(objroot)config.stamp
+ 	@true
+ endif
++
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff -r f594bacef3bb -r 545e9e9e7458 memory/mozjemalloc/Makefile.in
+--- a/memory/mozjemalloc/Makefile.in	Wed Sep 24 01:26:19 2014 +0800
++++ b/memory/mozjemalloc/Makefile.in	Wed May 06 19:22:10 2015 +0800
+@@ -17,3 +17,5 @@
+ endif
+ endif
+ 
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals
+diff -r f594bacef3bb -r 545e9e9e7458 nsprpub/pr/src/misc/Makefile.in
+--- a/nsprpub/pr/src/misc/Makefile.in	Wed Sep 24 01:26:19 2014 +0800
++++ b/nsprpub/pr/src/misc/Makefile.in	Wed May 06 19:22:10 2015 +0800
+@@ -77,4 +77,5 @@
+ 
+ export:: $(TARGETS)
+ 
+-
++CFLAGS		+= -fp:precise -Qfast_transcendentals
++CXXFLAGS	+= -fp:precise -Qfast_transcendentals

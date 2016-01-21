@@ -1,0 +1,31 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1411495294 -28800
+#      Wed Sep 24 02:01:34 2014 +0800
+# Branch MOBILE400b10_2015080313_RELBRANCH
+# Node ID e24a69d62ac9799dc1889fd04a447ac74eb8ce20
+# Parent  1b84fbf6e8fb3c832bfde768f5e1012c7ca903ee
+slim-little
+
+diff --git a/configure.in b/configure.in
+--- a/configure.in
++++ b/configure.in
+@@ -1775,17 +1775,17 @@ MOZ_ARG_ENABLE_BOOL(jprof,
+ if test -n "$MOZ_JPROF"; then
+     MOZ_PROFILING=1
+     AC_DEFINE(MOZ_JPROF)
+ fi
+ 
+ dnl ========================================================
+ dnl SPS Profiler
+ dnl ========================================================
+-MOZ_ENABLE_PROFILER_SPS=1
++MOZ_ENABLE_PROFILER_SPS=
+ 
+ case "${OS_TARGET}" in
+ Android)
+     case "${CPU_ARCH}" in
+     x86 | arm) ;;
+     *)
+         MOZ_ENABLE_PROFILER_SPS=
+     esac

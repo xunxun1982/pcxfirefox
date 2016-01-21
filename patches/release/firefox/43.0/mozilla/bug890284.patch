@@ -1,0 +1,246 @@
+# HG changeset patch
+# User Boris Zbarsky <bzbarsky@mit.edu>
+# Date 1444669671 14400
+#      Mon Oct 12 13:07:51 2015 -0400
+# Branch GECKO4301_2015121620_RELBRANCH
+# Node ID c01f96a1e70a36065a78ee312676f842b384216e
+# Parent  34a97de1d2558a9cde9a442c72f12fb2fc71e3c4
+Bug 890284.  Stop splitting textnodes in the XML content sink.  r=peterv
+
+diff --git a/dom/xml/nsXMLContentSink.cpp b/dom/xml/nsXMLContentSink.cpp
+--- a/dom/xml/nsXMLContentSink.cpp
++++ b/dom/xml/nsXMLContentSink.cpp
+@@ -91,26 +91,22 @@ NS_NewXMLContentSink(nsIXMLContentSink**
+   nsresult rv = it->Init(aDoc, aURI, aContainer, aChannel);
+   NS_ENSURE_SUCCESS(rv, rv);
+ 
+   it.forget(aResult);
+   return NS_OK;
+ }
+ 
+ nsXMLContentSink::nsXMLContentSink()
+-  : mConstrainSize(true),
+-    mPrettyPrintXML(true)
++  : mPrettyPrintXML(true)
+ {
+ }
+ 
+ nsXMLContentSink::~nsXMLContentSink()
+ {
+-  if (mText) {
+-    PR_Free(mText);  //  Doesn't null out, unlike PR_FREEIF
+-  }
+ }
+ 
+ nsresult
+ nsXMLContentSink::Init(nsIDocument* aDoc,
+                        nsIURI* aURI,
+                        nsISupports* aContainer,
+                        nsIChannel* aChannel)
+ {
+@@ -470,17 +466,16 @@ nsXMLContentSink::CreateElement(const ch
+   NS_ENSURE_SUCCESS(rv, rv);
+ 
+   if (aNodeInfo->Equals(nsGkAtoms::script, kNameSpaceID_XHTML)
+       || aNodeInfo->Equals(nsGkAtoms::script, kNameSpaceID_SVG)
+     ) {
+     nsCOMPtr<nsIScriptElement> sele = do_QueryInterface(content);
+     sele->SetScriptLineNumber(aLineNumber);
+     sele->SetCreatorParser(GetParser());
+-    mConstrainSize = false;
+   }
+ 
+   // XHTML needs some special attention
+   if (aNodeInfo->NamespaceEquals(kNameSpaceID_XHTML)) {
+     mPrettyPrintHasFactoredElements = true;
+   }
+   else {
+     // If we care, find out if we just used a special factory.
+@@ -547,17 +542,16 @@ nsXMLContentSink::CloseElement(nsIConten
+   if (!nodeInfo->NamespaceEquals(kNameSpaceID_XHTML) &&
+       !nodeInfo->NamespaceEquals(kNameSpaceID_SVG)) {
+     return NS_OK;
+   }
+ 
+   if (nodeInfo->Equals(nsGkAtoms::script, kNameSpaceID_XHTML)
+       || nodeInfo->Equals(nsGkAtoms::script, kNameSpaceID_SVG)
+     ) {
+-    mConstrainSize = true;
+     nsCOMPtr<nsIScriptElement> sele = do_QueryInterface(aContent);
+ 
+     if (mPreventScriptExecution) {
+       sele->PreventExecution();
+       return NS_OK;
+     }
+ 
+     // Always check the clock in nsContentSink right after a script
+@@ -773,53 +767,44 @@ nsXMLContentSink::IsScriptExecuting()
+ 
+ nsresult
+ nsXMLContentSink::FlushText(bool aReleaseTextNode)
+ {
+   nsresult rv = NS_OK;
+ 
+   if (mTextLength != 0) {
+     if (mLastTextNode) {
+-      if ((mLastTextNodeSize + mTextLength) > mTextSize && !mXSLTProcessor) {
+-        mLastTextNodeSize = 0;
+-        mLastTextNode = nullptr;
+-        FlushText(aReleaseTextNode);
+-      } else {
+-        bool notify = HaveNotifiedForCurrentContent();
+-        // We could probably always increase mInNotification here since
+-        // if AppendText doesn't notify it shouldn't trigger evil code.
+-        // But just in case it does, we don't want to mask any notifications.
+-        if (notify) {
+-          ++mInNotification;
+-        }
+-        rv = mLastTextNode->AppendText(mText, mTextLength, notify);
+-        if (notify) {
+-          --mInNotification;
+-        }
++      bool notify = HaveNotifiedForCurrentContent();
++      // We could probably always increase mInNotification here since
++      // if AppendText doesn't notify it shouldn't trigger evil code.
++      // But just in case it does, we don't want to mask any notifications.
++      if (notify) {
++        ++mInNotification;
++      }
++      rv = mLastTextNode->AppendText(mText, mTextLength, notify);
++      if (notify) {
++        --mInNotification;
++      }
+ 
+-        mLastTextNodeSize += mTextLength;
+-        mTextLength = 0;
+-      }
++      mTextLength = 0;
+     } else {
+       nsRefPtr<nsTextNode> textContent = new nsTextNode(mNodeInfoManager);
+ 
+       mLastTextNode = textContent;
+ 
+       // Set the text in the text node
+       textContent->SetText(mText, mTextLength, false);
+-      mLastTextNodeSize += mTextLength;
+       mTextLength = 0;
+ 
+       // Add text to its parent
+       rv = AddContentAsLeaf(textContent);
+     }
+   }
+ 
+   if (aReleaseTextNode) {
+-    mLastTextNodeSize = 0;
+     mLastTextNode = nullptr;
+   }
+ 
+   return rv;
+ }
+ 
+ nsIContent*
+ nsXMLContentSink::GetCurrentContent()
+@@ -1432,51 +1417,29 @@ nsXMLContentSink::AddAttributes(const ch
+ }
+ 
+ #define NS_ACCUMULATION_BUFFER_SIZE 4096
+ 
+ nsresult
+ nsXMLContentSink::AddText(const char16_t* aText,
+                           int32_t aLength)
+ {
+-  // Create buffer when we first need it
+-  if (0 == mTextSize) {
+-    mText = (char16_t *) PR_MALLOC(sizeof(char16_t) * NS_ACCUMULATION_BUFFER_SIZE);
+-    if (nullptr == mText) {
+-      return NS_ERROR_OUT_OF_MEMORY;
+-    }
+-    mTextSize = NS_ACCUMULATION_BUFFER_SIZE;
+-  }
+-
+-  // Copy data from string into our buffer; flush buffer when it fills up
++  // Copy data from string into our buffer; flush buffer when it fills up.
+   int32_t offset = 0;
+   while (0 != aLength) {
+-    int32_t amount = mTextSize - mTextLength;
++    int32_t amount = NS_ACCUMULATION_BUFFER_SIZE - mTextLength;
+     if (0 == amount) {
+-      // XSLT wants adjacent textnodes merged.
+-      if (mConstrainSize && !mXSLTProcessor) {
+-        nsresult rv = FlushText();
+-        if (NS_OK != rv) {
+-          return rv;
+-        }
++      nsresult rv = FlushText(false);
++      if (NS_WARN_IF(NS_FAILED(rv))) {
++        return rv;
++      }
++      MOZ_ASSERT(mTextLength == 0);
++      amount = NS_ACCUMULATION_BUFFER_SIZE;
++    }
+ 
+-        amount = mTextSize - mTextLength;
+-      }
+-      else {
+-        mTextSize += aLength;
+-        mText = (char16_t *) PR_REALLOC(mText, sizeof(char16_t) * mTextSize);
+-        if (nullptr == mText) {
+-          mTextSize = 0;
+-
+-          return NS_ERROR_OUT_OF_MEMORY;
+-        }
+-
+-        amount = aLength;
+-      }
+-    }
+     if (amount > aLength) {
+       amount = aLength;
+     }
+     memcpy(&mText[mTextLength], &aText[offset], sizeof(char16_t) * amount);
+     mTextLength += amount;
+     offset += amount;
+     aLength -= amount;
+   }
+diff --git a/dom/xml/nsXMLContentSink.h b/dom/xml/nsXMLContentSink.h
+--- a/dom/xml/nsXMLContentSink.h
++++ b/dom/xml/nsXMLContentSink.h
+@@ -166,34 +166,35 @@ protected:
+                               uint32_t aAttsCount, uint32_t aLineNumber,
+                               bool aInterruptable);
+   nsresult HandleEndElement(const char16_t *aName, bool aInterruptable);
+   nsresult HandleCharacterData(const char16_t *aData, uint32_t aLength,
+                                bool aInterruptable);
+ 
+   nsCOMPtr<nsIContent> mDocElement;
+   nsCOMPtr<nsIContent> mCurrentHead;  // When set, we're in an XHTML <haed>
+-  char16_t*       mText;
+ 
+   XMLContentSinkState mState;
+ 
++  // The length of the valid data in mText.
+   int32_t mTextLength;
+-  int32_t mTextSize;
+   
+   int32_t mNotifyLevel;
+   nsCOMPtr<nsIContent> mLastTextNode;
+-  int32_t mLastTextNodeSize;
+ 
+-  uint8_t mConstrainSize : 1;
+   uint8_t mPrettyPrintXML : 1;
+   uint8_t mPrettyPrintHasSpecialRoot : 1;
+   uint8_t mPrettyPrintHasFactoredElements : 1;
+   uint8_t mPrettyPrinting : 1;  // True if we called PrettyPrint() and it
+                                 // decided we should in fact prettyprint.
+   // True to call prevent script execution in the fragment mode.
+   uint8_t mPreventScriptExecution : 1;
+   
+   nsTArray<StackNode>              mContentStack;
+ 
+   nsCOMPtr<nsIDocumentTransformer> mXSLTProcessor;
++
++  static const int NS_ACCUMULATION_BUFFER_SIZE = 4096;
++  // Our currently accumulated text that we have not flushed to a textnode yet.
++  char16_t mText[NS_ACCUMULATION_BUFFER_SIZE];
+ };
+ 
+ #endif // nsXMLContentSink_h__

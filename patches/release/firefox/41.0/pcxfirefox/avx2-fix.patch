@@ -1,0 +1,38 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1411411987 -28800
+#      Tue Sep 23 02:53:07 2014 +0800
+# Node ID 7f55b62b37fd78ad3b89d77f06da3bd4250fc209
+# Parent  e7dcb8acf49122fb8888aadd8392cdfa5a727574
+avx2-fix
+
+diff --git a/media/libvpx/moz.build b/media/libvpx/moz.build
+--- a/media/libvpx/moz.build
++++ b/media/libvpx/moz.build
+@@ -78,16 +78,26 @@ if CONFIG['CLANG_CL'] or not CONFIG['_MS
+                 SOURCES[f].flags += CONFIG['SSE2_FLAGS']
+             if 'ssse3' in f:
+                 SOURCES[f].flags += ['-mssse3']
+             if 'sse4' in f:
+                 SOURCES[f].flags += ['-msse4.1']
+             if 'avx2' in f:
+                 SOURCES[f].flags += ['-mavx2']
+ 
++if CONFIG['_MSC_VER']:
++    for f in SOURCES:
++        if f.endswith('.c'):
++            if 'sse2' in f:
++                SOURCES[f].flags += ['-arch:SSE2']
++            if 'ssse3' in f:
++                SOURCES[f].flags += ['-arch:SSE2']
++            if 'avx2' in f:
++                SOURCES[f].flags += ['-arch:AVX2']
++
+ # Suppress warnings in third-party code.
+ if CONFIG['GNU_CC']:
+     CFLAGS += ['-Wno-sign-compare']
+ 
+ ASFLAGS += CONFIG['VPX_ASFLAGS']
+ ASFLAGS += [
+     '-I.',
+     '-I%s/media/libvpx/' % TOPSRCDIR,

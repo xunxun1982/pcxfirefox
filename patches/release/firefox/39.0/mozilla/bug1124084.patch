@@ -1,0 +1,63 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1434876846 -28800
+#      Sun Jun 21 16:54:06 2015 +0800
+# Node ID 041e93c6dcda4aa35ebbe1d473d5e9e78ef5188a
+# Parent  e718d0e339ecce83878400274beac411d5ea52bf
+Bug 1124084 - Flip on downscale-during-decode everywhere. r=tn
+
+diff -r e718d0e339ec -r 041e93c6dcda b2g/app/b2g.js
+--- a/b2g/app/b2g.js	Sun Jun 21 16:50:25 2015 +0800
++++ b/b2g/app/b2g.js	Sun Jun 21 16:54:06 2015 +0800
+@@ -322,6 +322,7 @@
+ pref("media.video-queue.default-size", 3);
+ 
+ // optimize images' memory usage
++pref("image.downscale-during-decode.enabled", true);
+ pref("image.decode-only-on-draw.enabled", true);
+ pref("image.mem.allow_locking_in_content_processes", true);
+ // Limit the surface cache to 1/8 of main memory or 128MB, whichever is smaller.
+diff -r e718d0e339ec -r 041e93c6dcda gfx/thebes/gfxPrefs.h
+--- a/gfx/thebes/gfxPrefs.h	Sun Jun 21 16:50:25 2015 +0800
++++ b/gfx/thebes/gfxPrefs.h	Sun Jun 21 16:54:06 2015 +0800
+@@ -238,7 +238,7 @@
+   DECL_GFX_PREF(Once, "image.cache.timeweight",                ImageCacheTimeWeight, int32_t, 500);
+   DECL_GFX_PREF(Live, "image.decode-only-on-draw.enabled",     ImageDecodeOnlyOnDrawEnabled, bool, true);
+   DECL_GFX_PREF(Live, "image.decode-immediately.enabled",      ImageDecodeImmediatelyEnabled, bool, false);
+-  DECL_GFX_PREF(Live, "image.downscale-during-decode.enabled", ImageDownscaleDuringDecodeEnabled, bool, false);
++  DECL_GFX_PREF(Live, "image.downscale-during-decode.enabled", ImageDownscaleDuringDecodeEnabled, bool, true);
+   DECL_GFX_PREF(Live, "image.high_quality_downscaling.enabled", ImageHQDownscalingEnabled, bool, false);
+   DECL_GFX_PREF(Live, "image.high_quality_downscaling.min_factor", ImageHQDownscalingMinFactor, uint32_t, 1000);
+   DECL_GFX_PREF(Live, "image.high_quality_upscaling.max_size", ImageHQUpscalingMaxSize, uint32_t, 20971520);
+diff -r e718d0e339ec -r 041e93c6dcda image/test/crashtests/crashtests.list
+--- a/image/test/crashtests/crashtests.list	Sun Jun 21 16:50:25 2015 +0800
++++ b/image/test/crashtests/crashtests.list	Sun Jun 21 16:54:06 2015 +0800
+@@ -46,4 +46,4 @@
+ # Asserts in the debug build
+ load 856616.gif
+ 
+-skip-if(AddressSanitizer) load 944353.jpg
++skip-if(AddressSanitizer) skip-if(B2G) load 944353.jpg
+diff -r e718d0e339ec -r 041e93c6dcda mobile/android/app/mobile.js
+--- a/mobile/android/app/mobile.js	Sun Jun 21 16:50:25 2015 +0800
++++ b/mobile/android/app/mobile.js	Sun Jun 21 16:54:06 2015 +0800
+@@ -566,6 +566,7 @@
+ pref("media.fragmented-mp4.android-media-codec.preferred", true);
+ 
+ // optimize images memory usage
++pref("image.downscale-during-decode.enabled", true);
+ pref("image.decode-only-on-draw.enabled", true);
+ 
+ #ifdef NIGHTLY_BUILD
+diff -r e718d0e339ec -r 041e93c6dcda modules/libpref/init/all.js
+--- a/modules/libpref/init/all.js	Sun Jun 21 16:50:25 2015 +0800
++++ b/modules/libpref/init/all.js	Sun Jun 21 16:54:06 2015 +0800
+@@ -3840,7 +3840,7 @@
+ pref("image.decode-immediately.enabled", false);
+ 
+ // Whether we attempt to downscale images during decoding.
+-pref("image.downscale-during-decode.enabled", false);
++pref("image.downscale-during-decode.enabled", true);
+ 
+ // The default Accept header sent for images loaded over HTTP(S)
+ pref("image.http.accept", "image/png,image/*;q=0.8,*/*;q=0.5");

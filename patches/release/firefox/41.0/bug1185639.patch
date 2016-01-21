@@ -1,0 +1,497 @@
+
+# HG changeset patch
+# User Aaron Klotz <aklotz@mozilla.com>
+# Date 1437463311 21600
+# Node ID f290fbb44af6c60614866deeef5e7cb4a53b3d56
+# Parent  1de396008d5b24a20a8193ff1b51bae3a884bd90
+Bug 1185639 - Allow deferred message processing to happen between consecutive IPC message dispatches. r=jimm
+
+diff --git a/ipc/glue/MessageChannel.cpp b/ipc/glue/MessageChannel.cpp
+--- a/ipc/glue/MessageChannel.cpp
++++ b/ipc/glue/MessageChannel.cpp
+@@ -848,16 +848,17 @@ MessageChannel::Send(Message* aMsg, Mess
+     AssertWorkerThread();
+     mMonitor->AssertNotCurrentThreadOwns();
+ 
+     if (mCurrentTransaction == 0)
+         mListener->OnBeginSyncTransaction();
+ 
+ #ifdef OS_WIN
+     SyncStackFrame frame(this, false);
++    NeuteredWindowRegion neuteredRgn(mFlags & REQUIRE_DEFERRED_MESSAGE_PROTECTION);
+ #endif
+ 
+     CxxStackFrame f(*this, OUT_MESSAGE, msg);
+ 
+     MonitorAutoLock lock(*mMonitor);
+ 
+     if (mTimedOutMessageSeqno) {
+         // Don't bother sending another sync message if a previous one timed out
+@@ -989,16 +990,17 @@ MessageChannel::Send(Message* aMsg, Mess
+ bool
+ MessageChannel::Call(Message* aMsg, Message* aReply)
+ {
+     AssertWorkerThread();
+     mMonitor->AssertNotCurrentThreadOwns();
+ 
+ #ifdef OS_WIN
+     SyncStackFrame frame(this, true);
++    NeuteredWindowRegion neuteredRgn(mFlags & REQUIRE_DEFERRED_MESSAGE_PROTECTION);
+ #endif
+ 
+     // This must come before MonitorAutoLock, as its destructor acquires the
+     // monitor lock.
+     CxxStackFrame cxxframe(*this, OUT_MESSAGE, aMsg);
+ 
+     MonitorAutoLock lock(*mMonitor);
+     if (!Connected()) {
+@@ -1027,16 +1029,22 @@ MessageChannel::Call(Message* aMsg, Mess
+         // might have already processed the OnError event. if so,
+         // trying another loop iteration will be futile because
+         // channel state will have been cleared
+         if (!Connected()) {
+             ReportConnectionError("MessageChannel::Call");
+             return false;
+         }
+ 
++#ifdef OS_WIN
++        /* We should pump messages at this point to ensure that the IPC peer
++           does not become deadlocked on a pending inter-thread SendMessage() */
++        neuteredRgn.PumpOnce();
++#endif
++
+         // Now might be the time to process a message deferred because of race
+         // resolution.
+         MaybeUndeferIncall();
+ 
+         // Wait for an event to occur.
+         while (!InterruptEventOccurred()) {
+             bool maybeTimedOut = !WaitForInterruptNotify();
+ 
+@@ -1143,16 +1151,17 @@ MessageChannel::Call(Message* aMsg, Mess
+     return true;
+ }
+ 
+ bool
+ MessageChannel::WaitForIncomingMessage()
+ {
+ #ifdef OS_WIN
+     SyncStackFrame frame(this, true);
++    NeuteredWindowRegion neuteredRgn(mFlags & REQUIRE_DEFERRED_MESSAGE_PROTECTION);
+ #endif
+ 
+     { // Scope for lock
+         MonitorAutoLock lock(*mMonitor);
+         AutoEnterWaitForIncoming waitingForIncoming(*this);
+         if (mChannelState != ChannelConnected) {
+             return false;
+         }
+diff --git a/ipc/glue/MessageChannel.h b/ipc/glue/MessageChannel.h
+--- a/ipc/glue/MessageChannel.h
++++ b/ipc/glue/MessageChannel.h
+@@ -10,16 +10,19 @@
+ 
+ #include "base/basictypes.h"
+ #include "base/message_loop.h"
+ 
+ #include "mozilla/DebugOnly.h"
+ #include "mozilla/Monitor.h"
+ #include "mozilla/Vector.h"
+ #include "mozilla/WeakPtr.h"
++#if defined(OS_WIN)
++#include "mozilla/ipc/Neutering.h"
++#endif // defined(OS_WIN)
+ #include "mozilla/ipc/Transport.h"
+ #include "MessageLink.h"
+ #include "nsAutoPtr.h"
+ 
+ #include <deque>
+ #include <stack>
+ #include <math.h>
+ 
+diff --git a/ipc/glue/Neutering.h b/ipc/glue/Neutering.h
+new file mode 100644
+--- /dev/null
++++ b/ipc/glue/Neutering.h
+@@ -0,0 +1,64 @@
++/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
++/* vim: set ts=8 sts=2 et sw=2 tw=80: */
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#ifndef mozilla_ipc_Neutering_h
++#define mozilla_ipc_Neutering_h
++
++#include "mozilla/GuardObjects.h"
++
++/**
++ * This header declares RAII wrappers for Window neutering. See
++ * WindowsMessageLoop.cpp for more details.
++ */
++
++namespace mozilla {
++namespace ipc {
++
++/**
++ * This class is a RAII wrapper around Window neutering. As long as a
++ * NeuteredWindowRegion object is instantiated, Win32 windows belonging to the
++ * current thread will be neutered. It is safe to nest multiple instances of
++ * this class.
++ */
++class MOZ_STACK_CLASS NeuteredWindowRegion
++{
++public:
++  explicit NeuteredWindowRegion(bool aDoNeuter MOZ_GUARD_OBJECT_NOTIFIER_PARAM);
++  ~NeuteredWindowRegion();
++
++  /**
++   * This function clears any backlog of nonqueued messages that are pending for
++   * the current thread.
++   */
++  void PumpOnce();
++
++private:
++  MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
++  bool mNeuteredByThis;
++};
++
++/**
++ * This class is analagous to MutexAutoUnlock for Mutex; it is an RAII class
++ * that is to be instantiated within a NeuteredWindowRegion, thus temporarily
++ * disabling neutering for the remainder of its enclosing block.
++ * @see NeuteredWindowRegion
++ */
++class MOZ_STACK_CLASS DeneuteredWindowRegion
++{
++public:
++  DeneuteredWindowRegion(MOZ_GUARD_OBJECT_NOTIFIER_ONLY_PARAM);
++  ~DeneuteredWindowRegion();
++
++private:
++  MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
++  bool mReneuter;
++};
++
++} // namespace ipc
++} // namespace mozilla
++
++#endif // mozilla_ipc_Neutering_h
++
+diff --git a/ipc/glue/WindowsMessageLoop.cpp b/ipc/glue/WindowsMessageLoop.cpp
+--- a/ipc/glue/WindowsMessageLoop.cpp
++++ b/ipc/glue/WindowsMessageLoop.cpp
+@@ -3,16 +3,17 @@
+  */
+ /* This Source Code Form is subject to the terms of the Mozilla Public
+  * License, v. 2.0. If a copy of the MPL was not distributed with this
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+ #include "mozilla/DebugOnly.h"
+ 
+ #include "WindowsMessageLoop.h"
++#include "Neutering.h"
+ #include "MessageChannel.h"
+ 
+ #include "nsAutoPtr.h"
+ #include "nsServiceManagerUtils.h"
+ #include "nsString.h"
+ #include "nsIXULAppInfo.h"
+ #include "WinUtils.h"
+ 
+@@ -857,16 +858,91 @@ MessageChannel::SpinInternalEventLoop()
+ 
+ static inline bool
+ IsTimeoutExpired(PRIntervalTime aStart, PRIntervalTime aTimeout)
+ {
+   return (aTimeout != PR_INTERVAL_NO_TIMEOUT) &&
+     (aTimeout <= (PR_IntervalNow() - aStart));
+ }
+ 
++static HHOOK gWindowHook;
++
++static inline void
++StartNeutering()
++{
++  MOZ_ASSERT(gUIThreadId);
++  MOZ_ASSERT(!gWindowHook);
++  NS_ASSERTION(!MessageChannel::IsPumpingMessages(),
++               "Shouldn't be pumping already!");
++  MessageChannel::SetIsPumpingMessages(true);
++  gWindowHook = ::SetWindowsHookEx(WH_CALLWNDPROC, CallWindowProcedureHook,
++                                   nullptr, gUIThreadId);
++  NS_ASSERTION(gWindowHook, "Failed to set hook!");
++}
++
++static void
++StopNeutering()
++{
++  MOZ_ASSERT(MessageChannel::IsPumpingMessages());
++  ::UnhookWindowsHookEx(gWindowHook);
++  gWindowHook = NULL;
++  ::UnhookNeuteredWindows();
++  // Before returning we need to set a hook to run any deferred messages that
++  // we received during the IPC call. The hook will unset itself as soon as
++  // someone else calls GetMessage, PeekMessage, or runs code that generates
++  // a "nonqueued" message.
++  ::ScheduleDeferredMessageRun();
++  MessageChannel::SetIsPumpingMessages(false);
++}
++
++NeuteredWindowRegion::NeuteredWindowRegion(bool aDoNeuter MOZ_GUARD_OBJECT_NOTIFIER_PARAM_IN_IMPL)
++  : mNeuteredByThis(!gWindowHook)
++{
++  MOZ_GUARD_OBJECT_NOTIFIER_INIT;
++  if (aDoNeuter && mNeuteredByThis) {
++    StartNeutering();
++  }
++}
++
++NeuteredWindowRegion::~NeuteredWindowRegion()
++{
++  if (gWindowHook && mNeuteredByThis) {
++    StopNeutering();
++  }
++}
++
++void
++NeuteredWindowRegion::PumpOnce()
++{
++  MSG msg = {0};
++  // Pump any COM messages so that we don't hang due to STA marshaling.
++  if (gCOMWindow && ::PeekMessageW(&msg, gCOMWindow, 0, 0, PM_REMOVE)) {
++      ::TranslateMessage(&msg);
++      ::DispatchMessageW(&msg);
++  }
++  // Expunge any nonqueued messages on the current thread.
++  ::PeekMessageW(&msg, nullptr, 0, 0, PM_NOREMOVE);
++}
++
++DeneuteredWindowRegion::DeneuteredWindowRegion(MOZ_GUARD_OBJECT_NOTIFIER_ONLY_PARAM_IN_IMPL)
++  : mReneuter(gWindowHook != NULL)
++{
++  MOZ_GUARD_OBJECT_NOTIFIER_INIT;
++  if (mReneuter) {
++    StopNeutering();
++  }
++}
++
++DeneuteredWindowRegion::~DeneuteredWindowRegion()
++{
++  if (mReneuter) {
++    StartNeutering();
++  }
++}
++
+ bool
+ MessageChannel::WaitForSyncNotify()
+ {
+   mMonitor->AssertCurrentThreadOwns();
+ 
+   MOZ_ASSERT(gUIThreadId, "InitUIThread was not called!");
+ 
+   // Use a blocking wait if this channel does not require
+@@ -911,25 +987,16 @@ MessageChannel::WaitForSyncNotify()
+     InitTimeoutData(&timeoutData, mTimeoutMs);
+ 
+     // We only do this to ensure that we won't get stuck in
+     // MsgWaitForMultipleObjects below.
+     timerId = SetTimer(nullptr, 0, mTimeoutMs, nullptr);
+     NS_ASSERTION(timerId, "SetTimer failed!");
+   }
+ 
+-  // Setup deferred processing of native events while we wait for a response.
+-  NS_ASSERTION(!MessageChannel::IsPumpingMessages(),
+-               "Shouldn't be pumping already!");
+-
+-  MessageChannel::SetIsPumpingMessages(true);
+-  HHOOK windowHook = SetWindowsHookEx(WH_CALLWNDPROC, CallWindowProcedureHook,
+-                                      nullptr, gUIThreadId);
+-  NS_ASSERTION(windowHook, "Failed to set hook!");
+-
+   {
+     while (1) {
+       MSG msg = { 0 };
+       // Don't get wrapped up in here if the child connection dies.
+       {
+         MonitorAutoLock lock(*mMonitor);
+         if (!Connected()) {
+           break;
+@@ -993,35 +1060,21 @@ MessageChannel::WaitForSyncNotify()
+       if (!PeekMessageW(&msg, nullptr, 0, 0, PM_NOREMOVE) &&
+           !haveSentMessagesPending) {
+         // Message was for child, we should wait a bit.
+         SwitchToThread();
+       }
+     }
+   }
+ 
+-  // Unhook the neutered window procedure hook.
+-  UnhookWindowsHookEx(windowHook);
+-
+-  // Unhook any neutered windows procedures so messages can be delivered
+-  // normally.
+-  UnhookNeuteredWindows();
+-
+-  // Before returning we need to set a hook to run any deferred messages that
+-  // we received during the IPC call. The hook will unset itself as soon as
+-  // someone else calls GetMessage, PeekMessage, or runs code that generates
+-  // a "nonqueued" message.
+-  ScheduleDeferredMessageRun();
+-
+   if (timerId) {
+     KillTimer(nullptr, timerId);
++    timerId = 0;
+   }
+ 
+-  MessageChannel::SetIsPumpingMessages(false);
+-
+   return WaitResponse(timedout);
+ }
+ 
+ bool
+ MessageChannel::WaitForInterruptNotify()
+ {
+   mMonitor->AssertCurrentThreadOwns();
+ 
+@@ -1045,66 +1098,38 @@ MessageChannel::WaitForInterruptNotify()
+ 
+   MonitorAutoUnlock unlock(*mMonitor);
+ 
+   bool timedout = false;
+ 
+   UINT_PTR timerId = 0;
+   TimeoutData timeoutData = { 0 };
+ 
+-  // windowHook is used as a flag variable for the loop below: if it is set
++  // gWindowHook is used as a flag variable for the loop below: if it is set
+   // and we start to spin a nested event loop, we need to clear the hook and
+   // process deferred/pending messages.
+-  // If windowHook is nullptr, MessageChannel::IsPumpingMessages should be false.
+-  HHOOK windowHook = nullptr;
+-
+   while (1) {
+-    NS_ASSERTION((!!windowHook) == MessageChannel::IsPumpingMessages(),
+-                 "windowHook out of sync with reality");
++    NS_ASSERTION((!!gWindowHook) == MessageChannel::IsPumpingMessages(),
++                 "gWindowHook out of sync with reality");
+ 
+     if (mTopFrame->mSpinNestedEvents) {
+-      if (windowHook) {
+-        UnhookWindowsHookEx(windowHook);
+-        windowHook = nullptr;
+-
+-        if (timerId) {
+-          KillTimer(nullptr, timerId);
+-          timerId = 0;
+-        }
+-
+-        // Used by widget to assert on incoming native events
+-        MessageChannel::SetIsPumpingMessages(false);
+-
+-        // Unhook any neutered windows procedures so messages can be delievered
+-        // normally.
+-        UnhookNeuteredWindows();
+-
+-        // Send all deferred "nonqueued" message to the intended receiver.
+-        // We're dropping into SpinInternalEventLoop so we should be fairly
+-        // certain these will get delivered soohn.
+-        ScheduleDeferredMessageRun();
++      if (gWindowHook && timerId) {
++        KillTimer(nullptr, timerId);
++        timerId = 0;
+       }
++      DeneuteredWindowRegion deneuteredRgn;
+       SpinInternalEventLoop();
+       ResetEvent(mEvent);
+       return true;
+     }
+ 
+-    if (!windowHook) {
+-      MessageChannel::SetIsPumpingMessages(true);
+-      windowHook = SetWindowsHookEx(WH_CALLWNDPROC, CallWindowProcedureHook,
+-                                    nullptr, gUIThreadId);
+-      NS_ASSERTION(windowHook, "Failed to set hook!");
+-
+-      NS_ASSERTION(!timerId, "Timer already initialized?");
+-
+-      if (mTimeoutMs != kNoTimeout) {
+-        InitTimeoutData(&timeoutData, mTimeoutMs);
+-        timerId = SetTimer(nullptr, 0, mTimeoutMs, nullptr);
+-        NS_ASSERTION(timerId, "SetTimer failed!");
+-      }
++    if (mTimeoutMs != kNoTimeout && !timerId) {
++      InitTimeoutData(&timeoutData, mTimeoutMs);
++      timerId = SetTimer(nullptr, 0, mTimeoutMs, nullptr);
++      NS_ASSERTION(timerId, "SetTimer failed!");
+     }
+ 
+     MSG msg = { 0 };
+ 
+     // Don't get wrapped up in here if the child connection dies.
+     {
+       MonitorAutoLock lock(*mMonitor);
+       if (!Connected()) {
+@@ -1146,37 +1171,21 @@ MessageChannel::WaitForInterruptNotify()
+     // MsgWaitForMultipleObjects every time.
+     if (!PeekMessageW(&msg, nullptr, 0, 0, PM_NOREMOVE) &&
+         !haveSentMessagesPending) {
+       // Message was for child, we should wait a bit.
+       SwitchToThread();
+     }
+   }
+ 
+-  if (windowHook) {
+-    // Unhook the neutered window procedure hook.
+-    UnhookWindowsHookEx(windowHook);
+-
+-    // Unhook any neutered windows procedures so messages can be delivered
+-    // normally.
+-    UnhookNeuteredWindows();
+-
+-    // Before returning we need to set a hook to run any deferred messages that
+-    // we received during the IPC call. The hook will unset itself as soon as
+-    // someone else calls GetMessage, PeekMessage, or runs code that generates
+-    // a "nonqueued" message.
+-    ScheduleDeferredMessageRun();
+-
+-    if (timerId) {
+-      KillTimer(nullptr, timerId);
+-    }
++  if (timerId) {
++    KillTimer(nullptr, timerId);
++    timerId = 0;
+   }
+ 
+-  MessageChannel::SetIsPumpingMessages(false);
+-
+   return WaitResponse(timedout);
+ }
+ 
+ void
+ MessageChannel::NotifyWorkerThread()
+ {
+   mMonitor->AssertCurrentThreadOwns();
+ 
+diff --git a/ipc/glue/moz.build b/ipc/glue/moz.build
+--- a/ipc/glue/moz.build
++++ b/ipc/glue/moz.build
+@@ -20,16 +20,17 @@ EXPORTS.mozilla.ipc += [
+     'FileDescriptorSetChild.h',
+     'FileDescriptorSetParent.h',
+     'FileDescriptorUtils.h',
+     'GeckoChildProcessHost.h',
+     'InputStreamUtils.h',
+     'IOThreadChild.h',
+     'MessageChannel.h',
+     'MessageLink.h',
++    'Neutering.h',
+     'ProcessChild.h',
+     'ProtocolUtils.h',
+     'ScopedXREEmbed.h',
+     'SharedMemory.h',
+     'SharedMemoryBasic.h',
+     'SharedMemorySysV.h',
+     'Shmem.h',
+     'Transport.h',
+

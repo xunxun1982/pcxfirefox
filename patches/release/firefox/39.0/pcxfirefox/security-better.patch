@@ -1,0 +1,77 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1424850252 -28800
+#      Wed Feb 25 15:44:12 2015 +0800
+# Node ID 2bc1bd2b27e987a1ebe24d626efd6b3ee0599001
+# Parent  b5c8af933a5d1deb1bd98b8b5af8cbaf8c627fdd
+security-better
+
+diff -r b5c8af933a5d -r 2bc1bd2b27e9 security/nss/coreconf/WIN32.mk
+--- a/security/nss/coreconf/WIN32.mk	Wed Feb 25 16:05:05 2015 +0800
++++ b/security/nss/coreconf/WIN32.mk	Wed Feb 25 15:44:12 2015 +0800
+@@ -157,9 +157,9 @@
+     endif
+     ifdef BUILD_OPT
+ 	ifeq (11,$(ALLOW_OPT_CODE_SIZE)$(OPT_CODE_SIZE))
+-		OPTIMIZER += -O1
++		OPTIMIZER += -O2 -Ot -Oi -Ob2 -Oy -Gy -GF -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -Qpar -GL
+ 	else
+-		OPTIMIZER += -O2
++		OPTIMIZER += -O2 -Ot -Oi -Ob2 -Oy -Gy -GF -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -Qpar -GL
+ 	endif
+ 	DEFINES    += -UDEBUG -U_DEBUG -DNDEBUG
+ 	DLLFLAGS   += -OUT:$@
+diff -r b5c8af933a5d -r 2bc1bd2b27e9 security/nss/coreconf/command.mk
+--- a/security/nss/coreconf/command.mk	Wed Feb 25 16:05:05 2015 +0800
++++ b/security/nss/coreconf/command.mk	Wed Feb 25 15:44:12 2015 +0800
+@@ -11,7 +11,7 @@
+ AS            = $(CC)
+ ASFLAGS      += $(CFLAGS)
+ CCF           = $(CC) $(CFLAGS)
+-LINK_DLL      = $(LINK) $(OS_DLLFLAGS) $(DLLFLAGS) $(XLDFLAGS)
++LINK_DLL      = $(LINK) $(OS_DLLFLAGS) $(DLLFLAGS) $(XLDFLAGS) -opt:ref,icf -LARGEADDRESSAWARE 
+ CFLAGS        = $(OPTIMIZER) $(OS_CFLAGS) $(XP_DEFINE) $(DEFINES) $(INCLUDES) \
+ 		$(XCFLAGS)
+ PERL          = perl
+diff -r b5c8af933a5d -r 2bc1bd2b27e9 security/nss/lib/freebl/Makefile
+--- a/security/nss/lib/freebl/Makefile	Wed Feb 25 16:05:05 2015 +0800
++++ b/security/nss/lib/freebl/Makefile	Wed Feb 25 15:44:12 2015 +0800
+@@ -132,7 +132,7 @@
+     DEFINES += -DMP_ASSEMBLY_MULTIPLY -DMP_ASSEMBLY_SQUARE 
+     DEFINES += -DMP_ASSEMBLY_DIV_2DX1D -DMP_USE_UINT_DIGIT -DMP_NO_MP_WORD
+     ifdef BUILD_OPT
+-	OPTIMIZER += -O2  # maximum optimization for freebl
++	OPTIMIZER += -O2 -Ot -Oi -Ob2 -Oy -Gy -GF -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -Qpar -GL  # maximum optimization for freebl
+     endif
+     # The Intel AES assembly code requires Visual C++ 2010.
+     # if $(_MSC_VER) >= 1600 (Visual C++ 2010)
+@@ -154,7 +154,7 @@
+ else
+ # MSVC
+     ifdef BUILD_OPT
+-	OPTIMIZER += -Ox  # maximum optimization for freebl
++	OPTIMIZER += -O2 -Ot -Oi -Ob2 -Oy -Gy -GF -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -Qpar -GL  # maximum optimization for freebl
+     endif
+     ASFILES  = arcfour-amd64-masm.asm mpi_amd64_masm.asm mp_comba_amd64_masm.asm
+     DEFINES += -DNSS_BEVAND_ARCFOUR -DMPI_AMD64 -DMP_ASSEMBLY_MULTIPLY
+diff -r b5c8af933a5d -r 2bc1bd2b27e9 security/nss/lib/freebl/mpi/Makefile.win
+--- a/security/nss/lib/freebl/mpi/Makefile.win	Wed Feb 25 16:05:05 2015 +0800
++++ b/security/nss/lib/freebl/mpi/Makefile.win	Wed Feb 25 15:44:12 2015 +0800
+@@ -35,7 +35,7 @@
+ 
+ ifeq ($(CPU_ARCH),x86_64)
+ AS_SRCS = mpi_x86_64.asm
+-CFLAGS = -O2 -Z7 -MD -W3 -nologo -DXP_PC -UDEBUG -U_DEBUG -DNDEBUG \
++CFLAGS = -O2 -Ot -Oi -Ob2 -Oy -Gy -GF -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -Qpar -GL -Z7 -MD -W3 -nologo -DXP_PC -UDEBUG -U_DEBUG -DNDEBUG \
+  -DWIN32 -D_WIN64 -D_AMD64_ -D_M_AMD64 -D_WINDOWS -DWIN95 $(MPICMN)
+ ASFLAGS = -Cp -Sn -Zi -I.
+ else
+@@ -48,7 +48,7 @@
+  -DWIN32 -D_WINDOWS -DWIN95 $(MPICMN)
+ #CFLAGS = -Od -Z7 -MD -W3 -nologo -D_X86_ -DXP_PC -UDEBUG -U_DEBUG -DNDEBUG \
+  -DWIN32 -D_WINDOWS -DWIN95 $(MPICMN)
+-CFLAGS = -O2 -Z7 -MD -W3 -nologo -D_X86_ -DXP_PC -UDEBUG -U_DEBUG -DNDEBUG \
++CFLAGS = -O2 -Ot -Oi -Ob2 -Oy -Gy -GF -GR- -fp:precise -Qfast_transcendentals -arch:SSE2 -FI e:/mozilla/pcxfunc.h -Zp16 -MP -Qpar -GL -Z7 -MD -W3 -nologo -D_X86_ -DXP_PC -UDEBUG -U_DEBUG -DNDEBUG \
+  -DWIN32 -D_WINDOWS -DWIN95 $(MPICMN)
+ ASFLAGS = -Cp -Sn -Zi -coff -I. 
+ endif

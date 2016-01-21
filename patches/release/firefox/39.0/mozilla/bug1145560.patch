@@ -1,0 +1,123 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1434876338 -28800
+#      Sun Jun 21 16:45:38 2015 +0800
+# Node ID 9bf93637f4badbe78ea9c199bde8b2e5129725ed
+# Parent  0c9072a62eb0501c039bd12b09a4293e1279d21d
+Bug 1145560 - During downscale-during-decode, compute the original size invalid rect based on the target size invalid rect. r=tn
+
+diff -r 0c9072a62eb0 -r 9bf93637f4ba image/decoders/nsJPEGDecoder.cpp
+--- a/image/decoders/nsJPEGDecoder.cpp	Sun Jun 21 16:39:00 2015 +0800
++++ b/image/decoders/nsJPEGDecoder.cpp	Sun Jun 21 16:45:38 2015 +0800
+@@ -722,16 +722,16 @@
+       }
+   }
+ 
+-  if (top != mInfo.output_scanline) {
++  if (mDownscaler && mDownscaler->HasInvalidation()) {
++    DownscalerInvalidRect invalidRect = mDownscaler->TakeInvalidRect();
++    PostInvalidation(invalidRect.mOriginalSizeRect,
++                     Some(invalidRect.mTargetSizeRect));
++    MOZ_ASSERT(!mDownscaler->HasInvalidation());
++  } else if (!mDownscaler && top != mInfo.output_scanline) {
+     PostInvalidation(nsIntRect(0, top,
+                                mInfo.output_width,
+-                               mInfo.output_scanline - top),
+-                     mDownscaler ? Some(mDownscaler->TakeInvalidRect())
+-                                 : Nothing());
++                               mInfo.output_scanline - top));
+   }
+-
+-  MOZ_ASSERT(!mDownscaler || !mDownscaler->HasInvalidation(),
+-             "Didn't send downscaler's invalidation");
+ }
+ 
+ 
+diff -r 0c9072a62eb0 -r 9bf93637f4ba image/src/Downscaler.cpp
+--- a/image/src/Downscaler.cpp	Sun Jun 21 16:39:00 2015 +0800
++++ b/image/src/Downscaler.cpp	Sun Jun 21 16:45:38 2015 +0800
+@@ -69,6 +69,8 @@
+              "Invalid original size");
+ 
+   mOriginalSize = aOriginalSize;
++  mScale = gfxSize(double(mOriginalSize.width) / mTargetSize.width,
++                   double(mOriginalSize.height) / mTargetSize.height);
+   mOutputBuffer = aOutputBuffer;
+   mHasAlpha = aHasAlpha;
+ 
+@@ -160,17 +162,25 @@
+   return mCurrentOutLine > mPrevInvalidatedLine;
+ }
+ 
+-nsIntRect
++DownscalerInvalidRect
+ Downscaler::TakeInvalidRect()
+ {
+   if (MOZ_UNLIKELY(!HasInvalidation())) {
+-    return nsIntRect();
++    return DownscalerInvalidRect();
+   }
+ 
+-  nsIntRect invalidRect(0, mPrevInvalidatedLine,
+-                        mTargetSize.width,
+-                        mCurrentOutLine - mPrevInvalidatedLine);
++  DownscalerInvalidRect invalidRect;
++
++  // Compute the target size invalid rect.
++  invalidRect.mTargetSizeRect =
++    nsIntRect(0, mPrevInvalidatedLine,
++              mTargetSize.width, mCurrentOutLine - mPrevInvalidatedLine);
+   mPrevInvalidatedLine = mCurrentOutLine;
++
++  // Compute the original size invalid rect.
++  invalidRect.mOriginalSizeRect = invalidRect.mTargetSizeRect;
++  invalidRect.mOriginalSizeRect.ScaleRoundOut(mScale.width, mScale.height);
++
+   return invalidRect;
+ }
+ 
+diff -r 0c9072a62eb0 -r 9bf93637f4ba image/src/Downscaler.h
+--- a/image/src/Downscaler.h	Sun Jun 21 16:39:00 2015 +0800
++++ b/image/src/Downscaler.h	Sun Jun 21 16:45:38 2015 +0800
+@@ -25,6 +25,16 @@
+ namespace image {
+ 
+ /**
++ * DownscalerInvalidRect wraps two invalidation rects: one in terms of the
++ * original image size, and one in terms of the target size.
++ */
++struct DownscalerInvalidRect
++{
++  nsIntRect mOriginalSizeRect;
++  nsIntRect mTargetSizeRect;
++};
++
++/**
+  * Downscaler is a high-quality, streaming image downscaler based upon Skia's
+  * scaling implementation.
+  *
+@@ -47,6 +57,7 @@
+ 
+   const nsIntSize& OriginalSize() const { return mOriginalSize; }
+   const nsIntSize& TargetSize() const { return mTargetSize; }
++  const gfxSize& Scale() const { return mScale; }
+ 
+   /**
+    * Begins a new frame and reinitializes the Downscaler.
+@@ -73,7 +84,7 @@
+   bool HasInvalidation() const;
+ 
+   /// Takes the Downscaler's current invalid rect and resets it.
+-  nsIntRect TakeInvalidRect();
++  DownscalerInvalidRect TakeInvalidRect();
+ 
+   /**
+    * Resets the Downscaler's position in the image, for a new progressive pass
+@@ -88,6 +99,7 @@
+ 
+   nsIntSize mOriginalSize;
+   nsIntSize mTargetSize;
++  gfxSize mScale;
+ 
+   uint8_t* mOutputBuffer;
+ 

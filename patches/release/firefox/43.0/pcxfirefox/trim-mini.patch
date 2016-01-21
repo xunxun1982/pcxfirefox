@@ -1,0 +1,53 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1441021891 -28800
+#      Mon Aug 31 19:51:31 2015 +0800
+# Branch GECKO4301_2015121620_RELBRANCH
+# Node ID 4871557f47978ebf09f4b3fe634dca01f762bc2a
+# Parent  1df2b987eb51fcdd909048b9af6c1aeafd07a8bd
+trim-mini
+
+diff --git a/widget/windows/nsWindow.cpp b/widget/windows/nsWindow.cpp
+--- a/widget/windows/nsWindow.cpp
++++ b/widget/windows/nsWindow.cpp
+@@ -664,17 +664,17 @@ nsWindow::Create(nsIWidget *aParent,
+   // do some initialization work.
+   if (sTrimOnMinimize == 2 && mWindowType == eWindowType_invisible) {
+     // Our internal trim prevention logic is effective on 2K/XP at maintaining
+     // the working set when windows are minimized, but on Vista and up it has
+     // little to no effect. Since this feature has been the source of numerous
+     // bugs over the years, disable it (sTrimOnMinimize=1) on Vista and up.
+     sTrimOnMinimize =
+       Preferences::GetBool("config.trim_on_minimize",
+-        IsVistaOrLater() ? 1 : 0);
++        false);
+     sSwitchKeyboardLayout =
+       Preferences::GetBool("intl.keyboard.per_window_layout", false);
+   }
+ 
+   // Query for command button metric data for rendering the titlebar. We
+   // only do this once on the first window that has an actual titlebar
+   if (ShouldCacheTitleBarInfo(mWindowType, mBorderStyle)) {
+     nsUXThemeData::UpdateTitlebarInfo(mWnd);
+@@ -1696,16 +1696,21 @@ nsWindow::SetSizeMode(nsSizeMode aMode) 
+       case nsSizeMode_Minimized :
+         // Using SW_SHOWMINIMIZED prevents the working set from being trimmed but
+         // keeps the window active in the tray. So after the window is minimized,
+         // windows will fire WM_WINDOWPOSCHANGED (OnWindowPosChanged) at which point
+         // we will do some additional processing to get the active window set right.
+         // If sTrimOnMinimize is set, we let windows handle minimization normally
+         // using SW_MINIMIZE.
+         mode = sTrimOnMinimize ? SW_MINIMIZE : SW_SHOWMINIMIZED;
++		if (sTrimOnMinimize) {
++			HANDLE hProcess = GetCurrentProcess();
++			if(hProcess != NULL)
++				SetProcessWorkingSetSize(hProcess, -1, -1);
++		}
+         break;
+ 
+       default :
+         mode = SW_RESTORE;
+     }
+ 
+     WINDOWPLACEMENT pl;
+     pl.length = sizeof(pl);

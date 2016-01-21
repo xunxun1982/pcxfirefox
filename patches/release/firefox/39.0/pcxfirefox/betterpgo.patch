@@ -1,0 +1,82 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1424849150 -28800
+#      Wed Feb 25 15:25:50 2015 +0800
+# Node ID e81d33fa5303b03eb120e542995487465ef17a2d
+# Parent  6e339a96251a8e155f6ce113f1d20f0f813c3727
+betterpgo
+
+diff -r 6e339a96251a -r e81d33fa5303 dom/media/AudioStream.cpp
+--- a/dom/media/AudioStream.cpp	Tue Sep 23 02:53:07 2014 +0800
++++ b/dom/media/AudioStream.cpp	Wed Feb 25 15:25:50 2015 +0800
+@@ -826,19 +826,12 @@
+   return mAudioClock.GetPositionUnlocked();
+ }
+ 
+-// This function is miscompiled by PGO with MSVC 2010.  See bug 768333.
+-#ifdef _MSC_VER
+-#pragma optimize("", off)
+-#endif
+ int64_t
+ AudioStream::GetPositionInFrames()
+ {
+   MonitorAutoLock mon(mMonitor);
+   return mAudioClock.GetPositionInFrames();
+ }
+-#ifdef _MSC_VER
+-#pragma optimize("", on)
+-#endif
+ 
+ int64_t
+ AudioStream::GetPositionInFramesUnlocked()
+diff -r 6e339a96251a -r e81d33fa5303 gfx/layers/moz.build
+--- a/gfx/layers/moz.build	Tue Sep 23 02:53:07 2014 +0800
++++ b/gfx/layers/moz.build	Wed Feb 25 15:25:50 2015 +0800
+@@ -329,14 +329,6 @@
+ # Disable RTTI in google protocol buffer
+ DEFINES['GOOGLE_PROTOBUF_NO_RTTI'] = True
+ 
+-# Workaround compiler bug (Bug 795594)
+-if CONFIG['_MSC_VER'] and CONFIG['CPU_ARCH'] == 'x86_64':
+-    for src in [
+-        'Layers.cpp',
+-        'LayerTreeInvalidation.cpp',
+-    ]:
+-        SOURCES[src].no_pgo = True
+-
+ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
+     SOURCES += [
+         'basic/MacIOSurfaceTextureHostBasic.cpp',
+diff -r 6e339a96251a -r e81d33fa5303 js/src/moz.build
+--- a/js/src/moz.build	Tue Sep 23 02:53:07 2014 +0800
++++ b/js/src/moz.build	Wed Feb 25 15:25:50 2015 +0800
+@@ -529,10 +529,6 @@
+     DEFINES['MOZ_LINKER'] = True
+ 
+ if CONFIG['_MSC_VER']:
+-    if CONFIG['CPU_ARCH'] == 'x86':
+-        SOURCES['builtin/RegExp.cpp'].no_pgo = True # Bug 772303
+-    elif CONFIG['CPU_ARCH'] == 'x86_64' and CONFIG['JS_HAS_CTYPES']:
+-        SOURCES['ctypes/CTypes.cpp'].no_pgo = True # Bug 810661
+     # Prevent floating point errors caused by VC++ optimizations
+     # XXX We should add this to CXXFLAGS, too?
+     CFLAGS += ['-fp:precise']
+diff -r 6e339a96251a -r e81d33fa5303 layout/style/nsCSSParser.cpp
+--- a/layout/style/nsCSSParser.cpp	Tue Sep 23 02:53:07 2014 +0800
++++ b/layout/style/nsCSSParser.cpp	Wed Feb 25 15:25:50 2015 +0800
+@@ -1624,7 +1624,6 @@
+ 
+ // See Bug 723197
+ #ifdef _MSC_VER
+-#pragma optimize( "", off )
+ #pragma warning( push )
+ #pragma warning( disable : 4748 )
+ #endif
+@@ -1766,7 +1765,6 @@
+ 
+ #ifdef _MSC_VER
+ #pragma warning( pop )
+-#pragma optimize( "", on )
+ #endif
+ 
+ void

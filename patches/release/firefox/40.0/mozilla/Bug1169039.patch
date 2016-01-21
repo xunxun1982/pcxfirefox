@@ -1,0 +1,166 @@
+# HG changeset patch
+# User Kyle <kfung@mozilla.com>
+# Date 1432842376 14400
+#      Thu May 28 15:46:16 2015 -0400
+# Branch MOBILE400b10_2015080313_RELBRANCH
+# Node ID 125cddeb8f06fee86c40636f767370f5dfdca20d
+# Parent  6cbb6dd57198e445010459d78289db57592f671a
+Bug 1169039 - Check for NULL in every function that uses CreateEffect(). r=mstange
+
+diff --git a/gfx/2d/DrawTargetD2D1.cpp b/gfx/2d/DrawTargetD2D1.cpp
+--- a/gfx/2d/DrawTargetD2D1.cpp
++++ b/gfx/2d/DrawTargetD2D1.cpp
+@@ -198,17 +198,21 @@ DrawTargetD2D1::DrawSurfaceWithShadow(So
+ 
+   if (!mat.IsIdentity()) {
+     gfxDebug() << *this << ": At this point complex partial uploads are not supported for Shadow surfaces.";
+     return;
+   }
+ 
+   // Step 1, create the shadow effect.
+   RefPtr<ID2D1Effect> shadowEffect;
+-  mDC->CreateEffect(CLSID_D2D1Shadow, byRef(shadowEffect));
++  HRESULT hr = mDC->CreateEffect(CLSID_D2D1Shadow, byRef(shadowEffect));
++  if (FAILED(hr) || !shadowEffect) {
++    gfxWarning() << "Failed to create shadow effect. Code: " << hexa(hr);
++    return;
++  }
+   shadowEffect->SetInput(0, image);
+   shadowEffect->SetValue(D2D1_SHADOW_PROP_BLUR_STANDARD_DEVIATION, aSigma);
+   D2D1_VECTOR_4F color = { aColor.r, aColor.g, aColor.b, aColor.a };
+   shadowEffect->SetValue(D2D1_SHADOW_PROP_COLOR, color);
+ 
+   D2D1_POINT_2F shadowPoint = D2DPoint(aDest + aOffset);
+   mDC->DrawImage(shadowEffect, &shadowPoint, nullptr, D2D1_INTERPOLATION_MODE_LINEAR, D2DCompositionMode(aOperator));
+ 
+@@ -1082,19 +1086,19 @@ DrawTargetD2D1::FinalizeDrawing(Composit
+         mDC->SetPrimitiveBlend(D2D1_PRIMITIVE_BLEND_COPY);
+         mDC->FillGeometry(inverseGeom, brush);
+         mDC->SetPrimitiveBlend(D2D1_PRIMITIVE_BLEND_SOURCE_OVER);
+       }
+       return;
+     }
+ 
+     if (!mBlendEffect) {
+-      mDC->CreateEffect(CLSID_D2D1Blend, byRef(mBlendEffect));
++      HRESULT hr = mDC->CreateEffect(CLSID_D2D1Blend, byRef(mBlendEffect));
+ 
+-      if (!mBlendEffect) {
++      if (FAILED(hr) || !mBlendEffect) {
+         gfxWarning() << "Failed to create blend effect!";
+         return;
+       }
+     }
+ 
+     RefPtr<ID2D1Bitmap> tmpBitmap;
+     HRESULT hr = mDC->CreateBitmap(D2DIntSize(mSize), D2D1::BitmapProperties(D2DPixelFormat(mFormat)), byRef(tmpBitmap));
+     if (FAILED(hr)) {
+@@ -1127,17 +1131,21 @@ DrawTargetD2D1::FinalizeDrawing(Composit
+     // Draw nothing!
+     return;
+   }
+ 
+   PushAllClips();
+ 
+   RefPtr<ID2D1Effect> radialGradientEffect;
+ 
+-  mDC->CreateEffect(CLSID_RadialGradientEffect, byRef(radialGradientEffect));
++  HRESULT hr = mDC->CreateEffect(CLSID_RadialGradientEffect, byRef(radialGradientEffect));
++  if (FAILED(hr) || !radialGradientEffect) {
++    gfxWarning() << "Failed to create radial gradient effect. Code: " << hexa(hr);
++    return;
++  }
+ 
+   radialGradientEffect->SetValue(RADIAL_PROP_STOP_COLLECTION,
+                                  static_cast<const GradientStopsD2D*>(pat->mStops.get())->mStopCollection);
+   radialGradientEffect->SetValue(RADIAL_PROP_CENTER_1, D2D1::Vector2F(pat->mCenter1.x, pat->mCenter1.y));
+   radialGradientEffect->SetValue(RADIAL_PROP_CENTER_2, D2D1::Vector2F(pat->mCenter2.x, pat->mCenter2.y));
+   radialGradientEffect->SetValue(RADIAL_PROP_RADIUS_1, pat->mRadius1);
+   radialGradientEffect->SetValue(RADIAL_PROP_RADIUS_2, pat->mRadius2);
+   radialGradientEffect->SetValue(RADIAL_PROP_RADIUS_2, pat->mRadius2);
+diff --git a/gfx/2d/FilterNodeD2D1.cpp b/gfx/2d/FilterNodeD2D1.cpp
+--- a/gfx/2d/FilterNodeD2D1.cpp
++++ b/gfx/2d/FilterNodeD2D1.cpp
+@@ -854,33 +854,33 @@ FilterNodeConvolveD2D1::FilterNodeConvol
+   // our custom ExtendInput effect to adjust the output rect of our input.
+   // All of this is only necessary when our edge mode is not EDGE_MODE_NONE, so
+   // we update the filter chain dynamically in UpdateChain().
+ 
+   HRESULT hr;
+   
+   hr = aDC->CreateEffect(CLSID_D2D1ConvolveMatrix, byRef(mEffect));
+ 
+-  if (FAILED(hr)) {
++  if (FAILED(hr) || !mEffect) {
+     gfxWarning() << "Failed to create ConvolveMatrix filter!";
+     return;
+   }
+ 
+   mEffect->SetValue(D2D1_CONVOLVEMATRIX_PROP_BORDER_MODE, D2D1_BORDER_MODE_SOFT);
+ 
+   hr = aDC->CreateEffect(CLSID_ExtendInputEffect, byRef(mExtendInputEffect));
+ 
+-  if (FAILED(hr)) {
++  if (FAILED(hr) || !mExtendInputEffect) {
+     gfxWarning() << "Failed to create ConvolveMatrix filter!";
+     return;
+   }
+ 
+   hr = aDC->CreateEffect(CLSID_D2D1Border, byRef(mBorderEffect));
+ 
+-  if (FAILED(hr)) {
++  if (FAILED(hr) || !mBorderEffect) {
+     gfxWarning() << "Failed to create ConvolveMatrix filter!";
+     return;
+   }
+ 
+   mBorderEffect->SetInputEffect(0, mExtendInputEffect.get());
+ 
+   UpdateChain();
+   UpdateSourceRect();
+@@ -1013,17 +1013,17 @@ FilterNodeExtendInputAdapterD2D1::Filter
+   // want mEffect to regard its input as unbounded. So we take the input,
+   // pipe it through an ExtendInput effect (which has an infinite output rect
+   // by default), and feed the resulting unbounded composition into mEffect.
+ 
+   HRESULT hr;
+ 
+   hr = aDC->CreateEffect(CLSID_ExtendInputEffect, byRef(mExtendInputEffect));
+ 
+-  if (FAILED(hr)) {
++  if (FAILED(hr) || !mExtendInputEffect) {
+     gfxWarning() << "Failed to create extend input effect for filter: " << hexa(hr);
+     return;
+   }
+ 
+   aFilterNode->InputEffect()->SetInputEffect(0, mExtendInputEffect.get());
+ }
+ 
+ FilterNodePremultiplyAdapterD2D1::FilterNodePremultiplyAdapterD2D1(ID2D1DeviceContext *aDC,
+@@ -1057,24 +1057,24 @@ FilterNodePremultiplyAdapterD2D1::Filter
+   // with the enabled channels.
+   // We also add an unpremultiply effect that postprocesses the result of the
+   // transfer effect because getting unpremultiplied results from the transfer
+   // filters is part of the FilterNode API.
+   HRESULT hr;
+ 
+   hr = aDC->CreateEffect(CLSID_D2D1Premultiply, byRef(mPrePremultiplyEffect));
+ 
+-  if (FAILED(hr)) {
++  if (FAILED(hr) || !mPrePremultiplyEffect) {
+     gfxWarning() << "Failed to create ComponentTransfer filter!";
+     return;
+   }
+ 
+   hr = aDC->CreateEffect(CLSID_D2D1UnPremultiply, byRef(mPostUnpremultiplyEffect));
+ 
+-  if (FAILED(hr)) {
++  if (FAILED(hr) || !mPostUnpremultiplyEffect) {
+     gfxWarning() << "Failed to create ComponentTransfer filter!";
+     return;
+   }
+ 
+   aFilterNode->InputEffect()->SetInputEffect(0, mPrePremultiplyEffect.get());
+   mPostUnpremultiplyEffect->SetInputEffect(0, aFilterNode->OutputEffect());
+ }
+ 

@@ -1,0 +1,106 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1446704940 -28800
+#      Thu Nov 05 14:29:00 2015 +0800
+# Node ID 0442dfb5b43eda2dbab8bfe3bb99535856171455
+# Parent  02d9acc8fe448777cb8ee78eb9fe1f80e1fe46be
+back out Bug 1165981
+
+diff --git a/dom/plugins/base/nsPluginHost.cpp b/dom/plugins/base/nsPluginHost.cpp
+--- a/dom/plugins/base/nsPluginHost.cpp
++++ b/dom/plugins/base/nsPluginHost.cpp
+@@ -2089,49 +2089,19 @@ struct CompareFilesByTime
+   Equals(const nsCOMPtr<nsIFile>& a, const nsCOMPtr<nsIFile>& b) const
+   {
+     return GetPluginLastModifiedTime(a) == GetPluginLastModifiedTime(b);
+   }
+ };
+ 
+ } // namespace
+ 
+-bool
+-nsPluginHost::ShouldAddPlugin(nsPluginTag* aPluginTag)
+-{
+-#if defined(XP_WIN) && (defined(__x86_64__) || defined(_M_X64))
+-  // On 64-bit windows, the only plugin we should load is flash. Use library
+-  // filename and MIME type to check.
+-  if (StringBeginsWith(aPluginTag->FileName(), NS_LITERAL_CSTRING("NPSWF"), nsCaseInsensitiveCStringComparator()) &&
+-      (aPluginTag->HasMimeType(NS_LITERAL_CSTRING("application/x-shockwave-flash")) ||
+-       aPluginTag->HasMimeType(NS_LITERAL_CSTRING("application/x-shockwave-flash-test")))) {
+-    return true;
+-  }
+-  // Accept the test plugin MIME types, so mochitests still work.
+-  if (aPluginTag->HasMimeType(NS_LITERAL_CSTRING("application/x-test")) ||
+-      aPluginTag->HasMimeType(NS_LITERAL_CSTRING("application/x-Second-Test")) ||
+-      aPluginTag->HasMimeType(NS_LITERAL_CSTRING("application/x-java-test"))) {
+-    return true;
+-  }
+-#ifdef PLUGIN_LOGGING
+-  PLUGIN_LOG(PLUGIN_LOG_NORMAL,
+-             ("ShouldAddPlugin : Ignoring non-flash plugin library %s\n", aPluginTag->FileName().get()));
+-#endif // PLUGIN_LOGGING
+-  return false;
+-#else
+-  return true;
+-#endif // defined(XP_WIN) && (defined(__x86_64__) || defined(_M_X64))
+-}
+-
+ void
+ nsPluginHost::AddPluginTag(nsPluginTag* aPluginTag)
+ {
+-  if (!ShouldAddPlugin(aPluginTag)) {
+-    return;
+-  }
+   aPluginTag->mNext = mPlugins;
+   mPlugins = aPluginTag;
+ 
+   if (aPluginTag->IsActive()) {
+     nsAdoptingCString disableFullPage =
+       Preferences::GetCString(kPrefDisableFullPage);
+     for (uint32_t i = 0; i < aPluginTag->MimeTypes().Length(); i++) {
+       if (!IsTypeInList(aPluginTag->MimeTypes()[i], disableFullPage)) {
+@@ -3302,20 +3272,16 @@ nsPluginHost::ReadPluginInfo()
+     // Import flags from registry into prefs for old registry versions
+     if (hasValidFlags && !pluginStateImported) {
+       tag->ImportFlagsToPrefs(tagflag);
+     }
+ 
+     MOZ_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_BASIC,
+       ("LoadCachedPluginsInfo : Loading Cached plugininfo for %s\n", tag->FileName().get()));
+ 
+-    if (!ShouldAddPlugin(tag)) {
+-      continue;
+-    }
+-
+     tag->mNext = mCachedPlugins;
+     mCachedPlugins = tag;
+   }
+ 
+ // On Android we always want to try to load a plugin again (Flash). Bug 935676.
+ #ifndef MOZ_WIDGET_ANDROID
+   if (hasInvalidPlugins) {
+     if (!ReadSectionHeader(reader, "INVALID")) {
+diff --git a/dom/plugins/base/nsPluginHost.h b/dom/plugins/base/nsPluginHost.h
+--- a/dom/plugins/base/nsPluginHost.h
++++ b/dom/plugins/base/nsPluginHost.h
+@@ -357,20 +357,16 @@ private:
+   // To be used by the chrome process; returns the current epoch.
+   uint32_t ChromeEpoch();
+ 
+   // To be used by the content process to get/set the last observed epoch value
+   // from the chrome process.
+   uint32_t ChromeEpochForContent();
+   void SetChromeEpochForContent(uint32_t aEpoch);
+ 
+-  // On certain platforms, we only want to load certain plugins. This function
+-  // centralizes loading rules.
+-  bool ShouldAddPlugin(nsPluginTag* aPluginTag);
+-
+   nsRefPtr<nsPluginTag> mPlugins;
+   nsRefPtr<nsPluginTag> mCachedPlugins;
+   nsRefPtr<nsInvalidPluginTag> mInvalidPlugins;
+   nsTArray< nsRefPtr<nsPluginPlayPreviewInfo> > mPlayPreviewMimeTypes;
+ 
+   nsTArray< nsRefPtr<nsFakePluginTag> > mFakePlugins;
+ 
+   bool mPluginsLoaded;

@@ -1,0 +1,37 @@
+# HG changeset patch
+# User Nick Fitzgerald <fitzgen@gmail.com>
+# Date 1440669780 14400
+#      Thu Aug 27 06:03:00 2015 -0400
+# Node ID dd9b563ecedf20f1f71f6fe7164c681835b012db
+# Parent  abb0a8bffb733c2413c1509539f33502bcb37cfb
+Bug 1196631 - Make JS::ubi::Node::size return 1 by default. r=sfink
+
+The old default was zero, but one is a better default in a couple ways: (1)
+there are no zero-sized things in C++ so one is closer to the truth, and (2) it
+gives us an idea of what magnitude of space is consumed by node specializations
+which don't have a JS::ubi::Node::size override yet.
+
+diff --git a/js/public/UbiNode.h b/js/public/UbiNode.h
+--- a/js/public/UbiNode.h
++++ b/js/public/UbiNode.h
+@@ -212,18 +212,18 @@ class Base {
+     //
+     // This must always return Concrete<T>::concreteTypeName; we use that
+     // pointer as a tag for this particular referent type.
+     virtual const char16_t* typeName() const = 0;
+ 
+     // Return the size of this node, in bytes. Include any structures that this
+     // node owns exclusively that are not exposed as their own ubi::Nodes.
+     // |mallocSizeOf| should be a malloc block sizing function; see
+-    // |mfbt/MemoryReporting.h.
+-    virtual size_t size(mozilla::MallocSizeOf mallocSizeof) const { return 0; }
++    // |mfbt/MemoryReporting.h|.
++    virtual size_t size(mozilla::MallocSizeOf mallocSizeof) const { return 1; }
+ 
+     // Return an EdgeRange that initially contains all the referent's outgoing
+     // edges. The caller takes ownership of the EdgeRange.
+     //
+     // If wantNames is true, compute names for edges. Doing so can be expensive
+     // in time and memory.
+     virtual UniquePtr<EdgeRange> edges(JSContext* cx, bool wantNames) const = 0;
+ 

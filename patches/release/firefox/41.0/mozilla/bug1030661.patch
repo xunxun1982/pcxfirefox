@@ -1,0 +1,108 @@
+# HG changeset patch
+# User Tim Taubert <ttaubert@mozilla.com>
+# Date 1438174655 -7200
+#      Wed Jul 29 14:57:35 2015 +0200
+# Node ID e6ac0ea470ebc2613edc2e4c5ccda826eb885007
+# Parent  5c96cefd7eaccb195be26234e4bef95c1327231b
+Bug 1031661 - Apply correct zoom level to preloaded content like about:newtab r=dao
+
+diff --git a/browser/base/content/tabbrowser.xml b/browser/base/content/tabbrowser.xml
+--- a/browser/base/content/tabbrowser.xml
++++ b/browser/base/content/tabbrowser.xml
+@@ -563,26 +563,38 @@
+         ]]></body>
+       </method>
+ 
+       <!-- A web progress listener object definition for a given tab. -->
+       <method name="mTabProgressListener">
+         <parameter name="aTab"/>
+         <parameter name="aBrowser"/>
+         <parameter name="aStartsBlank"/>
++        <parameter name="aWasPreloadedBrowser"/>
+         <body>
+         <![CDATA[
++          let stateFlags = 0;
++          // Initialize mStateFlags to non-zero e.g. when creating a progress
++          // listener for preloaded browsers as there was no progress listener
++          // around when the content started loading. If the content didn't
++          // quite finish loading yet, mStateFlags will very soon be overridden
++          // with the correct value and end up at STATE_STOP again.
++          if (aWasPreloadedBrowser) {
++            stateFlags = Ci.nsIWebProgressListener.STATE_STOP |
++                         Ci.nsIWebProgressListener.STATE_IS_REQUEST;
++          }
++
+           return ({
+             mTabBrowser: this,
+             mTab: aTab,
+             mBrowser: aBrowser,
+             mBlank: aStartsBlank,
+ 
+             // cache flags for correct status UI update after tab switching
+-            mStateFlags: 0,
++            mStateFlags: stateFlags,
+             mStatus: 0,
+             mMessage: "",
+             mTotalProgress: 0,
+ 
+             // count of open requests (should always be 0 or 1)
+             mRequestCount: 0,
+ 
+             destroy: function () {
+@@ -1827,17 +1839,17 @@
+             } else if (aURI.toLowerCase().startsWith("javascript:")) {
+               // This can go away when bug 672618 or bug 55696 are fixed.
+               t.label = aURI;
+             }
+ 
+             this.tabContainer.updateVisibility();
+ 
+             // wire up a progress listener for the new browser object.
+-            var tabListener = this.mTabProgressListener(t, b, uriIsAboutBlank);
++            var tabListener = this.mTabProgressListener(t, b, uriIsAboutBlank, usingPreloadedContent);
+             const filter = Components.classes["@mozilla.org/appshell/component/browser-status-filter;1"]
+                                      .createInstance(Components.interfaces.nsIWebProgress);
+             filter.addProgressListener(tabListener, Components.interfaces.nsIWebProgress.NOTIFY_ALL);
+             b.webProgress.addProgressListener(filter, Components.interfaces.nsIWebProgress.NOTIFY_ALL);
+             this.mTabListeners[position] = tabListener;
+             this.mTabFilters[position] = filter;
+ 
+             b.droppedLinkHandler = handleDroppedLink;
+@@ -2539,17 +2551,17 @@
+ 
+             // Swap permanentKey properties.
+             let ourPermanentKey = ourBrowser.permanentKey;
+             ourBrowser.permanentKey = aOtherBrowser.permanentKey;
+             aOtherBrowser.permanentKey = ourPermanentKey;
+ 
+             // Restore the progress listener
+             this.mTabListeners[index] = tabListener =
+-              this.mTabProgressListener(aOurTab, ourBrowser, false);
++              this.mTabProgressListener(aOurTab, ourBrowser, false, false);
+ 
+             const notifyAll = Ci.nsIWebProgress.NOTIFY_ALL;
+             filter.addProgressListener(tabListener, notifyAll);
+             ourBrowser.webProgress.addProgressListener(filter, notifyAll);
+           ]]>
+         </body>
+       </method>
+ 
+@@ -4001,17 +4013,17 @@
+           this._autoScrollPopup = this.mCurrentBrowser._createAutoScrollPopup();
+           this._autoScrollPopup.id = "autoscroller";
+           this.appendChild(this._autoScrollPopup);
+           this.mCurrentBrowser.setAttribute("autoscrollpopup", this._autoScrollPopup.id);
+           this.mCurrentBrowser.droppedLinkHandler = handleDroppedLink;
+           this.updateWindowResizers();
+ 
+           // Hook up the event listeners to the first browser
+-          var tabListener = this.mTabProgressListener(this.mCurrentTab, this.mCurrentBrowser, true);
++          var tabListener = this.mTabProgressListener(this.mCurrentTab, this.mCurrentBrowser, true, false);
+           const nsIWebProgress = Components.interfaces.nsIWebProgress;
+           const filter = Components.classes["@mozilla.org/appshell/component/browser-status-filter;1"]
+                                    .createInstance(nsIWebProgress);
+           filter.addProgressListener(tabListener, nsIWebProgress.NOTIFY_ALL);
+           this.mTabListeners[0] = tabListener;
+           this.mTabFilters[0] = filter;
+           this.webProgress.addProgressListener(filter, nsIWebProgress.NOTIFY_ALL);
+ 

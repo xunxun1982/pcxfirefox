@@ -1,0 +1,37 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1411492683 -28800
+#      Wed Sep 24 01:18:03 2014 +0800
+# Branch MOBILE400b10_2015080313_RELBRANCH
+# Node ID c59fb7cdd933ff75062a8788898cf6e771dd014d
+# Parent  018f73380c05e1f80ab5bc084de033e406a951e5
+exit
+
+diff --git a/toolkit/xre/nsAppRunner.cpp b/toolkit/xre/nsAppRunner.cpp
+--- a/toolkit/xre/nsAppRunner.cpp
++++ b/toolkit/xre/nsAppRunner.cpp
+@@ -3403,23 +3403,17 @@ static void SetShutdownChecks() {
+   // Set default first. On debug builds we crash. On nightly and local
+   // builds we record. Nightlies will then send the info via telemetry,
+   // but it is usefull to have the data in about:telemetry in local builds
+   // too.
+ 
+ #ifdef DEBUG
+   gShutdownChecks = SCM_CRASH;
+ #else
+-  const char* releaseChannel = NS_STRINGIFY(MOZ_UPDATE_CHANNEL);
+-  if (strcmp(releaseChannel, "nightly") == 0 ||
+-      strcmp(releaseChannel, "default") == 0) {
+-    gShutdownChecks = SCM_RECORD;
+-  } else {
+-    gShutdownChecks = SCM_NOTHING;
+-  }
++  gShutdownChecks = SCM_NOTHING;
+ #endif
+ 
+   // We let an environment variable override the default so that addons
+   // authors can use it for debugging shutdown with released firefox versions.
+   const char* mozShutdownChecksEnv = PR_GetEnv("MOZ_SHUTDOWN_CHECKS");
+   if (mozShutdownChecksEnv) {
+     if (strcmp(mozShutdownChecksEnv, "crash") == 0) {
+       gShutdownChecks = SCM_CRASH;

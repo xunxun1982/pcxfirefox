@@ -1,0 +1,61 @@
+# HG changeset patch
+# User Milan Sreckovic <milan@mozilla.com>
+# Date 1448532000 -3600
+#      Thu Nov 26 11:00:00 2015 +0100
+# Branch GECKO4301_2015121620_RELBRANCH
+# Node ID 4fe9ed4ed5101b6a4ccac836cd1bbd3a7409c6a5
+# Parent  a15b759ce9dc287ce1e6343a721c2f50a518317c
+Bug 1228287 - Make sure we can't do SkiaGL without the pref set. r=benwa a=ritu
+
+diff --git a/dom/canvas/CanvasRenderingContext2D.cpp b/dom/canvas/CanvasRenderingContext2D.cpp
+--- a/dom/canvas/CanvasRenderingContext2D.cpp
++++ b/dom/canvas/CanvasRenderingContext2D.cpp
+@@ -1190,16 +1190,23 @@ CanvasRenderingContext2D::RedrawUser(con
+ 
+ bool CanvasRenderingContext2D::SwitchRenderingMode(RenderingMode aRenderingMode)
+ {
+   if (!IsTargetValid() || mRenderingMode == aRenderingMode) {
+     return false;
+   }
+ 
+ #ifdef USE_SKIA_GPU
++  // Do not attempt to switch into GL mode if the platform doesn't allow it.
++  if ((aRenderingMode == RenderingMode::OpenGLBackendMode) &&
++      (!gfxPlatform::GetPlatform()->HaveChoiceOfHWAndSWCanvas() ||
++       !gfxPlatform::GetPlatform()->UseAcceleratedSkiaCanvas())) {
++      return false;
++  }
++
+   if (mRenderingMode == RenderingMode::OpenGLBackendMode) {
+     if (mVideoTexture) {
+       gfxPlatform::GetPlatform()->GetSkiaGLGlue()->GetGLContext()->MakeCurrent();
+       gfxPlatform::GetPlatform()->GetSkiaGLGlue()->GetGLContext()->fDeleteTextures(1, &mVideoTexture);
+     }
+ 	  mCurrentVideoSize.width = 0;
+ 	  mCurrentVideoSize.height = 0;
+   }
+diff --git a/gfx/thebes/gfxPlatform.cpp b/gfx/thebes/gfxPlatform.cpp
+--- a/gfx/thebes/gfxPlatform.cpp
++++ b/gfx/thebes/gfxPlatform.cpp
+@@ -1173,16 +1173,21 @@ gfxPlatform::InitializeSkiaCacheLimits()
+ #endif
+   }
+ }
+ 
+ SkiaGLGlue*
+ gfxPlatform::GetSkiaGLGlue()
+ {
+ #ifdef USE_SKIA_GPU
++  if (!gfxPlatform::GetPlatform()->UseAcceleratedSkiaCanvas()) {
++    gfxCriticalNote << "Accelerated Skia canvas is disabled";
++    return nullptr;
++  }
++
+   if (!mSkiaGlue) {
+     /* Dummy context. We always draw into a FBO.
+      *
+      * FIXME: This should be stored in TLS or something, since there needs to be one for each thread using it. As it
+      * stands, this only works on the main thread.
+      */
+     nsRefPtr<GLContext> glContext;
+     glContext = GLContextProvider::CreateHeadless(CreateContextFlags::REQUIRE_COMPAT_PROFILE |

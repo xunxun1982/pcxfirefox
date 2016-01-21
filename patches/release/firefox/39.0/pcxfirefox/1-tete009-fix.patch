@@ -1,0 +1,20 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1434875940 -28800
+#      Sun Jun 21 16:39:00 2015 +0800
+# Node ID 0c9072a62eb0501c039bd12b09a4293e1279d21d
+# Parent  d159859fb52fc086cf22fb28257e7d0c0a9c3831
+tete009 fix
+
+diff -r d159859fb52f -r 0c9072a62eb0 js/src/jit/x86/MacroAssembler-x86.cpp
+--- a/js/src/jit/x86/MacroAssembler-x86.cpp	Sun Jun 21 14:44:25 2015 +0800
++++ b/js/src/jit/x86/MacroAssembler-x86.cpp	Sun Jun 21 16:39:00 2015 +0800
+@@ -471,7 +471,7 @@
+         if (!enoughMemory_)
+             return;
+ 
+-        MoveEmitter emitter(*this);
++        MoveEmitter emitter(asMasm());
+         emitter.emit(moveResolver_);
+         emitter.finish();
+     }

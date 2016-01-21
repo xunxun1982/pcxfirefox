@@ -1,0 +1,235 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1434793282 -28800
+#      Sat Jun 20 17:41:22 2015 +0800
+# Branch MOBILE400b10_2015080313_RELBRANCH
+# Node ID 040bb505d57d8b7a5e5cfae154053617cb5ac71c
+# Parent  4172c68d7c136379d07a458e93d5f505eb348713
+pcx-tweak
+
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -375,16 +375,20 @@ pref("browser.download.manager.resumeOnW
+ 
+ // This allows disabling the animated notifications shown by
+ // the Downloads Indicator when a download starts or completes.
+ pref("browser.download.animateNotifications", true);
+ 
+ // This records whether or not the panel has been shown at least once.
+ pref("browser.download.panel.shown", false);
+ 
++//pcxfirefox tweak
++pref("browser.download.manager.scanWhenDone", false);
++pref("browser.download.useDownloadDir", false);
++
+ #ifndef XP_MACOSX
+ pref("browser.helperApps.deleteTempFileOnExit", true);
+ #endif
+ 
+ // search engines URL
+ pref("browser.search.searchEnginesURL",      "https://addons.mozilla.org/%LOCALE%/firefox/search-engines/");
+ 
+ // Tell the search service to load search plugins from the locale JAR
+@@ -457,17 +461,17 @@ pref("browser.link.open_newwindow.restri
+ // different.
+ #ifdef XP_MACOSX
+ pref("browser.link.open_newwindow.disabled_in_fullscreen", true);
+ #else
+ pref("browser.link.open_newwindow.disabled_in_fullscreen", false);
+ #endif
+ 
+ // Tabbed browser
+-pref("browser.tabs.closeWindowWithLastTab", true);
++pref("browser.tabs.closeWindowWithLastTab", false);
+ pref("browser.tabs.insertRelatedAfterCurrent", true);
+ pref("browser.tabs.warnOnClose", true);
+ pref("browser.tabs.warnOnCloseOtherTabs", true);
+ pref("browser.tabs.warnOnOpen", true);
+ pref("browser.tabs.maxOpenBeforeWarn", 15);
+ pref("browser.tabs.loadInBackground", true);
+ pref("browser.tabs.opentabfor.middleclick", true);
+ pref("browser.tabs.loadDivertedInBackground", false);
+@@ -866,16 +870,66 @@ pref("plugin.state.libplugins", 2);
+ #ifdef XP_WIN
+ pref("plugin.state.npnipp", 2);
+ pref("plugin.state.npnisp", 2);
+ #endif
+ #ifdef XP_MACOSX
+ pref("plugin.state.iprint", 2);
+ #endif
+ 
++//pcx other tweak
++#ifdef XP_WIN
++//WMP
++pref("plugin.state.np-mswmp", 2);
++//Alipay
++pref("plugin.state.npaliedit", 2);
++pref("plugin.state.npalidcp", 2);
++pref("plugin.state.npalicdo", 2);
++pref("plugin.state.npalisecctrl", 2);
++pref("plugin.state.npalissologin", 2);
++//BOC
++pref("plugin.state.npseceditctl", 2);
++pref("plugin.state.npseceditctl.boc.x86", 2);
++//ICBC
++pref("plugin.state.npclcache", 2);
++pref("plugin.state.npclientbinding", 2);
++pref("plugin.state.npfullscreen", 2);
++pref("plugin.state.npsubmit", 2);
++pref("plugin.state.npxxin", 2);
++//CMB
++pref("plugin.state.npcmbedit", 2);
++//Tenpay
++pref("plugin.state.npqqcert", 2);
++pref("plugin.state.npqqedit", 2);
++//QQ Login
++pref("plugin.state.npssoaxctrlforptlogin", 2);
++//AliWangwang
++pref("plugin.state.npwangwang", 2);
++//SumatraPDF
++pref("plugin.state.nppdfviewer", 2);
++//Baiduyun upload
++pref("plugin.state.npuploader", 2);
++//360yun upload
++pref("plugin.state.npuploadplugin", 2);
++//115 upload
++pref("plugin.state.npuploadfile", 2);
++//QQ upload
++pref("plugin.state.nptxftnWebKit", 2);
++//CNTV
++pref("plugin.state.npcntvlive2", 2);
++//QzoneMusic
++pref("plugin.state.npqzonemusic", 2);
++//UnionPay
++pref("plugin.state.npupeditor2", 2);
++//JDEdit
++pref("plugin.state.npjdedit", 2);
++//Baifubao
++pref("plugin.state.npbaiedit", 2);
++#endif
++
+ #ifdef XP_MACOSX
+ pref("browser.preferences.animateFadeIn", true);
+ #else
+ pref("browser.preferences.animateFadeIn", false);
+ #endif
+ 
+ #ifdef XP_WIN
+ pref("browser.preferences.instantApply", false);
+@@ -984,18 +1038,18 @@ pref("gecko.handlerService.schemes.ircs.
+ pref("gecko.handlerService.schemes.ircs.3.uriTemplate", "chrome://browser-region/locale/region.properties");
+ 
+ // By default, we don't want protocol/content handlers to be registered from a different host, see bug 402287
+ pref("gecko.handlerService.allowRegisterFromDifferentHost", false);
+ 
+ #ifdef MOZ_SAFE_BROWSING
+ pref("browser.safebrowsing.enabled", true);
+ pref("browser.safebrowsing.malware.enabled", true);
+-pref("browser.safebrowsing.downloads.enabled", true);
+-pref("browser.safebrowsing.downloads.remote.enabled", true);
++pref("browser.safebrowsing.downloads.enabled", false);
++pref("browser.safebrowsing.downloads.remote.enabled", false);
+ pref("browser.safebrowsing.debug", false);
+ 
+ pref("browser.safebrowsing.updateURL", "https://safebrowsing.google.com/safebrowsing/downloads?client=SAFEBROWSING_ID&appver=%VERSION%&pver=2.2&key=%GOOGLE_API_KEY%");
+ pref("browser.safebrowsing.gethashURL", "https://safebrowsing.google.com/safebrowsing/gethash?client=SAFEBROWSING_ID&appver=%VERSION%&pver=2.2");
+ pref("browser.safebrowsing.reportURL", "https://safebrowsing.google.com/safebrowsing/report?");
+ pref("browser.safebrowsing.reportGenericURL", "http://%LOCALE%.phish-generic.mozilla.com/?hl=%LOCALE%");
+ pref("browser.safebrowsing.reportErrorURL", "http://%LOCALE%.phish-error.mozilla.com/?hl=%LOCALE%");
+ pref("browser.safebrowsing.reportPhishURL", "http://%LOCALE%.phish-report.mozilla.com/?hl=%LOCALE%");
+@@ -1015,17 +1069,17 @@ pref("browser.safebrowsing.id", "navclie
+ // Name of the about: page contributed by safebrowsing to handle display of error
+ // pages on phishing/malware hits.  (bug 399233)
+ pref("urlclassifier.alternate_error_page", "blocked");
+ 
+ // The number of random entries to send with a gethash request.
+ pref("urlclassifier.gethashnoise", 4);
+ 
+ // Gethash timeout for Safebrowsing.
+-pref("urlclassifier.gethash.timeout_ms", 5000);
++pref("urlclassifier.gethash.timeout_ms", 200);
+ 
+ // If an urlclassifier table has not been updated in this number of seconds,
+ // a gethash request will be forced to check that the result is still in
+ // the database.
+ pref("urlclassifier.max-complete-age", 2700);
+ // Tables for application reputation.
+ pref("urlclassifier.downloadBlockTable", "goog-badbinurl-shavar");
+ #ifdef XP_WIN
+@@ -1871,16 +1925,22 @@ pref("experiments.manifest.uri", "https:
+ // Whether experiments are supported by the current application profile.
+ pref("experiments.supported", true);
+ 
+ // Enable GMP support in the addon manager.
+ pref("media.gmp-provider.enabled", true);
+ 
+ pref("browser.apps.URL", "https://marketplace.firefox.com/discovery/");
+ 
++//pcxfirefox tweak
++pref("config.trim_on_minimize", false);
++pref("datareporting.healthreport.uploadEnabled", false);
++pref("datareporting.healthreport.logging.consoleEnabled", false);
++pref("datareporting.policy.dataSubmissionEnabled", false);
++
+ #ifdef NIGHTLY_BUILD
+ pref("browser.polaris.enabled", false);
+ pref("privacy.trackingprotection.ui.enabled", false);
+ #endif
+ 
+ #ifdef NIGHTLY_BUILD
+ // At the moment, autostart.2 is used, while autostart.1 is unused.
+ // We leave it here set to false to reset users' defaults and allow
+diff --git a/browser/branding/official/pref/firefox-branding.js b/browser/branding/official/pref/firefox-branding.js
+--- a/browser/branding/official/pref/firefox-branding.js
++++ b/browser/branding/official/pref/firefox-branding.js
+@@ -20,9 +20,25 @@ pref("app.update.url.details", "https://
+ 
+ // The number of days a binary is permitted to be old
+ // without checking for an update.  This assumes that
+ // app.update.checkInstallTime is true.
+ pref("app.update.checkInstallTime.days", 63);
+ 
+ // Number of usages of the web console or scratchpad.
+ // If this is less than 5, then pasting code into the web console or scratchpad is disabled
+-pref("devtools.selfxss.count", 0);
+\ No newline at end of file
++pref("devtools.selfxss.count", 0);
++
++//pcxfirefox tweak
++//browser
++pref("browser.download.manager.scanWhenDone", false);
++pref("browser.download.useDownloadDir", false);
++pref("browser.tabs.closeWindowWithLastTab", false);
++//dom
++pref("dom.popup_maximum", 5);
++//datareporting
++pref("datareporting.healthreport.uploadEnabled", false);
++pref("datareporting.healthreport.logging.consoleEnabled", false);
++pref("datareporting.policy.dataSubmissionEnabled", false);
++//special
++pref("pdfjs.disabled", false);
++pref("config.trim_on_minimize", false);
++pref("plugin.expose_full_path", true);
+diff --git a/modules/libpref/init/all.js b/modules/libpref/init/all.js
+--- a/modules/libpref/init/all.js
++++ b/modules/libpref/init/all.js
+@@ -992,17 +992,17 @@ pref("dom.disable_window_open_feature.me
+ pref("dom.disable_window_open_feature.scrollbars",  false);
+ pref("dom.disable_window_open_feature.resizable",   true);
+ pref("dom.disable_window_open_feature.minimizable", false);
+ pref("dom.disable_window_open_feature.status",      true);
+ 
+ pref("dom.allow_scripts_to_close_windows",          false);
+ 
+ pref("dom.disable_open_during_load",                false);
+-pref("dom.popup_maximum",                           20);
++pref("dom.popup_maximum",                           5);
+ pref("dom.popup_allowed_events", "change click dblclick mouseup reset submit touchend");
+ pref("dom.disable_open_click_delay", 1000);
+ 
+ pref("dom.storage.enabled", true);
+ pref("dom.storage.default_quota",      5120);
+ 
+ pref("dom.send_after_paint_to_content", false);
+ 

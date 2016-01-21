@@ -1,0 +1,41 @@
+# HG changeset patch
+# User xunxun1982
+# Date 1411493179 -28800
+#      Wed Sep 24 01:26:19 2014 +0800
+# Branch MOBILE400b10_2015080313_RELBRANCH
+# Node ID 042c78bbd566f859e91efaef1991adce754e8f41
+# Parent  3d4fc029d28ac5e729e4ed0acc022f42a8e5d4c7
+libffi-better
+
+diff --git a/build/autoconf/ffi.m4 b/build/autoconf/ffi.m4
+--- a/build/autoconf/ffi.m4
++++ b/build/autoconf/ffi.m4
+@@ -55,22 +55,26 @@ if test -z "$BUILDING_JS" -o -n "$JS_STA
+       if test -n "$CLANG_CL"; then
+         flags="$flags -clang-cl"
+       fi
+       case "${target_cpu}" in
+       x86_64)
+         # Need target since MSYS tools into mozilla-build may be 32bit
+         ac_configure_args="$ac_configure_args \
+                            CC=\"$_topsrcdir/js/src/ctypes/libffi/msvcc.sh -m64$flags\" \
+-                           CXX=\"$_topsrcdir/js/src/ctypes/libffi/msvcc.sh -m64$flags\""
++                           CFLAGS=\"$MOZ_OPTIMIZE_FLAGS -fp:precise -Qfast_transcendentals -GL-\" \
++                           CXX=\"$_topsrcdir/js/src/ctypes/libffi/msvcc.sh -m64$flags\" \
++                           CXXFLAGS=\"$MOZ_OPTIMIZE_FLAGS -fp:precise -Qfast_transcendentals -GL-\""
+         ;;
+       *)
+         ac_configure_args="$ac_configure_args \
+                            CC=\"$_topsrcdir/js/src/ctypes/libffi/msvcc.sh$flags\" \
+-                           CXX=\"$_topsrcdir/js/src/ctypes/libffi/msvcc.sh$flags\""
++                           CFLAGS=\"$MOZ_OPTIMIZE_FLAGS -fp:precise -Qfast_transcendentals -GL-\" \
++                           CXX=\"$_topsrcdir/js/src/ctypes/libffi/msvcc.sh$flags\" \
++                           CXXFLAGS=\"$MOZ_OPTIMIZE_FLAGS -fp:precise -Qfast_transcendentals -GL-\""
+         ;;
+       esac
+     fi
+     if test "$SOLARIS_SUNPRO_CC"; then
+       # Always use gcc for libffi on Solaris
+       if test ! "$HAVE_64BIT_BUILD"; then
+         ac_configure_args="$ac_configure_args CC=gcc CFLAGS=-m32 LD= LDFLAGS="
+       else

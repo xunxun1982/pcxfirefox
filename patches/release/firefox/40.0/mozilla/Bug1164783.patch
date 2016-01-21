@@ -1,0 +1,205 @@
+# HG changeset patch
+# User xunxun1982@gmail.com
+# Date 1434785332 -28800
+#      Sat Jun 20 15:28:52 2015 +0800
+# Branch MOBILE400b10_2015080313_RELBRANCH
+# Node ID 6cbb6dd57198e445010459d78289db57592f671a
+# Parent  00be55eb3b858d998ea72b66148bd238fe3d0d7f
+Bug 1164783 - <input type="search"> doesn't have border-box box-sizing
+
+diff --git a/layout/style/forms.css b/layout/style/forms.css
+--- a/layout/style/forms.css
++++ b/layout/style/forms.css
+@@ -1,16 +1,16 @@
+ /* This Source Code Form is subject to the terms of the Mozilla Public
+  * License, v. 2.0. If a copy of the MPL was not distributed with this
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+-/** 
++/**
+   Styles for old GFX form widgets
+- **/ 
+- 
++ **/
++
+ 
+ @namespace url(http://www.w3.org/1999/xhtml); /* set default namespace to HTML */
+ @namespace xul url(http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul);
+ 
+ *|*::-moz-fieldset-content {
+   display: block;
+   unicode-bidi: inherit;
+   text-overflow: inherit;
+@@ -43,17 +43,17 @@ fieldset {
+ }
+ 
+ label {
+   cursor: default;
+ }
+ 
+ /* default inputs, text inputs, and selects */
+ 
+-/* Note: Values in nsNativeTheme IsWidgetStyled function 
++/* Note: Values in nsNativeTheme IsWidgetStyled function
+    need to match textfield background/border values here */
+ 
+ input {
+   -moz-appearance: textfield;
+   /* The sum of border and padding on block-start and block-end
+      must be the same here, for buttons, and for <select> (including its
+      internal padding magic) */
+   padding: 1px;
+@@ -202,17 +202,17 @@ select {
+    * Note that the "UA !important" tests in
+    * layout/style/test/test_animations.html depend on this rule, because
+    * they need some UA !important rule to test.  If this changes, use a
+    * different one there.
+    */
+   line-height: normal !important;
+   white-space: nowrap !important;
+   word-wrap: normal !important;
+-  text-align: start; 
++  text-align: start;
+   cursor: default;
+   box-sizing: border-box;
+   -moz-user-select: none;
+   -moz-appearance: menulist;
+   border-width: 2px;
+   border-style: inset;
+   text-indent: 0;
+   overflow: -moz-hidden-unscrollable;
+@@ -220,17 +220,17 @@ select {
+   /* No text-decoration reaching inside, by default */
+   display: inline-block;
+   page-break-inside: avoid;
+   overflow-clip-box: padding-box !important; /* bug 992447 */
+ }
+ 
+ /* Need the "select[size][multiple]" selector to override the settings on
+    'select[size="1"]', eg if one has <select size="1" multiple> */
+-   
++
+ select[size],
+ select[multiple],
+ select[size][multiple] {
+   /* Different alignment and padding for listbox vs combobox */
+   background-color: -moz-Field;
+   color: -moz-FieldText;
+   vertical-align: text-bottom;
+   padding-block-start: 1px;
+@@ -277,17 +277,17 @@ select > button:active {
+ 
+ select:empty {
+   inline-size: 2.5em;
+ }
+ 
+ *|*::-moz-display-comboboxcontrol-frame {
+   overflow: -moz-hidden-unscrollable;
+   /* This block-start/end padding plus the combobox block-start/end border need to
+-     add up to the block-start/end borderpadding of text inputs and buttons */ 
++     add up to the block-start/end borderpadding of text inputs and buttons */
+   padding-block-start: 1px;
+   padding-block-end: 1px;
+   -moz-padding-start: 4px;
+   -moz-padding-end: 0;
+   color: inherit;
+   white-space: nowrap;
+   text-align: inherit;
+   -moz-user-select: none;
+@@ -365,17 +365,17 @@ optgroup:before {
+    * We can't change the padding here, because that would affect our
+    * intrinsic inline-size, since we scroll.  But at the same time, we want
+    * to make sure that our inline-start border+padding matches the inline-start
+    * border+padding of a combobox so that our scrollbar will line up
+    * with the dropmarker.  So set our inline-start border to 2px.
+    */
+   border: 1px outset black !important;
+   -moz-border-start-width: 2px ! important;
+-} 
++}
+ 
+ input:disabled,
+ textarea:disabled,
+ option:disabled,
+ optgroup:disabled,
+ select:disabled:disabled /* Need the pseudo-class twice to have the specificity
+                             be at least the same as select[size][multiple] above */
+ {
+@@ -539,33 +539,37 @@ input[type="checkbox"]:disabled,
+ input[type="checkbox"]:disabled:active,
+ input[type="checkbox"]:disabled:hover,
+ input[type="checkbox"]:disabled:hover:active {
+   padding: 1px;
+   border: 1px inset ThreeDShadow ! important;
+   /* same as above, but !important */
+   color: GrayText ! important;
+   background-color: ThreeDFace ! important;
+-  cursor: inherit; 
++  cursor: inherit;
+ }
+ 
+ input[type="checkbox"]:-moz-focusring,
+ input[type="radio"]:-moz-focusring {
+   border-style: groove !important;
+ }
+ 
+ input[type="checkbox"]:hover:active,
+ input[type="radio"]:hover:active {
+   background-color: ThreeDFace ! important;
+   border-style: inset !important;
+ }
+ 
++input[type="search"] {
++  box-sizing: border-box;
++}
++
+ /* buttons */
+ 
+-/* Note: Values in nsNativeTheme IsWidgetStyled function 
++/* Note: Values in nsNativeTheme IsWidgetStyled function
+    need to match button background/border values here */
+ 
+ /* Non text-related properties for buttons: these ones are shared with
+    input[type="color"] */
+ button,
+ input[type="color"]:-moz-system-metric(color-picker-available),
+ input[type="reset"],
+ input[type="button"],
+@@ -587,17 +591,17 @@ input[type="submit"] {
+ }
+ 
+ /* Text-related properties for buttons: these ones are not shared with
+    input[type="color"] */
+ button,
+ input[type="reset"],
+ input[type="button"],
+ input[type="submit"] {
+-  color: ButtonText; 
++  color: ButtonText;
+   font: -moz-button;
+   line-height: normal;
+   white-space: pre;
+   text-align: center;
+   text-shadow: none;
+   overflow-clip-box: padding-box;
+ }
+ 
+@@ -688,17 +692,17 @@ input[type="submit"]:disabled:active,
+ input[type="submit"]:disabled {
+   /* The sum of border and padding on block-start and block-end
+      must be the same here and for text inputs */
+   padding-block-start: 0px;
+   -moz-padding-end: 6px;
+   padding-block-end: 0px;
+   -moz-padding-start: 6px;
+   border: 2px outset ButtonFace;
+-  cursor: inherit; 
++  cursor: inherit;
+ }
+ 
+ button:disabled:active, button:disabled,
+ input[type="reset"]:disabled:active,
+ input[type="reset"]:disabled,
+ input[type="button"]:disabled:active,
+ input[type="button"]:disabled,
+ select:disabled > button,
