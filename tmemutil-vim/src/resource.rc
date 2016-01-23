@@ -1,0 +1,35 @@
+#ifndef _APP_RES_INVOKED_
+#define _APP_RES_INVOKED_
+
+#ifndef _MAC
+
+// Version
+
+1 VERSIONINFO
+FILEVERSION     0,1,0,0
+PRODUCTVERSION  0,1,0,0
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "080904E4"
+    BEGIN
+      VALUE "CompanyName", "ZH_CN NetWork\0"
+      VALUE "FileDescription", "Memory Utility and Portable DLL for Mozilla Products -- Modified for Vimperator and Pentadactyl Extensions\0"
+      VALUE "FileVersion", "0.1.0.0"
+      VALUE "InternalName", "tmemutil\0"
+      VALUE "LegalCopyright", " Copyright (C) 2013-2014 adonais & pcxfirefox\0"
+      VALUE "OriginalFilename", "tmemutil.dll\0"
+      VALUE "ProductName", "tmemutil.dll"
+      VALUE "ProductVersion", "0.1.0.0"
+    END
+  END
+
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x809, 1252
+  END
+END
+
+#endif    // !_MAC
+
+#endif    // _APP_RES_INVOKED_
