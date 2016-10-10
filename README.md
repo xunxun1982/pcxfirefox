@@ -1,6 +1,11 @@
 pcxfirefox
 ==========
 
-Full edition: http://forums.mozillazine.org/viewtopic.php?f=42&t=2531117
+Full edition
+------------
+Download: https://sourceforge.net/projects/pcxfirefox/ <br>
+Blog: https://pcxfirefox.wordpress.com/
 
-Mini edition: http://forums.mozillazine.org/viewtopic.php?f=42&t=2802509
+Mini edition:
+Download: https://sourceforge.net/projects/pcxfirefoxmini/ <br>
+Reasoning: http://forums.mozillazine.org/viewtopic.php?f=42&t=2802509
